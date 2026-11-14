@@ -130,7 +130,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `npm install -D vitest`. Script `"test": "vitest run"`. Config: `environment: "node"`, `include: ["src/**/*.test.ts"]`. Tests import pure modules from `src/lib` only (no WebGL, no DOM).
   - **Verify:** `npm test` runs and reports 0 tests or a trivial passing test.
 
-- [ ] **21. Tests: map projection** (S) — Depends on 20
+- [x] **21. Tests: map projection** (S) — Depends on 20
   - **Files:** new `src/lib/astro.test.ts`.
   - **Spec:** for `(lat, lon)` in `{(-89.9, 0), (-89.5, 45), (-85, -120), (-80, 179.9), (-75, -179.9)}`: `toLatLon(...toMap(lat, lon))` equals the input within 1e-6° (compare lon modulo 360). Also `toMap(-90, any)` is `[0, 0]` within 1e-6 m.
   - **Verify:** `npm test` green.
