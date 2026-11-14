@@ -846,6 +846,13 @@ export class MoonScene {
     window.addEventListener("blur", () => this.keys.clear());
   }
 
+  /** Holds or releases R / F (camera up / down) as if the key were pressed, for on-screen buttons. */
+  setHeld(key: "r" | "f", down: boolean) {
+    if (down) this.keys.add(key);
+    else this.keys.delete(key);
+    this.dirty = true;
+  }
+
   private diveTo(p: THREE.Vector3) {
     const up = p.clone().sub(MOON_CENTER).normalize();
     const back = this.camera.position.clone().sub(p).projectOnPlane(up);
