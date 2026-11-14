@@ -250,3 +250,8 @@ button { font: inherit; color: inherit; }
 .tour-text { font-size: 12.5px; line-height: 1.55; color: var(--text); }
 .tour-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
 .chip.tour-btn { color: #c7cfff; border-color: rgba(139,156,255,0.4); }
+.contacts { font-size: 11.5px; }
+.contacts-sum { color: var(--link); font-family: var(--mono); font-size: 11px; margin-bottom: 4px; }
+.contact-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.contact-row .c-station { color: var(--text); }
+.contact-row .c-time, .contact-row .c-dur { font-family: var(--mono); color: var(--muted); font-size: 10.5px; }

@@ -4,6 +4,8 @@ import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
 import { siteThermal, type SiteThermal } from "../lib/siteThermal";
+import { contactWindows } from "../lib/contacts";
+import { formatUtc, hourToDate } from "../state/store";
 import { formatDuration, useApp } from "../state/store";
 import { useSelectedSite, useSeries, useSiteState } from "../state/selectors";
 
@@ -49,6 +51,8 @@ export default function SitePanel() {
   const thermStart = Math.floor(hourBucket / 720) * 720;
   const therm = useMemo(() => siteThermal(data.ephem, site, thermStart, 24 * 395), [data, site, thermStart]);
   const tNow = therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))];
+
+  const contacts = useMemo(() => contactWindows(data.ephem, series, hourBucket, 24 * 7), [data, series, hourBucket]);
 
   const sunUp = st.sunFraction >= 0.5;
   const bestStation = st.dsn.reduce((b, v, i) => (v > st.dsn[b] ? i : b), 0);
@@ -121,6 +125,22 @@ export default function SitePanel() {
         <dt>Longest night</dt>
         <dd>{formatDuration(yearStats.night)}</dd>
       </dl>
+
+      <div className="section-label" style={{ margin: "16px 0 6px" }}>Contact with Earth, next 7 days</div>
+      <div className="contacts">
+        <div className="contacts-sum">
+          {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} passes
+        </div>
+        {contacts.windows.length === 0 && <div className="f-hint">Earth stays below this site's horizon all week: a relay satellite would be needed.</div>}
+        {contacts.windows.slice(0, 7).map((w) => (
+          <div key={`${w.station}-${w.start}`} className="contact-row">
+            <span className="c-station">{w.station}</span>
+            <span className="c-time">{formatUtc(hourToDate(data, w.start)).slice(5)}</span>
+            <span className="c-dur">{formatDuration(w.end - w.start)}</span>
+          </div>
+        ))}
+        {contacts.windows.length > 7 && <div className="f-hint">+{contacts.windows.length - 7} more</div>}
+      </div>
 
       <div className="section-label" style={{ margin: "16px 0 6px" }}>Ground temperature</div>
       <dl className="kv">
