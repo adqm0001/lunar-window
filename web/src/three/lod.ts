@@ -460,6 +460,35 @@ ${PROCEDURAL_GLSL}
 ${TILE_CACHE_GLSL}
 
 float hashf(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float h3(ivec3 c) { return float(pcg3(c.x, c.y, c.z) & 0xffffu) / 65535.0; }
+
+float vnoise3(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  ivec3 c = ivec3(i);
+  float a = mix(h3(c), h3(c + ivec3(1, 0, 0)), f.x);
+  float b = mix(h3(c + ivec3(0, 1, 0)), h3(c + ivec3(1, 1, 0)), f.x);
+  float d = mix(h3(c + ivec3(0, 0, 1)), h3(c + ivec3(1, 0, 1)), f.x);
+  float e = mix(h3(c + ivec3(0, 1, 1)), h3(c + ivec3(1, 1, 1)), f.x);
+  return mix(mix(a, b, f.y), mix(d, e, f.y), f.z);
+}
+
+// Fine brightness variation of the regolith below the color map's ~1.3 km pixels.
+// Octaves smaller than a few screen pixels fade out so it never shimmers.
+float mottle(vec3 p, float footprint) {
+  float s = 0.0;
+  float wl = 6.0;
+  float amp = 0.11;
+  for (int o = 0; o < 5; o++) {
+    float fade = smoothstep(footprint * 3.0, footprint * 9.0, wl);
+    s += (vnoise3(p / wl + float(o) * 17.3) - 0.5) * 2.0 * amp * fade;
+    wl *= 0.42;
+    amp *= 0.8;
+  }
+  return s;
+}
+
 float vnoise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(hashf(i), hashf(i + vec2(1, 0)), u.x), mix(hashf(i + vec2(0, 1)), hashf(i + vec2(1, 1)), u.x), u.y);
@@ -594,7 +623,8 @@ void main() {
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
   vec3 albedo = mix(mapAlbedo, polarAlbedo, polarW);
   albedo *= 0.92 + 0.16 * vnoise(vec2(lon, lat) * 3.0);
-  albedo *= 1.0 + 0.55 * halo;
+  albedo *= 1.0 + 0.32 * halo;
+  if (camDist < 150.0) albedo *= 1.0 + mottle(u * R_KM, footprint) * (1.0 - smoothstep(90.0, 150.0, camDist));
 
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);

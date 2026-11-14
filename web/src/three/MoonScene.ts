@@ -64,6 +64,7 @@ export class MoonScene {
   private keys = new Set<string>();
   private dragging = false;
   private upDirty = false;
+  private sunGain = 1;
   private quality: Quality = "balanced";
   private bloom!: UnrealBloomPass;
   private cutaway = new Cutaway();
@@ -467,6 +468,28 @@ export class MoonScene {
     }
   }
 
+  // Like an eye or camera adapting: the polar look is tuned for a grazing Sun, so where the Sun
+  // is high the sunlight gain is lowered to keep detail instead of blowing out to white.
+  private autoExposure(dt: number): boolean {
+    const sun = this.sunDir;
+    const camRel = this.camera.position.clone().sub(MOON_CENTER);
+    const alt = camRel.length() - R_MOON_KM;
+    const focus = this.orbitMode ? camRel.normalize() : this.controls.target.clone().sub(MOON_CENTER).normalize();
+    const local = Math.max(focus.dot(sun), 0.16);
+    const surfaceGain = Math.pow(0.16 / local, 0.8);
+    const ang = Math.acos(Math.max(-1, Math.min(1, camRel.normalize().dot(sun))));
+    const brightestVisible = ang < Math.PI / 2 ? 1 : Math.cos(ang - Math.PI / 2);
+    const diskGain = Math.pow(0.16 / Math.max(brightestVisible, 0.16), 0.55);
+    const w = Math.min(1, Math.max(0, (alt - 150) / 1200));
+    const target = surfaceGain + (diskGain - surfaceGain) * w;
+    const next = this.sunGain + (target - this.sunGain) * Math.min(1, dt * 2.5);
+    const changed = Math.abs(next - this.sunGain) > 0.0015;
+    this.sunGain = Math.abs(target - next) < 0.0015 ? target : next;
+    const power = 10.5 * this.sunGain;
+    for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) m.uniforms.uSunPower.value = power;
+    return changed;
+  }
+
   private keepAboveGround(): boolean {
     const rel = this.camera.position.clone().sub(MOON_CENTER);
     const d = rel.length();
@@ -626,6 +649,7 @@ export class MoonScene {
       if (this.keepAboveGround()) this.dirty = true;
     }
     this.updateDepthAndSky();
+    if (this.autoExposure(dt)) this.dirty = true;
     if (this.lod?.update(this.camera)) this.dirty = true;
     if (!this.dirty) return;
     const fps = this.quality === "saver" ? 30 : this.quality === "balanced" ? 60 : 0;
