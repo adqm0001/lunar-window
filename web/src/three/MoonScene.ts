@@ -313,8 +313,7 @@ export class MoonScene {
   setSites(sites: Site[]) {
     this.dirty = true;
     this.lastSites = sites;
-    this.labelObjs = this.labelObjs.filter((o) => !this.beaconLabel(o));
-    for (const b of this.beacons.values()) this.scene.remove(b.group);
+    for (const b of this.beacons.values()) this.dropGroup(b.group);
     this.beacons.clear();
     for (const s of sites) {
       const p = this.sitePosition(s);
@@ -711,8 +710,20 @@ export class MoonScene {
     this.lod?.material.uniforms.uHole.value.set(cx, cy, e);
   }
 
-  private beaconLabel(o: CSS2DObject) {
-    return (o.element as HTMLElement).classList.contains("site-label");
+  // Removing a parent group does not delete child label elements from the page, so do it by hand.
+  private dropGroup(group: THREE.Object3D) {
+    group.removeFromParent();
+    const gone = new Set<CSS2DObject>();
+    group.traverse((o) => {
+      if (o instanceof CSS2DObject) {
+        o.element.remove();
+        gone.add(o);
+      } else if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
+        o.geometry.dispose();
+        (o.material as THREE.Material).dispose();
+      }
+    });
+    if (gone.size) this.labelObjs = this.labelObjs.filter((o) => !gone.has(o));
   }
 
   private hideOccludedLabels() {
@@ -778,7 +789,7 @@ export class MoonScene {
       this.pendingRegions = regions;
       return;
     }
-    this.scene.remove(this.regionGroup);
+    this.dropGroup(this.regionGroup);
     this.regionGroup = new THREE.Group();
     const g = this.globe;
     for (const r of regions) {
