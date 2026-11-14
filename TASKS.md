@@ -1,286 +1,95 @@
 # Tasks
 
-Everything that's left, written so you can pick one up without asking anyone.
+Small, separate pieces of work. Each one should take an hour or two.
 
-**How to take a task:** put your name in the **Owner** line in a quick pull request (or tell the team chat), make a branch named after the task (for example `t04-unit-tests`), and open a pull request when it's done. Read the [README](README.md) first for how to run the app.
+**To take one:** add your name at the end of the line (`— taken: yourname`) in a quick commit or pull request, so nobody doubles up. Work on a branch named after the number (for example `task-14`), then open a pull request. When it's merged, tick the box.
 
-**Sizes:** S = an hour or two · M = an afternoon · L = a day or more.
-
-| # | Task | Area | Size | Owner |
-|---|---|---|---|---|
-| 1 | [Demo video](#1-demo-video) | Submission | M | |
-| 2 | [Slides](#2-slides) | Submission | M | |
-| 3 | [Test on other devices](#3-test-on-other-devices) | Submission | S | |
-| 4 | [Unit tests](#4-unit-tests) | Engineering | M | |
-| 5 | [Split the JavaScript bundle](#5-split-the-javascript-bundle) | Engineering | S | |
-| 6 | [Move heavy work to a Web Worker](#6-move-heavy-work-to-a-web-worker) | Engineering | M | |
-| 7 | [Smaller polar terrain file](#7-smaller-polar-terrain-file) | Engineering | M | |
-| 8 | [Touch controls on phones](#8-touch-controls-on-phones) | Engineering | M | |
-| 9 | [Accessibility pass](#9-accessibility-pass) | Engineering | M | |
-| 10 | [Bounced light in the thermal model](#10-bounced-light-in-the-thermal-model) | Science | L | |
-| 11 | [Extend the ephemeris past 2028](#11-extend-the-ephemeris-past-2028) | Science | S | |
-| 12 | [Communications link budget](#12-communications-link-budget) | Science | M | |
-| 13 | [Sharper horizons around key sites](#13-sharper-horizons-around-key-sites) | Science | L | |
-| 14 | [North pole detail](#14-north-pole-detail) | Science | L | |
-| 15 | [Lander shadow](#15-lander-shadow) | Features | M | |
-| 16 | [Split-screen compare](#16-split-screen-compare) | Features | L | |
-| 17 | [Replay a real landing](#17-replay-a-real-landing) | Features | M | |
-| 18 | [VR mode](#18-vr-mode) | Features | L | |
+Status key: `[ ]` open · `[x]` done. See the [README](README.md) for how to run the app.
 
 ---
 
-## Submission
-
-### 1. Demo video
-
-**Why:** Judges often watch the video before they open the app. It has to show the problem and the most impressive parts in two to three minutes.
-
-**How:**
-1. Open the live app and press **● Rec** in the timeline. It records the 3D view (not the side panels) to a `.webm` file and starts time playing. Press it again to stop and save.
-2. Suggested shots, in order:
-   - Whole Moon slowly turning (drag), then fly to the south pole.
-   - Shadows sweeping across the pole with time playing at 6 h/s.
-   - **Sun %** layer over 1 year, then **❄ Ice**, then **Temp**.
-   - **★ Find landing spot**: run a search, click the top result.
-   - **⛟ Rover route**: plan Connecting ridge B → Shackleton ridge A, press Replay.
-   - **♥ Lander sim** → "See the lander on the ground".
-   - **🏁 Artemis III report** and the **✓ Validation** window (screen capture for these, since Rec only captures 3D).
-3. Use a screen recorder (OBS, or Win+G on Windows) for the panel parts, then cut everything together with a voice-over. Keep it under 3 minutes.
-
-**Done when:** a video under 3 minutes is uploaded and linked from the NASA project page.
-
-### 2. Slides
-
-**Why:** Needed for judging and any live presentation.
-
-**How:** About 7 slides:
-1. Problem: the polar Sun is 1.6° high, shadows move, landers freeze, Earth hides.
-2. What Lunar Window is (one screenshot, one sentence).
-3. Three feature screenshots (use `docs/`).
-4. How it works (the diagram in the README).
-5. Validation numbers (README table).
-6. Who it helps: mission planners, students, the public.
-7. Team and links.
-
-**Done when:** slides are exported to PDF and linked from the project page.
-
-### 3. Test on other devices
-
-**Why:** Everything was built and tested on one Windows desktop with an RTX 2060 Super. Judges will use whatever they have.
-
-**How:** Open https://adqm0001.github.io/lunar-window/ on each device you can find and go through this checklist:
-- [ ] Laptop with integrated graphics (Intel or AMD): is it smooth? Try the **Saver** power setting.
-- [ ] Mac with Safari
-- [ ] Firefox
-- [ ] Android phone and iPhone
-- [ ] Slow Wi-Fi: how long until the Moon appears?
-- [ ] The guided tour from start to finish
-- [ ] Each layer, and each button in the layer bar
-
-Write down the device, browser and anything broken or slow. Open a GitHub issue for each problem with a screenshot.
-
-**Done when:** at least four device/browser combinations are checked and their problems are filed as issues.
-
----
-
-## Engineering
-
-### 4. Unit tests
-
-**Why:** There are no automated tests. The math is validated by hand, and nothing stops a change from silently breaking it.
-
-**Where:** `web/src/lib/astro.ts`, `web/src/lib/siteThermal.ts`, `web/src/lib/rover.ts`, `web/src/lib/visibility.ts`
-
-**How:**
-1. `cd web && npm install -D vitest`, then add `"test": "vitest run"` to `package.json` scripts.
-2. Tests to write (in `web/src/lib/*.test.ts`):
-   - `toMap` then `toLatLon` returns the original latitude and longitude (to 1e-6°) for several points near the pole.
-   - `discFraction(0)` is 0.5, `discFraction(1)` is 1, `discFraction(-1)` is 0.
-   - `horizonAt` interpolates between neighbouring directions and wraps at 360°.
-   - `planRoute` on a tiny hand-made grid (5 × 5 cells, everything sunlit) finds the straight path; with a shadow wall it waits or goes around.
-   - `siteThermal` at the Apollo 11 site gives a maximum between 370 and 400 K and a minimum between 80 and 100 K. Loading the ephemeris in a test needs a small helper that reads `public/data/ephem.bin` from disk.
-3. Add a step running `npm test` to `.github/workflows/pages.yml` before the build, so broken math blocks the deploy.
-
-**Done when:** `npm test` passes locally and in GitHub Actions.
-
-### 5. Split the JavaScript bundle
-
-**Why:** The app ships one 880 KB JavaScript file. Panels most people never open are downloaded up front.
-
-**Where:** `web/src/App.tsx`, `web/src/components/LayerControls.tsx`, `web/vite.config.ts`
-
-**How:**
-1. Load rarely used panels with `React.lazy` and `Suspense`: `LanderPanel`, `FinderPanel`, `RoverPanel`, `PorkchopPanel`, `ComparePanel`, `RegionReport`, `ValidationPanel`, `SkylinePanel`.
-2. In `vite.config.ts`, put three.js in its own chunk (`build.rollupOptions.output.manualChunks`) so it caches separately.
-3. Run `npm run build` and compare the file sizes it prints.
-
-**Done when:** the main chunk is under 500 KB and every panel still opens.
-
-### 6. Move heavy work to a Web Worker
-
-**Why:** Some calculations run on the main thread and freeze the page briefly on slower laptops: the per-site hourly series (`siteSeries`), the site thermal model (`siteThermal`), and the rover route search (`planRoute`).
-
-**Where:** `web/src/lib/visibility.ts`, `web/src/lib/siteThermal.ts`, `web/src/lib/rover.ts`, and the components that call them (`SitePanel.tsx`, `RoverPanel.tsx`, `Timeline.tsx`)
-
-**How:**
-1. Create `web/src/workers/compute.worker.ts`. Vite supports `new Worker(new URL("./compute.worker.ts", import.meta.url), { type: "module" })`.
-2. Send the ephemeris to the worker once, then send site requests (id, lat, lon, height, horizon) and get typed arrays back. Transfer buffers instead of copying them.
-3. Make the callers async and show a small "computing…" state while waiting.
-4. `planRoute` needs the visibility bits from the GPU. Compute those on the main thread (they come from WebGL), then transfer them to the worker for the search.
-
-**Done when:** selecting a new site and planning a route don't drop frames while the 3D view is moving.
-
-### 7. Smaller polar terrain file
-
-**Why:** `web/public/data/polar_80m.bin.gz` is 25 MB. It now loads in the background, but on slow connections the pole stays blurry for a long time.
-
-**Where:** `pipeline/build_globe.py` (writes it), `web/src/data/globe.ts` (`loadPolar80`)
-
-**How:** Either:
-- **Tile it:** split the 6250 × 6250 grid into 64 tiles of ~780 × 780 and load only the tiles near the camera, the same way `web/src/data/tiles.ts` handles the 40 m data; or
-- **Encode it better:** store heights as 16-bit differences from the 240 m data (`polar_240m`) upsampled, which are small numbers that compress much better than raw heights.
-
-**Done when:** the first sharp view of the pole needs under 8 MB of polar data and heights match the old file to within 1 m.
-
-### 8. Touch controls on phones
-
-**Why:** The phone layout exists (bottom tab bar, slide-up panels), but moving the camera relies on mouse drag and keyboard keys.
-
-**Where:** `web/src/three/MoonScene.ts` (`configureControls`, `bindMovement`, `bindMapInput`), `web/src/components/MobileNav.tsx`
-
-**How:**
-1. OrbitControls already supports one-finger rotate and two-finger zoom. Check it works on a real phone, including in the 2D map mode, which has its own drag handler (`bindMapInput`); add pinch-zoom there.
-2. Add on-screen buttons for up/down (the R and F keys) in the phone layout.
-3. Make sure tapping the terrain still adds a point without fighting the drag.
-
-**Done when:** you can fly from the whole Moon to the pole surface and back using only touch.
-
-### 9. Accessibility pass
-
-**Why:** Some people can't use a mouse, and some can't tell the map colors apart.
-
-**Where:** `web/src/components/*`, `web/src/gpu/layers.ts` (color scales), `web/src/styles.css`
-
-**How:**
-1. Tab through the whole page: every button should be reachable and show a visible focus outline.
-2. Modal windows should close with Escape and keep focus inside while open.
-3. Add a color-blind-safe option for the map layers (for example a viridis-style scale) in `layers.ts`, switchable in the legend.
-4. Check text contrast on the glass panels.
-
-**Done when:** the app is usable with keyboard only, and every layer has a color-blind-safe option.
-
----
-
-## Science
-
-### 10. Bounced light in the thermal model
-
-**Why:** The soil temperature model only uses direct sunlight. Inside permanently shadowed craters, the only heat comes from sunlight and infrared bounced off nearby sunlit slopes. Without it the darkest floors come out around 25 K, while NASA's Diviner measures 30–50 K. This matters because ice stability depends on exactly those temperatures.
-
-**Where:** `web/src/gpu/thermal.ts` (GPU, whole polar field), `web/src/gpu/globalLayers.ts` (whole Moon), `web/src/lib/siteThermal.ts` (one site)
-
-**How:**
-1. For each cell, estimate the fraction of its sky taken up by terrain from the horizon data already loaded: the average over all directions of sin²(horizon elevation) is a good start.
-2. Per time step, scattered sunlight into a cell ≈ that sky fraction × albedo × the average sunlight on the surrounding terrain. Simplest version: use the region's mean absorbed sunlight at that hour. Better: precompute per-cell view factors to a coarse grid.
-3. Thermal infrared from surrounding warm terrain ≈ sky fraction × ε σ T⁴ of the surroundings.
-4. Add both to `absorbed` in the surface energy balance.
-5. Check against Diviner: Shackleton's floor should reach roughly 40–60 K at most, and the equator must stay at about 95–390 K.
-
-**Reference:** Hayne et al. 2017; Paige et al. 2010 (Science), "Diviner Lunar Radiometer observations of cold traps in the Moon's south polar region".
-
-**Done when:** Shackleton floor temperatures land in the measured range, the equator is unchanged, and the validation window shows the new numbers.
-
-### 11. Extend the ephemeris past 2028
-
-**Why:** Sun and Earth positions cover 2026–2028 only. Ice stability and long-term sunlight are better judged over longer periods.
-
-**Where:** `pipeline/ephemeris.py` (lines with `datetime(2026, …)` and `datetime(2029, …)`), output `web/public/data/ephem.bin` and `dsn.bin`
-
-**How:**
-1. Change the end date (for example to 2036). DE421 covers it.
-2. Rerun `python ephemeris.py`. The file grows by about 210 KB per year.
-3. Check the web app still handles the larger count. The GPU texture layout in `web/src/gpu/engine.ts` and `globalLayers.ts` packs hours into rows of 4096, so it should just work. Test the 1-year layers and the timeline.
-4. Update the "2026–2028" text in the UI and README.
-
-**Done when:** the timeline runs through the new end year and all layers still compute.
-
-### 12. Communications link budget
-
-**Why:** The app shows when a DSN dish can see a site, but not how much data could get through.
-
-**Where:** `web/src/lib/contacts.ts`, the "Contact with Earth" section of `web/src/components/SitePanel.tsx`
-
-**How:**
-1. Standard link budget: received power = transmit power + transmit antenna gain + receive antenna gain − free-space loss (20·log10(4π·distance/wavelength)), in dB.
-2. Use typical small-lander values: X-band (8.4 GHz), 20 W, a 0.5 m dish, DSN 34 m antenna, system noise temperature about 30 K.
-3. Data rate ≈ received power ÷ (k·T·required Eb/N0), with Eb/N0 around 2 dB plus a 3 dB margin.
-4. The Earth–Moon distance comes from the Earth vector in the ephemeris.
-5. Show "about N Mbps" per pass and total data per week.
-
-**Done when:** each contact window shows an estimated data rate with the assumptions listed in a tooltip.
-
-### 13. Sharper horizons around key sites
-
-**Why:** The polar horizon field is 250 m per cell. Landing-miss simulations near ridge tops would be more accurate with 20 m cells around the main sites.
-
-**Where:** `engine/horizon.cpp`, `pipeline/build_field.py`, `web/src/data/field.ts`
-
-**How:**
-1. Run the C++ engine on a 20 m grid in a 5 × 5 km box around each named site (250 × 250 points × 180 directions).
-2. Save each as a small field file in the same format as `field_pole` (see `build_field.py`).
-3. In the app, when the camera or analysis is inside one of these boxes, use the fine field for the site panel and the Monte Carlo.
-
-**Done when:** the landing-miss simulation at Connecting ridge B uses 20 m horizons, with the result checked against the coarse field.
-
-### 14. North pole detail
-
-**Why:** Only the south pole has the 40 m terrain and the precomputed horizon field. The north pole uses the whole-Moon grid (about 1.4 km near the poles).
-
-**Where:** `pipeline/fetch_data.py`, `pipeline/build_field.py`, `pipeline/build_tiles.py`
-
-**How:** Download the north polar versions of the LOLA products used for the south (same PDS directory as in `fetch_data.py`) and run the same pipeline with the north polar projection. The app needs a way to switch which polar field is active, similar to how regional fields work (`web/src/gpu/regions.ts`).
-
-**Done when:** the north pole has the same detailed maps and 3D quality as the south.
-
----
-
-## Features
-
-### 15. Lander shadow
-
-**Why:** The 3D lander (`web/src/three/landerModel.ts`) doesn't cast a shadow, which looks wrong with the Sun 1.5° above the horizon. Its shadow should be tens of metres long.
-
-**How:** The terrain uses custom shaders, so three.js shadow maps won't reach it. Easiest: in the terrain fragment shaders (`web/src/three/shaders.ts` and `web/src/three/lod.ts`), add a uniform with the lander's position, height and radius, and darken pixels inside its shadow cone. The same math as the rock shadows in `GROUND_GLSL` (`web/src/three/craterTexture.ts`, `rockShadow`).
-
-**Done when:** the lander casts a long shadow that moves with the Sun as time plays.
-
-### 16. Split-screen compare
-
-**Why:** Comparing two sites or two dates side by side is clearer than switching back and forth.
-
-**Where:** `web/src/components/Scene3D.tsx`, `web/src/three/MoonScene.ts`, `web/src/state/store.ts`
-
-**How:** Render the scene twice with two cameras using `renderer.setScissor` and `setViewport`, each with its own time or site. Simplest first version: same time, two cameras, each following one pinned site from the Compare panel.
-
-**Done when:** two pinned sites can be viewed side by side with time playing in both.
-
-### 17. Replay a real landing
-
-**Why:** Showing a real event makes the problem concrete. Intuitive Machines' IM-2 lander (Athena) landed near Mons Mouton in March 2025, tipped over and ran out of power. The app could show the lighting it actually faced.
-
-**How:**
-1. Add a short ephemeris for February–March 2025 (task 11 shows how).
-2. Add the landing site and time to `pipeline/sites.py` (from NASA and Intuitive Machines public reports).
-3. Add a "Replay" entry that jumps to that time and site with the lander model and the sunlight timeline.
-
-**Done when:** you can watch the lighting at the IM-2 site around its landing.
-
-### 18. VR mode
-
-**Why:** Standing on a ridge and watching the Sun circle the horizon is the most memorable way to understand the pole.
-
-**Where:** `web/src/three/MoonScene.ts`
-
-**How:** three.js supports WebXR: `renderer.xr.enabled = true` and the `VRButton` helper. The custom render loop (`loop`) has to switch to `renderer.setAnimationLoop` in VR, and post-processing (bloom) should be skipped there. Place the camera at a site at standing height.
-
-**Done when:** a Quest or similar headset can stand at a site with time playing.
+## Act 1: Submission
+
+- [ ] 1. **Clip: whole Moon to pole.** On the live app press **● Rec** (timeline), drag the Moon around, then click "Connecting ridge B" to fly to the pole. Stop and save.
+- [ ] 2. **Clip: moving shadows.** At the pole, set speed to 6 h/s and press Play while recording, about 15 seconds.
+- [ ] 3. **Clip: data layers.** Record switching **Sun %** (1y) → **❄ Ice** → **Temp**, pausing a few seconds on each.
+- [ ] 4. **Clip: landing finder.** Screen-record (OBS or Win+G) opening **★ Find landing spot**, searching, and clicking the top result.
+- [ ] 5. **Clip: rover.** Screen-record **⛟ Rover route**: Connecting ridge B → Shackleton ridge A, Plan route, Replay.
+- [ ] 6. **Clip: lander close-up.** Open **♥ Lander sim** → "See the lander on the ground", record a slow orbit around it.
+- [ ] 7. **Clip: report and validation.** Screen-record **🏁 Artemis III report** and **✓ Validation**.
+- [ ] 8. **Voice-over script.** Under 2:30: the problem (1.6° Sun, moving shadows, landers freeze), what the app does, how we know it's right.
+- [ ] 9. **Edit the video.** Put clips 1–7 together with the voice-over, under 3 minutes. Upload (YouTube unlisted is fine).
+- [ ] 10. **Slides: problem and solution.** Two slides. Screenshots are in `docs/`.
+- [ ] 11. **Slides: features.** Three slides with screenshots: maps, finder/lander/rover, Artemis III report.
+- [ ] 12. **Slides: how it works and validation.** Diagram and table from the README.
+- [ ] 13. **Slides: impact and team.** Who it helps, team names, links. Export everything to PDF.
+- [ ] 14. **NASA project page.** Description, live link, repo link, video, slides.
+
+## Act 2: Testing
+
+Open https://adqm0001.github.io/lunar-window/ and report what you find as GitHub issues (device, browser, screenshot).
+
+- [ ] 15. **Laptop with integrated graphics.** Is it smooth? Try Saver / Balanced / High (top bar).
+- [ ] 16. **Mac Safari.**
+- [ ] 17. **Firefox.**
+- [ ] 18. **Android phone.** Does the bottom tab bar work? Can you move the camera?
+- [ ] 19. **iPhone.**
+- [ ] 20. **Slow internet.** Chrome DevTools → Network → "Fast 4G", hard reload. How long until the Moon appears?
+- [ ] 21. **Tour.** Press **▶ Tour** and go through all 9 steps. Note anything that looks wrong.
+- [ ] 22. **Every button.** Click every layer and panel button with DevTools open (F12 → Console). Report any red errors.
+
+## Act 3: Tests and code health
+
+- [ ] 23. **Set up tests.** `cd web && npm install -D vitest`, add `"test": "vitest run"` to `package.json`.
+- [ ] 24. **Test map projection.** `toMap` then `toLatLon` returns the same point (±1e-6°) for a few polar points. File: `web/src/lib/astro.ts`.
+- [ ] 25. **Test Sun disc.** `discFraction(0) = 0.5`, `discFraction(1) = 1`, `discFraction(-1) = 0`. Same file.
+- [ ] 26. **Test horizon lookup.** `horizonAt` interpolates between directions and wraps past 360°. Same file.
+- [ ] 27. **Test rover search.** `planRoute` on a hand-made 5 × 5 grid: all sunlit gives a straight path; a shadow wall makes it wait or detour. File: `web/src/lib/rover.ts`.
+- [ ] 28. **Test thermal model.** `siteThermal` at the Apollo 11 site: max 370–400 K, min 80–100 K. Needs a small helper to read `web/public/data/ephem.bin` from disk. File: `web/src/lib/siteThermal.ts`.
+- [ ] 29. **Run tests on every push.** Add an `npm test` step before the build in `.github/workflows/pages.yml`.
+- [ ] 30. **Lazy-load tool panels.** Wrap `LanderPanel`, `FinderPanel`, `RoverPanel`, `PorkchopPanel` in `React.lazy` + `Suspense`. File: `web/src/App.tsx`.
+- [ ] 31. **Lazy-load windows.** Same for `RegionReport`, `ValidationPanel`, `SkylinePanel`.
+- [ ] 32. **Separate three.js chunk.** `build.rollupOptions.output.manualChunks` in `web/vite.config.ts`. Check the sizes `npm run build` prints.
+- [ ] 33. **Remove dead code.** `buildGlobe`, `buildSkirt`, `globeMaterial`, `polarTexture` and `setPolarUniforms` in `web/src/three/globe.ts` are no longer used anywhere. Delete them and anything only they use; `npm run build` must still pass.
+- [ ] 34. **Worker skeleton.** Create `web/src/workers/compute.worker.ts` and send it the ephemeris once on startup.
+- [ ] 35. **Site time series in the worker.** Move `siteSeries` (`web/src/lib/visibility.ts`) into the worker; callers become async.
+- [ ] 36. **Site temperature in the worker.** Same for `siteThermal`.
+- [ ] 37. **Rover search in the worker.** Compute the visibility bits on the main thread (GPU), transfer them, run `planRoute` in the worker.
+- [ ] 38. **Tile the 80 m polar file.** In `pipeline/build_globe.py`, write `polar_80m` as 8 × 8 tiles instead of one 25 MB file.
+- [ ] 39. **Load 80 m tiles on demand.** In `web/src/data/globe.ts` and `web/src/three/lod.ts`, fetch only the tiles near the camera.
+
+## Act 4: Phones and accessibility
+
+- [ ] 40. **Pinch zoom in the 2D map.** `bindMapInput` in `web/src/three/MoonScene.ts` only handles mouse wheel zoom.
+- [ ] 41. **Up/down buttons on phones.** Phones have no R/F keys. Add two buttons in the phone layout (`web/src/components/MobileNav.tsx`).
+- [ ] 42. **Tap to add a point on phones.** Make sure a tap adds a point but a drag doesn't (`bindPicking` in `MoonScene.ts`).
+- [ ] 43. **Focus outlines.** Every button should show a visible outline when reached with Tab. File: `web/src/styles.css`.
+- [ ] 44. **Modal keyboard handling.** Escape closes the Validation, Skyline and Report windows, and Tab stays inside them while open.
+- [ ] 45. **Color-blind palette.** Add a viridis-style option for the map layers in `web/src/gpu/layers.ts` with a switch in the legend.
+
+## Act 5: Science upgrades
+
+- [ ] 46. **Sky fraction per cell.** From the horizon data, compute how much of each cell's sky is blocked by terrain (average of sin² of the horizon elevation over all directions). File: `web/src/gpu/thermal.ts`.
+- [ ] 47. **Scattered sunlight.** Add sunlight reflected from surrounding terrain (sky fraction × albedo × average sunlit-terrain brightness) to the surface energy balance in `thermal.ts`.
+- [ ] 48. **Infrared from surroundings.** Add heat radiated by warm surrounding terrain (sky fraction × εσT⁴) in `thermal.ts`.
+- [ ] 49. **Same in the other two thermal models.** Copy 46–48 into `web/src/gpu/globalLayers.ts` and `web/src/lib/siteThermal.ts`.
+- [ ] 50. **Recheck temperatures.** Shackleton floor max should land around 40–60 K and the equator stay at about 95–390 K. Update the numbers in `web/src/components/ValidationPanel.tsx`.
+- [ ] 51. **Longer ephemeris.** Change the end date in `pipeline/ephemeris.py` (now 2029-01-01) to 2036, rerun it, check the timeline and 1-year layers still work.
+- [ ] 52. **Update date text.** Replace "2026–2028" in the UI and README after 51.
+- [ ] 53. **Link budget function.** In `web/src/lib/contacts.ts`, estimate data rate per pass: X-band, 20 W, 0.5 m lander dish, DSN 34 m, free-space loss from the Earth distance.
+- [ ] 54. **Show data rates.** Add the rate per pass and data per week to the "Contact with Earth" section in `web/src/components/SitePanel.tsx`.
+- [ ] 55. **20 m horizons at one site.** Run `engine/horizon.cpp` on a 20 m grid, 5 × 5 km around Connecting ridge B, saved like `field_pole` (see `pipeline/build_field.py`).
+- [ ] 56. **Use the 20 m field.** Make the landing-miss Monte Carlo use it when the target is inside it.
+- [ ] 57. **North pole data.** Add the north polar LOLA files to `pipeline/fetch_data.py` (same PDS directory as the south ones).
+- [ ] 58. **North pole field.** Run `build_field.py` with the north polar projection.
+- [ ] 59. **North pole in the app.** Let the app switch its active polar field to the north (similar to `web/src/gpu/regions.ts`).
+
+## Act 6: New features
+
+- [ ] 60. **Lander shadow.** Pass the lander position and size to the terrain shaders (`web/src/three/shaders.ts`, `lod.ts`) and darken pixels inside its shadow. The rock shadow math in `rockShadow` (`web/src/three/craterTexture.ts`) is the template.
+- [ ] 61. **Split screen: rendering.** Draw the scene twice with two cameras using `setScissor` / `setViewport` in `MoonScene.ts`.
+- [ ] 62. **Split screen: controls.** A toggle in the Compare panel, each half following one pinned site.
+- [ ] 63. **IM-2 replay: ephemeris.** Generate Sun/Earth positions for February–March 2025 (see 51).
+- [ ] 64. **IM-2 replay: time.** The IM-2 site is already in `pipeline/sites.py` (`im2-athena`). Add its landing time from public reports and a "Replay" button that jumps there with the lander shown.
+- [ ] 65. **VR: enable.** Turn on WebXR in `MoonScene.ts` (`renderer.xr.enabled`, three.js `VRButton`).
+- [ ] 66. **VR: render loop.** Use `renderer.setAnimationLoop` in VR, skip bloom, stand the camera at a site at human height.
