@@ -159,7 +159,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** in the `build` job, add `- name: Test` / `working-directory: web` / `run: npm test` between Install and Build. A failing test must stop the deploy.
   - **Verify:** `npm test` passes locally and the step order in the YAML is Install → Test → Build. After merge, the Actions run on `main` shows the Test step passing. (The workflow only runs on `main`; to see a failure block the deploy, temporarily break a test on `main` in a test fork.)
 
-- [ ] **26. Lazy-load tool panels** (S)
+- [x] **26. Lazy-load tool panels** (S)
   - **Files:** `src/App.tsx`.
   - **Spec:** replace static imports of `LanderPanel`, `FinderPanel`, `RoverPanel`, `PorkchopPanel`, `ComparePanel` with `React.lazy(() => import(...))`, render inside `<Suspense fallback={null}>`.
   - **Verify:** `npm run build` prints separate chunks for them; each panel still opens.
