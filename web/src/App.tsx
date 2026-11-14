@@ -10,12 +10,14 @@ import SitePanel from "./components/SitePanel";
 import Timeline from "./components/Timeline";
 import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
+import FinderPanel from "./components/FinderPanel";
 
 export default function App() {
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
   const view = useApp((s) => s.view);
   const cinema = useApp((s) => s.cinema);
+  const finderOpen = useApp((s) => s.finderOpen);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -71,7 +73,7 @@ export default function App() {
     <div className={`app ${cinema ? "cinema" : ""}`}>
       <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
       <TopBar />
-      <SiteList />
+      {finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />
       <SitePanel />
       <Timeline />

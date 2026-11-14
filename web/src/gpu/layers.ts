@@ -1,7 +1,7 @@
 import type { FieldData } from "../data/field";
 import type { FieldMetrics } from "./engine";
 
-export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope";
+export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "score";
 
 type Stop = [number, number, number, number];
 
@@ -19,6 +19,7 @@ const SUN: Stop[] = [[0, 8, 8, 20], [0.25, 90, 30, 70], [0.55, 220, 90, 40], [0.
 const EARTH: Stop[] = [[0, 6, 10, 25], [0.5, 30, 90, 190], [1, 170, 220, 255]];
 const LINK: Stop[] = [[0, 6, 14, 14], [0.5, 25, 140, 100], [1, 180, 255, 210]];
 const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 108], [1, 90, 20, 40]];
+export const SCORE: Stop[] = [[0, 20, 10, 40], [0.4, 110, 40, 150], [0.7, 240, 110, 90], [0.88, 255, 200, 80], [1, 255, 255, 230]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
 
 export const LAYERS: LayerDef[] = [
@@ -28,6 +29,7 @@ export const LAYERS: LayerDef[] = [
   { id: "earth", label: "Earth in view %", short: "Earth %", ranged: true, stops: EARTH, legend: ["0%", "100%"], describe: "Share of time Earth is above the terrain" },
   { id: "link", label: "Power + comms %", short: "Sun+DSN", ranged: true, stops: LINK, legend: ["0%", "100%"], describe: "Sun up, Earth up and a DSN dish seeing the Moon, all at once" },
   { id: "night", label: "Longest night", short: "Night", ranged: true, stops: NIGHT, legend: ["0 d", "≥ 30 d"], describe: "Longest continuous stretch without sunlight" },
+  { id: "score", label: "Landing score", short: "★ Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
 
@@ -70,6 +72,32 @@ export function formatLayerValue(id: LayerId, v: number | null): string {
   if (id === "now") return v >= 0.5 ? "lit" : "shadow";
   if (id === "terrain") return "";
   return `${(v * 100).toFixed(1)}%`;
+}
+
+export function paintScores(scores: Float32Array, img: ImageData) {
+  let max = 0;
+  let min = Infinity;
+  for (const v of scores) if (v >= 0) {
+    max = Math.max(max, v);
+    min = Math.min(min, v);
+  }
+  const px = img.data;
+  for (let i = 0; i < scores.length; i++) {
+    const o = i * 4;
+    const v = scores[i];
+    if (v < 0) {
+      px[o] = 6;
+      px[o + 1] = 6;
+      px[o + 2] = 12;
+      px[o + 3] = 170;
+      continue;
+    }
+    const [r, g, b] = sample(SCORE, (v - min) / (max - min || 1));
+    px[o] = r;
+    px[o + 1] = g;
+    px[o + 2] = b;
+    px[o + 3] = 225;
+  }
 }
 
 export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img: ImageData) {

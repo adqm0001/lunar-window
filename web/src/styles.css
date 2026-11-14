@@ -133,3 +133,30 @@ button { font: inherit; color: inherit; }
 .app.cinema .topbar { opacity: 0.85; }
 .kbd-hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 168px; font: 10px var(--mono); color: var(--dim); z-index: 1; pointer-events: none; letter-spacing: 0.08em; }
 .app.cinema .kbd-hint { bottom: 16px; }
+
+.left.finder { width: 300px; padding: 16px 14px; }
+.layer-bar { left: 324px; }
+.finder-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.finder-title { font-size: 15px; font-weight: 600; }
+.finder-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.icon-btn { background: none; border: 1px solid var(--line-2); border-radius: 7px; width: 26px; height: 26px; cursor: pointer; color: var(--muted); }
+.icon-btn:hover { color: var(--text); border-color: var(--accent); }
+.f-label { display: block; color: var(--muted); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; margin: 12px 0 5px; }
+.f-value { font-family: var(--mono); font-size: 13px; }
+.f-hint { color: var(--dim); font-size: 10.5px; margin-top: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips .chip { border-color: var(--line-2); }
+.search-btn { width: 100%; margin-top: 16px; padding: 10px; font-size: 13px; background: linear-gradient(90deg, #8b9cff, #b48cff); border: none; color: #0a0d14; }
+.search-btn:disabled { opacity: 0.6; cursor: wait; }
+.chip.find { color: #ffd27a; border-color: rgba(255,210,122,0.35); }
+.chip.find.sel { background: rgba(255,210,122,0.15); }
+.f-stats { margin: 12px 0 8px; font-family: var(--mono); font-size: 10.5px; color: var(--accent); line-height: 1.5; }
+.results { display: flex; flex-direction: column; gap: 5px; }
+.result { display: flex; gap: 10px; align-items: center; text-align: left; background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; cursor: pointer; }
+.result:hover { border-color: var(--line-2); }
+.result.active { border-color: rgba(255,210,122,0.6); background: rgba(255,210,122,0.07); }
+.r-rank { font-family: var(--mono); color: #ffd27a; font-weight: 500; width: 26px; }
+.r-main { display: flex; align-items: center; gap: 10px; flex: 1; }
+.r-score { font-family: var(--mono); font-size: 18px; width: 30px; }
+.r-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.r-metrics i { font-style: normal; }

@@ -12,6 +12,8 @@ export default function LayerControls() {
   const layer = useApp((s) => s.layer);
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
+  const hasFinder = useApp((s) => !!s.finder);
+  const finderOpen = useApp((s) => s.finderOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
   const def = layerDef(layer);
@@ -27,11 +29,15 @@ export default function LayerControls() {
           ))}
         </div>
         <span className="chip-sep" />
-        {LAYERS.filter((l) => !(view === "3d" && l.id === "now")).map((l) => (
+        {LAYERS.filter((l) => !(view === "3d" && l.id === "now") && (l.id !== "score" || hasFinder)).map((l) => (
           <button key={l.id} className={`chip ${l.id === layer ? "sel" : ""}`} onClick={() => setLayer(l.id)} title={l.describe}>
             {view === "3d" && l.id === "terrain" ? "Shadows" : l.short}
           </button>
         ))}
+        <span className="chip-sep" />
+        <button className={`chip find ${finderOpen ? "sel" : ""}`} onClick={() => useApp.getState().setFinderOpen(!finderOpen)}>
+          ★ Find landing spot
+        </button>
         {def.ranged && (
           <>
             <span className="chip-sep" />

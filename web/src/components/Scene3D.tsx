@@ -16,6 +16,7 @@ export default function Scene3D() {
   const fieldProgress = useApp((s) => s.fieldProgress);
   const hour = useApp((s) => s.hour);
   const layer = useApp((s) => s.layer);
+  const finder = useApp((s) => s.finder);
   const sites = useSites();
   const site = useSelectedSite();
   const st = useSiteState();
@@ -64,8 +65,8 @@ export default function Scene3D() {
   }, [scene, site, st]);
 
   useEffect(() => {
-    scene?.setOverlay(layer === "now" ? null : overlayCanvas(layer, metrics, field));
-  }, [scene, layer, metrics, field]);
+    scene?.setOverlay(layer === "now" ? null : overlayCanvas(layer, metrics, field, finder));
+  }, [scene, layer, metrics, field, finder]);
 
   return (
     <div className="scene-host" ref={host}>

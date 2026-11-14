@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppData, Site } from "../data/load";
 import type { FieldData } from "../data/field";
 import type { LayerId } from "../gpu/layers";
+import type { FinderResult } from "../gpu/finder";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -19,6 +20,10 @@ interface AppState {
   rangeDays: number;
   view: "3d" | "2d";
   cinema: boolean;
+  finderOpen: boolean;
+  finder: FinderResult | null;
+  setFinderOpen: (o: boolean) => void;
+  setFinder: (r: FinderResult | null) => void;
   toggleCinema: () => void;
   setView: (v: "3d" | "2d") => void;
   customSite: Site | null;
@@ -48,6 +53,10 @@ export const useApp = create<AppState>((set, get) => ({
   rangeDays: 30,
   view: "3d",
   cinema: false,
+  finderOpen: false,
+  finder: null,
+  setFinderOpen: (finderOpen) => set({ finderOpen }),
+  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSite: null,
