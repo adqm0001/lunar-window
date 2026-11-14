@@ -7,6 +7,8 @@ export default function TopBar() {
   const site = useSelectedSite();
   const st = useSiteState();
   const sunPct = Math.round(st.sunFraction * 100);
+  const quality = useApp((s) => s.quality);
+  const setQuality = useApp((s) => s.setQuality);
   return (
     <header className="topbar">
       <div className="brand">
@@ -18,6 +20,13 @@ export default function TopBar() {
         <span>UTC</span>
       </div>
       <div className="spacer" />
+      <div className="power" title="Graphics power: Saver uses the least GPU">
+        {(["saver", "balanced", "high"] as const).map((q) => (
+          <button key={q} className={`chip ${q === quality ? "sel" : ""}`} onClick={() => setQuality(q)}>
+            {q === "saver" ? "Saver" : q === "balanced" ? "Balanced" : "High"}
+          </button>
+        ))}
+      </div>
       <span style={{ color: "var(--muted)", fontSize: 12 }}>{site.name}</span>
       <span className={`pill ${sunPct > 0 ? "on-sun" : ""}`}>
         <i />

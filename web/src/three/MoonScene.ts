@@ -15,7 +15,7 @@ import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
-import { LodTerrain } from "./lod";
+import { LodTerrain, type Quality } from "./lod";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
 import type { ArtemisRegion } from "../data/artemis";
@@ -57,6 +57,10 @@ export class MoonScene {
   private pendingIntro: Site | null = null;
   private lastSites: Site[] = [];
   onPickLatLon: ((lat: number, lon: number) => void) | null = null;
+  private dirty = true;
+  private lastRender = 0;
+  private quality: Quality = "balanced";
+  private bloom!: UnrealBloomPass;
   private scatter: THREE.Points | null = null;
   private regionGroup = new THREE.Group();
   private labelObjs: CSS2DObject[] = [];
@@ -159,7 +163,8 @@ export class MoonScene {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.5, 1.6));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.5, 1.6);
+    this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.lens = new ShaderPass(LENS_SHADER);
     this.composer.addPass(this.lens);
@@ -242,6 +247,7 @@ export class MoonScene {
   }
 
   setBodies(sunMe: Vec3, earthMe: Vec3, hour: number) {
+    this.dirty = true;
     const s = meToWorld(sunMe);
     const e = meToWorld(earthMe);
     this.terrainMat.uniforms.uSun.value.set(sunMe[0], sunMe[1], sunMe[2]);
@@ -265,6 +271,7 @@ export class MoonScene {
   }
 
   setOverlay(canvas: HTMLCanvasElement | null) {
+    this.dirty = true;
     const u = this.terrainMat.uniforms;
     if (!canvas) {
       u.uOverlayMix.value = 0;
@@ -291,6 +298,7 @@ export class MoonScene {
   }
 
   setSites(sites: Site[]) {
+    this.dirty = true;
     this.lastSites = sites;
     this.labelObjs = this.labelObjs.filter((o) => !this.beaconLabel(o));
     for (const b of this.beacons.values()) this.scene.remove(b.group);
@@ -326,6 +334,7 @@ export class MoonScene {
   }
 
   select(site: Site, fly: boolean) {
+    this.dirty = true;
     this.selected = site.id;
     this.highlight(site.id);
     const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
@@ -385,6 +394,7 @@ export class MoonScene {
   }
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
+    this.dirty = true;
     const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
     for (const [line, target, up] of [
       [this.sunRay, this.sun.position, sunUp],
@@ -426,6 +436,7 @@ export class MoonScene {
   }
 
   private resize() {
+    this.dirty = true;
     const w = this.host.clientWidth;
     const h = this.host.clientHeight;
     if (!w || !h) return;
@@ -461,25 +472,31 @@ export class MoonScene {
         this.flight = null;
         this.configureControls(f.orbit);
       }
-    } else {
-      this.controls.update();
+      this.dirty = true;
+    } else if (this.controls.update()) {
+      this.dirty = true;
     }
     this.updateDepthAndSky();
-    this.lod?.update(this.camera);
+    if (this.lod?.update(this.camera)) this.dirty = true;
+    if (!this.dirty) return;
+    const minGap = this.quality === "saver" ? 32 : 0;
+    if (now - this.lastRender < minGap) return;
+    this.lastRender = now;
+    this.dirty = false;
     this.adaptResolution(dt, now);
-    this.terrainMat.uniforms.uTime.value = now / 1000;
-    this.lens.uniforms.uTime.value = (now / 1000) % 100;
     this.composer.render();
     this.labels.render(this.scene, this.camera);
   };
 
   setGlobe(g: GlobeData) {
+    this.dirty = true;
     this.globe = g;
     const tex = new THREE.Texture(g.color);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
     this.lod = new LodTerrain(g, tex);
+    this.lod.setQuality(this.quality);
     this.globeMats = [this.lod.material];
     this.updateHoles();
     this.scene.add(this.lod.group);
@@ -503,6 +520,7 @@ export class MoonScene {
   }
 
   setField(field: FieldData) {
+    this.dirty = true;
     if (field === this.field) return;
     this.field = field;
     const old = this.terrainMesh;
@@ -573,6 +591,7 @@ export class MoonScene {
   }
 
   setScatter(points: ScatterPoint[] | null) {
+    this.dirty = true;
     if (this.scatter) {
       this.scene.remove(this.scatter);
       this.scatter.geometry.dispose();
@@ -594,6 +613,7 @@ export class MoonScene {
   }
 
   setRegions(regions: ArtemisRegion[]) {
+    this.dirty = true;
     if (!this.globe) {
       this.pendingRegions = regions;
       return;
@@ -655,6 +675,24 @@ export class MoonScene {
     this.startFlight(p, offset, 2.6, up);
   }
 
+  setQuality(q: Quality) {
+    this.quality = q;
+    const native = window.devicePixelRatio || 1;
+    this.maxDpr = q === "high" ? Math.min(native, 1.75) : q === "balanced" ? Math.min(native, 1.25) : 1;
+    this.dpr = Math.min(this.dpr, this.maxDpr);
+    if (q !== "high") this.dpr = this.maxDpr;
+    this.renderer.setPixelRatio(this.dpr);
+    this.composer.setPixelRatio(this.dpr);
+    this.bloom.enabled = q !== "saver";
+    this.lod?.setQuality(q);
+    this.resize();
+    this.dirty = true;
+  }
+
+  invalidate() {
+    this.dirty = true;
+  }
+
   private adaptResolution(dt: number, now: number) {
     this.frameTimes.push(dt);
     if (this.frameTimes.length < 90) return;
@@ -689,7 +727,7 @@ const LENS_SHADER = {
   vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
-    float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233)) + uTime * 61.7) * 43758.5453); }
+    float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
       vec2 c = vUv - 0.5;
       float ca = 0.0012 * length(c);
@@ -699,7 +737,7 @@ const LENS_SHADER = {
       col.b = texture2D(tDiffuse, vUv - c * ca).b;
       float vig = smoothstep(0.95, 0.25, length(c * vec2(1.15, 1.0)));
       col *= mix(0.62, 1.0, vig);
-      col += (h(vUv * 913.0) - 0.5) * 0.028;
+      col += (h(vUv * 913.0) - 0.5) * 0.022;
       gl_FragColor = vec4(col, 1.0);
     }`,
 };

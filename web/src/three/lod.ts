@@ -13,6 +13,8 @@ const SPLIT = 2.4;
 const BUILD_BUDGET_MS = 7;
 const MAX_CACHED = 2400;
 
+export type Quality = "saver" | "balanced" | "high";
+
 interface Face {
   n: THREE.Vector3;
   u: THREE.Vector3;
@@ -137,6 +139,7 @@ export class LodTerrain {
         uHole: { value: new THREE.Vector3(0, 0, 0) },
         uCamPos: { value: new THREE.Vector3() },
         uT64: { value: null },
+        uQuality: { value: 1 },
         uT64Index: { value: null },
       },
     });
@@ -145,7 +148,10 @@ export class LodTerrain {
     this.material.uniforms.uT64Index.value = this.cache.index;
     onGlobalTile((key) => {
       for (const n of this.nodes.values()) {
-        if (n.pending.has(key)) n.dirty = true;
+        if (n.pending.has(key)) {
+          n.dirty = true;
+          this.hasWork = true;
+        }
       }
     });
   }
@@ -160,7 +166,18 @@ export class LodTerrain {
     return n;
   }
 
-  update(camera: THREE.Camera) {
+  private lastCam = new THREE.Vector3(1e9, 0, 0);
+  private hasWork = true;
+  private changedFlag = false;
+
+  setQuality(q: Quality) {
+    this.material.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
+  }
+
+  update(camera: THREE.Camera): boolean {
+    if (!this.hasWork && camera.position.distanceToSquared(this.lastCam) < 1e-10) return false;
+    this.lastCam.copy(camera.position);
+    this.changedFlag = false;
     this.frame++;
     const cam = camera.position.clone().sub(MOON_CENTER);
     const camDist = cam.length();
@@ -203,12 +220,15 @@ export class LodTerrain {
     for (const n of this.queue) {
       if (performance.now() - t0 > BUILD_BUDGET_MS && n.level > 1) break;
       this.build(n);
+      this.changedFlag = true;
     }
+    this.hasWork = this.queue.some((n) => !n.mesh || n.dirty);
 
     this.meshes = [];
     for (const n of this.nodes.values()) {
       if (!n.mesh) continue;
       const on = visible.has(n);
+      if (n.mesh.visible !== on) this.changedFlag = true;
       n.mesh.visible = on;
       if (on) {
         n.lastUsed = this.frame;
@@ -216,6 +236,7 @@ export class LodTerrain {
       }
     }
     if (this.nodes.size > MAX_CACHED) this.evict();
+    return this.changedFlag;
   }
 
   private evict() {
@@ -415,6 +436,7 @@ uniform float uSunPower;
 uniform float uEarthshine;
 uniform vec3 uHole;
 uniform vec3 uCamPos;
+uniform int uQuality;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSpacing;
@@ -504,7 +526,7 @@ void main() {
   vec3 n = normalize(vNormal);
   float footprint = max(camDist * 0.0012, 0.004);
   float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
-  if (maxCell > footprint * 3.0) {
+  if (uQuality > 0 && maxCell > footprint * 3.0 && camDist < 80.0) {
     vec3 p = u * R_KM;
     vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
     vec3 north = cross(u, east);
@@ -521,7 +543,9 @@ void main() {
   vec3 sv = normalize(uSunME - u * R_KM);
   float sel = asin(dot(sv, u));
   float lit = 1.0;
-  if (sel < radians(30.0)) {
+  bool facing = dot(normalize(vNormal), normalize(uSunWorld)) > -0.08;
+  if (!facing) lit = 0.0;
+  if (facing && sel < radians(30.0)) {
     vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
     vec3 north = cross(u, east);
     vec3 sdir = normalize(sv - u * dot(sv, u));
@@ -530,16 +554,19 @@ void main() {
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
     float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.05), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
+    int steps = uQuality == 0 ? 36 : uQuality == 1 ? 60 : 90;
+    float grow = uQuality == 0 ? 1.16 : uQuality == 1 ? 1.1 : 1.075;
     for (int i = 0; i < 90; i++) {
+      if (i >= steps) break;
       float delta = d / R_M;
       float sh = sin(0.5 * delta);
       vec3 q = cos(delta) * u + sin(delta) * sdir;
       float r2;
       float dh = demH(q, r2) - hs;
-      if (camDist < 30.0 && i < 28) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
+      if (uQuality > 0 && camDist < 25.0 && i < 16) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
       best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
       if (best > sel + 0.02) break;
-      d *= 1.075;
+      d *= grow;
       if (d > 220000.0) break;
     }
     lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);

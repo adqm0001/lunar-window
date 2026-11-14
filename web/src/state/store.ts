@@ -3,6 +3,7 @@ import type { AppData, Site } from "../data/load";
 import type { FieldData } from "../data/field";
 import type { GlobeData } from "../data/globe";
 import type { LayerId } from "../gpu/layers";
+import type { Quality } from "../three/lod";
 import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
 import { LANDER_PRESETS, type Lander } from "../lib/lander";
@@ -25,6 +26,8 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  quality: Quality;
+  setQuality: (q: Quality) => void;
   porkchopOpen: boolean;
   setPorkchopOpen: (o: boolean) => void;
   poleField: FieldData | null;
@@ -72,6 +75,16 @@ interface AppState {
   select: (id: string) => void;
 }
 
+function loadQuality(): Quality {
+  try {
+    const q = localStorage.getItem("lw-quality");
+    if (q === "saver" || q === "balanced" || q === "high") return q;
+  } catch {
+    return "balanced";
+  }
+  return "balanced";
+}
+
 export const useApp = create<AppState>((set, get) => ({
   data: null,
   field: null,
@@ -82,6 +95,15 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  quality: loadQuality(),
+  setQuality: (quality) => {
+    try {
+      localStorage.setItem("lw-quality", quality);
+    } catch (e) {
+      void e;
+    }
+    set({ quality });
+  },
   porkchopOpen: false,
   setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
   poleField: null,

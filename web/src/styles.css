@@ -209,3 +209,6 @@ button { font: inherit; color: inherit; }
 .porkchop-foot { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: -1px; }
 .sw.g { background: rgba(61,220,151,0.9); } .sw.y { background: rgba(255,200,70,0.85); } .sw.o { background: rgba(255,130,70,0.85); } .sw.r { background: rgba(200,40,60,0.85); }
+
+.power { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line-2); border-radius: 9px; }
+.power .chip { padding: 3px 8px; font-size: 11px; }

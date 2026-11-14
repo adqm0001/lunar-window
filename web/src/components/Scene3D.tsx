@@ -55,6 +55,7 @@ export default function Scene3D() {
   const field = useApp((s) => s.field);
   const globe = useApp((s) => s.globe);
   const orbitRequest = useApp((s) => s.orbitRequest);
+  const quality = useApp((s) => s.quality);
   const mc = useApp((s) => s.mc);
   const flyRequest = useApp((s) => s.flyRequest);
   const fieldProgress = useApp((s) => s.fieldProgress);
@@ -110,6 +111,10 @@ export default function Scene3D() {
   useEffect(() => {
     if (scene && orbitRequest > 0) scene.flyToOrbit();
   }, [scene, orbitRequest]);
+
+  useEffect(() => {
+    scene?.setQuality(quality);
+  }, [scene, quality]);
 
   useEffect(() => {
     if (scene && flyRequest) scene.flyToLatLon(flyRequest.lat, flyRequest.lon, flyRequest.altKm);
