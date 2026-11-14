@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useApp } from "../state/store";
-import { percentOn, siteSeries } from "../lib/visibility";
+import { percentOn } from "../lib/visibility";
 import { useSites } from "../state/selectors";
+import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { ARTEMIS_REGIONS, ARTEMIS_SOURCE } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
 
@@ -14,12 +15,17 @@ export default function SiteList() {
   const select = useApp((s) => s.select);
   const sites = useSites();
   const dayBucket = Math.floor(hour / 24);
+  const seriesVersion = useSeriesVersion();
 
+  // Sites whose series is still being computed are left out and show an empty bar.
   const sunlit = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const s of sites) out[s.id] = percentOn(siteSeries(data.ephem, s).sun, dayBucket * 24, dayBucket * 24 + WINDOW_HOURS, (v) => v >= 128);
+    for (const s of sites) {
+      const series = getSeries(data.ephem, s);
+      if (series) out[s.id] = percentOn(series.sun, dayBucket * 24, dayBucket * 24 + WINDOW_HOURS, (v) => v >= 128);
+    }
     return out;
-  }, [data, sites, dayBucket]);
+  }, [data, sites, dayBucket, seriesVersion]);
 
   const groups = useMemo(() => {
     const g = new Map<string, typeof sites>();
@@ -47,10 +53,10 @@ export default function SiteList() {
             >
               <span className="name">{s.name}</span>
               <span className="bar">
-                <b style={{ width: `${sunlit[s.id]}%` }} />
+                <b style={{ width: `${sunlit[s.id] ?? 0}%` }} />
               </span>
               <span className="meta" style={{ width: 32, textAlign: "right" }}>
-                {Math.round(sunlit[s.id])}%
+                {s.id in sunlit ? `${Math.round(sunlit[s.id])}%` : "…"}
               </span>
               {s.group === "Custom" && (
                 <span

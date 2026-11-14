@@ -1,4 +1,5 @@
-import type { Ephemeris } from "../data/load";
+import type { Ephemeris, Site } from "../data/load";
+import { siteSeries } from "../lib/visibility";
 
 export interface WorkerRequest {
   id: number;
@@ -11,17 +12,34 @@ export type WorkerResponse = { id: number; ok: true; result: unknown } | { id: n
 // The project's lib is DOM, which types `self` as Window; this is the dedicated worker scope we actually get.
 const scope = self as unknown as {
   onmessage: ((e: MessageEvent<WorkerRequest>) => void) | null;
-  postMessage(msg: WorkerResponse): void;
+  onmessageerror: (() => void) | null;
+  postMessage(msg: WorkerResponse, transfer?: Transferable[]): void;
+};
+
+// A request that can't be read has no id to answer, so its caller would wait forever. Throwing turns it into
+// an error event on the main thread, where the client fails this worker's calls and starts a fresh one.
+scope.onmessageerror = () => {
+  throw new Error("could not read a request");
 };
 
 let ephem: Ephemeris | null = null;
 
-const handlers: Record<string, (payload: unknown) => unknown> = {
+function needEphem(): Ephemeris {
+  if (!ephem) throw new Error("Compute worker used before initWorker");
+  return ephem;
+}
+
+// A handler returns its result plus any buffers to transfer back instead of copying.
+const handlers: Record<string, (payload: unknown) => { result: unknown; transfer?: Transferable[] }> = {
   init: (payload) => {
     ephem = payload as Ephemeris;
-    return ephem.count;
+    return { result: ephem.count };
   },
-  ping: (payload) => payload,
+  ping: (payload) => ({ result: payload }),
+  siteSeries: (payload) => {
+    const s = siteSeries(needEphem(), payload as Site);
+    return { result: s, transfer: [s.sun.buffer, s.earth.buffer, s.link.buffer] };
+  },
 };
 
 scope.onmessage = (e) => {
@@ -29,7 +47,8 @@ scope.onmessage = (e) => {
   const handler = handlers[type];
   try {
     if (!handler) throw new Error(`Unknown worker request "${type}"`);
-    scope.postMessage({ id, ok: true, result: handler(payload) });
+    const { result, transfer = [] } = handler(payload);
+    scope.postMessage({ id, ok: true, result }, transfer);
   } catch (err) {
     scope.postMessage({ id, ok: false, error: err instanceof Error ? err.message : String(err) });
   }

@@ -184,7 +184,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** worker created with `new Worker(new URL("./compute.worker.ts", import.meta.url), { type: "module" })`. `client.ts` exposes `initWorker(ephem: Ephemeris)` (posts `data` and `dsn` buffers, transferred copies) and a promise-based `call<T>(type, payload): Promise<T>` with request ids.
   - **Verify:** a `ping` round trip resolves; no change in behaviour yet.
 
-- [ ] **31. Site time series in the worker** (M) — Depends on 30
+- [x] **31. Site time series in the worker** (M) — Depends on 30
   - **Files:** `src/lib/visibility.ts`, worker, callers: `src/state/selectors.ts` (`useSeries`), `src/components/Timeline.tsx`, `ComparePanel.tsx`, `SiteList.tsx`, `ValidationPanel.tsx`, `src/lib/siteThermal.ts`.
   - **Spec:** worker computes `siteSeries` (returns three `Uint8Array`s, transferred). Keep a main-thread cache keyed by `site.id`. `useSeries` becomes async-aware: return the cached series or `null` while computing; components render a placeholder for `null`.
   - **Verify:** selecting a site while the 3D view is moving doesn't stall (Performance panel shows no long main-thread task > 50 ms from `siteSeries`).

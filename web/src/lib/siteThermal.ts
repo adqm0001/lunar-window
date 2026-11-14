@@ -1,6 +1,6 @@
 import type { Ephemeris, Site } from "../data/load";
 import { altaz, localFrame } from "./astro";
-import { siteRadiusKm, siteSeries } from "./visibility";
+import { siteRadiusKm, siteSeries, type SiteSeries } from "./visibility";
 import { ICE_K, NZ } from "../gpu/thermal";
 
 // Same regolith heat-flow model as the GPU layer (see gpu/thermal.ts), for one site, hourly,
@@ -27,14 +27,15 @@ export interface SiteThermal {
 
 const cache = new Map<string, SiteThermal>();
 
-export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours = 24 * 365): SiteThermal {
+// Pass `series` when the caller already has it (the UI gets it from the compute worker); otherwise it is computed here.
+export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours = 24 * 365, series?: SiteSeries): SiteThermal {
   const start = Math.max(0, Math.min(e.count - 1, Math.floor(startHour / 24) * 24));
   const len = Math.min(hours, e.count - start);
   const key = `${site.id}:${start}:${len}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const series = siteSeries(e, site);
+  const sun = (series ?? siteSeries(e, site)).sun;
   const frame = localFrame(site.lat, site.lon);
   const r = siteRadiusKm(site);
   const absorbedAt = (i: number) => {
@@ -43,7 +44,7 @@ export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours =
     const mu = Math.max(0, Math.sin((s.el * Math.PI) / 180));
     const inc = (Math.acos(Math.min(1, mu)) * 180) / Math.PI;
     const albedo = 0.12 + 0.06 * (inc / 45) ** 3 + 0.25 * (inc / 90) ** 8;
-    return (1 - albedo) * S0 * (series.sun[i] / 255) * mu;
+    return (1 - albedo) * S0 * (sun[i] / 255) * mu;
   };
   const absorbed = new Float32Array(len);
   let fluxSum = 0;
