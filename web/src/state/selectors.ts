@@ -4,12 +4,12 @@ import { useApp } from "./store";
 
 export function useSites() {
   const data = useApp((s) => s.data)!;
-  const custom = useApp((s) => s.customSite);
+  const custom = useApp((s) => s.customSites);
   const finder = useApp((s) => s.finder);
   return useMemo(() => {
     const out = [...data.sites];
     if (finder) out.push(...finder.candidates.map((c) => c.site));
-    if (custom) out.push(custom);
+    out.push(...custom);
     return out;
   }, [data, custom, finder]);
 }

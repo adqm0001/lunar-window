@@ -57,7 +57,8 @@ interface AppState {
   setFinder: (r: FinderResult | null) => void;
   toggleCinema: () => void;
   setView: (v: "3d" | "2d") => void;
-  customSite: Site | null;
+  customSites: Site[];
+  pointSeq: number;
   hour: number;
   playing: boolean;
   speedIndex: number;
@@ -68,6 +69,8 @@ interface AppState {
   setLayer: (l: LayerId) => void;
   setRangeDays: (d: number) => void;
   setCustomSite: (s: Site) => void;
+  removeCustomSite: (id: string) => void;
+  renameCustomSite: (id: string, name: string) => void;
   setData: (d: AppData) => void;
   setHour: (h: number) => void;
   togglePlaying: () => void;
@@ -145,13 +148,32 @@ export const useApp = create<AppState>((set, get) => ({
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
-  customSite: null,
+  customSites: [],
+  pointSeq: 0,
   setField: (field) => set({ field, poleField: field }),
   setFieldProgress: (fieldProgress) => set({ fieldProgress }),
   setFieldError: (fieldError) => set({ fieldError }),
   setLayer: (layer) => set({ layer }),
   setRangeDays: (rangeDays) => set({ rangeDays }),
-  setCustomSite: (customSite) => set({ customSite, selectedId: customSite.id }),
+  setCustomSite: (site) =>
+    set((s) => {
+      const i = s.customSites.findIndex((c) => c.id === site.id);
+      if (i >= 0) {
+        const next = [...s.customSites];
+        next[i] = { ...site, name: s.customSites[i].name };
+        return { customSites: next, selectedId: site.id };
+      }
+      const seq = s.pointSeq + 1;
+      const named = site.name === "Custom point" ? { ...site, name: `Point ${seq}` } : site;
+      return { customSites: [...s.customSites, named].slice(-20), pointSeq: seq, selectedId: site.id };
+    }),
+  removeCustomSite: (id) =>
+    set((s) => ({
+      customSites: s.customSites.filter((c) => c.id !== id),
+      pinned: s.pinned.filter((p) => p.id !== id),
+      selectedId: s.selectedId === id ? "connecting-ridge-b" : s.selectedId,
+    })),
+  renameCustomSite: (id, name) => set((s) => ({ customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)) })),
   hour: 0,
   playing: false,
   speedIndex: 2,

@@ -37,7 +37,7 @@ export async function analyzeArea(label: string, lat: number, lon: number) {
     const now = useApp.getState();
     now.setActiveField(f);
     now.setRegionStatus(null);
-    const custom = now.customSite;
+    const custom = now.customSites.find((c) => c.id === now.selectedId);
     if (custom && now.selectedId === custom.id) {
       const [cx, cy] = toMap(custom.lat, custom.lon);
       const better = inField(f, cx, cy) ? customSiteAt(f, cx, cy) : null;

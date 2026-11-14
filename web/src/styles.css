@@ -212,3 +212,6 @@ button { font: inherit; color: inherit; }
 
 .power { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--line-2); border-radius: 9px; }
 .power .chip { padding: 3px 8px; font-size: 11px; }
+
+.row-x { color: var(--dim); font-size: 10px; padding: 2px 4px; border-radius: 4px; }
+.row-x:hover { color: var(--danger); background: rgba(255,93,108,0.1); }

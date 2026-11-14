@@ -32,9 +32,19 @@ export default function SiteList() {
       <div className="section-label" style={{ marginTop: 0 }}>Sites · sunlight next 30 days</div>
       {groups.map(([group, sites]) => (
         <div key={group}>
-          <div className="section-label">{group}</div>
+          <div className="section-label">{group === "Custom" ? "Your points · click the terrain to add" : group}</div>
           {sites.map((s) => (
-            <button key={s.id} className={`site-row ${s.id === selectedId ? "active" : ""}`} onClick={() => select(s.id)}>
+            <button
+              key={s.id}
+              className={`site-row ${s.id === selectedId ? "active" : ""}`}
+              onClick={() => select(s.id)}
+              onDoubleClick={() => {
+                if (s.group !== "Custom") return;
+                const name = window.prompt("Name this point", s.name);
+                if (name && name.trim()) useApp.getState().renameCustomSite(s.id, name.trim().slice(0, 40));
+              }}
+              title={s.group === "Custom" ? "Double-click to rename" : undefined}
+            >
               <span className="name">{s.name}</span>
               <span className="bar">
                 <b style={{ width: `${sunlit[s.id]}%` }} />
@@ -42,6 +52,19 @@ export default function SiteList() {
               <span className="meta" style={{ width: 32, textAlign: "right" }}>
                 {Math.round(sunlit[s.id])}%
               </span>
+              {s.group === "Custom" && (
+                <span
+                  className="row-x"
+                  role="button"
+                  aria-label={`Remove ${s.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    useApp.getState().removeCustomSite(s.id);
+                  }}
+                >
+                  ✕
+                </span>
+              )}
             </button>
           ))}
         </div>
