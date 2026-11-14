@@ -4,7 +4,8 @@ import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
-import { siteThermal, type SiteThermal } from "../lib/siteThermal";
+import type { SiteThermal } from "../lib/siteThermal";
+import { getThermal, useSeriesVersion } from "../state/seriesCache";
 import { contactWindows } from "../lib/contacts";
 import { formatUtc, hourToDate } from "../state/store";
 import { formatDuration, useApp } from "../state/store";
@@ -52,7 +53,8 @@ export default function SitePanel() {
   }, [series, Math.floor(hourBucket / 24)]);
 
   const thermStart = Math.floor(hourBucket / 720) * 720;
-  const therm = useMemo(() => (series ? siteThermal(data.ephem, site, thermStart, 24 * 395, series) : null), [data, site, thermStart, series]);
+  const seriesVersion = useSeriesVersion();
+  const therm = useMemo(() => getThermal(data.ephem, site, thermStart, 24 * 395), [data, site, thermStart, seriesVersion]);
   const tNow = therm ? therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))] : 0;
 
   const contacts = useMemo(() => (series ? contactWindows(data.ephem, series, hourBucket, 24 * 7) : null), [data, series, hourBucket]);

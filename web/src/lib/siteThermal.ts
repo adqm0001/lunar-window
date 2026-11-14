@@ -4,7 +4,7 @@ import { siteRadiusKm, siteSeries, type SiteSeries } from "./visibility";
 import { ICE_K, NZ } from "../gpu/thermal";
 
 // Same regolith heat-flow model as the GPU layer (see gpu/thermal.ts), for one site, hourly,
-// on level ground. Cheap enough to run on every site selection (~10 ms for a year).
+// on level ground. Runs in the compute worker (src/workers); the UI reads results through state/seriesCache.ts.
 
 const S0 = 1361;
 const EMIS = 0.95;
@@ -27,10 +27,15 @@ export interface SiteThermal {
 
 const cache = new Map<string, SiteThermal>();
 
-// Pass `series` when the caller already has it (the UI gets it from the compute worker); otherwise it is computed here.
-export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours = 24 * 365, series?: SiteSeries): SiteThermal {
+/** The window siteThermal actually models: start rounded down to a whole day, clipped to the ephemeris. */
+export function thermalWindow(e: Ephemeris, startHour: number, hours: number) {
   const start = Math.max(0, Math.min(e.count - 1, Math.floor(startHour / 24) * 24));
-  const len = Math.min(hours, e.count - start);
+  return { start, len: Math.min(hours, e.count - start) };
+}
+
+// Pass `series` when the caller already has it; otherwise it is computed here.
+export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours = 24 * 365, series?: SiteSeries): SiteThermal {
+  const { start, len } = thermalWindow(e, startHour, hours);
   const key = `${site.id}:${start}:${len}`;
   const hit = cache.get(key);
   if (hit) return hit;
