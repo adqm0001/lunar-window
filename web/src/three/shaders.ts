@@ -32,6 +32,7 @@ uniform vec3 uEarth;
 uniform vec3 uEarthWorld;
 uniform float uEarthshine;
 uniform float uExaggeration;
+uniform float uMapLight;
 uniform float uCutOn;
 uniform vec3 uCutA;
 uniform vec3 uCutB;
@@ -135,6 +136,16 @@ void main() {
   vec3 Lh = normalize(L - upW * dot(L, upW) + upW * 0.15);
   float fill = uSunPower * 0.012 * (0.35 + 0.65 * max(dot(n, Lh), 0.0)) * smoothstep(-0.12, 0.05, dot(upW, L));
   vec3 col = albedo * (sunCol * photometry * surge * lit + vec3(0.85, 0.85, 0.88) * fill + earthshine + vec3(0.0008, 0.0009, 0.0012));
+  if (uMapLight > 0.5) {
+    // map view: shaded relief lit from a fixed direction, readable everywhere
+    vec3 fixedW = vec3(-0.7, 0.0, -0.7);
+    vec3 tW = fixedW - upW * dot(fixedW, upW);
+    vec3 Lm = normalize(upW * 0.62 + (dot(tW, tW) > 1e-6 ? normalize(tW) : vec3(1.0, 0.0, 0.0)));
+    float hill = max(dot(n, Lm), 0.0);
+    col = albedo * 3.4 * (0.1 + 0.9 * hill);
+    mu0 = hill;
+  }
+
 
   if (uOverlayMix > 0.0) {
     vec2 uv = vec2((vMap.x - uCenter.x + uExtent) / (2.0 * uExtent), (vMap.y - uCenter.y + uExtent) / (2.0 * uExtent));

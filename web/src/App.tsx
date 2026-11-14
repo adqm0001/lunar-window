@@ -7,7 +7,6 @@ import { applyEarly, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
 import TopBar from "./components/TopBar";
 import SiteList from "./components/SiteList";
-import MapView from "./components/MapView";
 import SitePanel from "./components/SitePanel";
 import Timeline from "./components/Timeline";
 import Scene3D from "./components/Scene3D";
@@ -25,7 +24,6 @@ let startedData = false;
 export default function App() {
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
-  const view = useApp((s) => s.view);
   const cinema = useApp((s) => s.cinema);
   const finderOpen = useApp((s) => s.finderOpen);
   const compareOpen = useApp((s) => s.compareOpen);
@@ -98,7 +96,9 @@ export default function App() {
 
   return (
     <div className={`app ${cinema ? "cinema" : ""}`}>
-      <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
+      <main className="stage">
+        <Scene3D />
+      </main>
       <TopBar />
       {roverOpen ? <RoverPanel /> : landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />

@@ -74,6 +74,10 @@ export class MoonScene {
   private dragging = false;
   private upDirty = false;
   private sunGain = 1;
+  private mapMode = false;
+  private mapTarget = new THREE.Vector3();
+  private mapDist = 120;
+  private mapDrag: { x: number; y: number } | null = null;
   private quality: Quality = "balanced";
   private bloom!: UnrealBloomPass;
   private cutaway = new Cutaway();
@@ -122,6 +126,7 @@ export class MoonScene {
     this.controls.target.copy(MOON_CENTER);
     this.configureControls(true);
     this.bindMovement();
+    this.bindMapInput();
 
     this.scene.background = new THREE.Color(0x000000);
     this.stars = this.makeStars();
@@ -154,6 +159,7 @@ export class MoonScene {
         uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
         uEarthshine: { value: 0 },
         uExaggeration: { value: EXAGGERATION },
+        uMapLight: { value: 0 },
         uCutOn: { value: 0 },
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
@@ -487,6 +493,140 @@ export class MoonScene {
     }
   }
 
+  // ---- 2D map mode: the same terrain seen straight down, north up (0 longitude up near the poles)
+  setMapMode(on: boolean) {
+    if (on === this.mapMode) return;
+    this.mapMode = on;
+    this.flight = null;
+    this.dirty = true;
+    for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) m.uniforms.uMapLight.value = on ? 1 : 0;
+    this.bloom.enabled = !on && this.quality !== "saver";
+    if (on) {
+      this.controls.enabled = false;
+      const dir = (this.orbitMode ? this.camera.position.clone() : this.controls.target.clone()).sub(MOON_CENTER).normalize();
+      this.mapTarget.copy(MOON_CENTER).addScaledVector(dir, this.groundRadius(dir, 0.1));
+      const d = this.orbitMode ? this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM : this.camera.position.distanceTo(this.controls.target);
+      this.mapDist = Math.min(3500, Math.max(3, d));
+      this.placeMapCamera();
+      return;
+    }
+    const up = this.mapTarget.clone().sub(MOON_CENTER).normalize();
+    if (this.mapDist > 900) {
+      this.controls.target.copy(MOON_CENTER);
+      this.camera.up.set(0, 1, 0);
+      this.camera.position.copy(MOON_CENTER).addScaledVector(up, R_MOON_KM + Math.max(1500, this.mapDist));
+      this.configureControls(true);
+    } else {
+      this.controls.target.copy(this.mapTarget);
+      this.camera.up.copy(up);
+      const h = this.mapHeading(up);
+      this.camera.position.copy(this.mapTarget).addScaledVector(up, this.mapDist * 0.6).addScaledVector(h, -this.mapDist * 0.8);
+      this.configureControls(false);
+    }
+    this.camera.lookAt(this.controls.target);
+  }
+
+  get isMapMode() {
+    return this.mapMode;
+  }
+
+  private mapHeading(up: THREE.Vector3): THREE.Vector3 {
+    const proj = (v: THREE.Vector3) => v.clone().sub(up.clone().multiplyScalar(v.dot(up)));
+    const north = proj(new THREE.Vector3(0, -1, 0));
+    const zero = proj(new THREE.Vector3(0, 0, -1));
+    const lat = Math.abs((Math.asin(Math.max(-1, Math.min(1, -up.y))) * 180) / Math.PI);
+    const w = Math.min(1, Math.max(0, (lat - 70) / 15));
+    const nl = north.length();
+    const zl = zero.length();
+    const h = new THREE.Vector3();
+    if (nl > 1e-6) h.addScaledVector(north, (1 - w) / nl);
+    if (zl > 1e-6) h.addScaledVector(zero, w / zl);
+    return h.lengthSq() > 1e-8 ? h.normalize() : new THREE.Vector3(1, 0, 0);
+  }
+
+  private placeMapCamera() {
+    const up = this.mapTarget.clone().sub(MOON_CENTER).normalize();
+    this.mapTarget.copy(MOON_CENTER).addScaledVector(up, this.groundRadius(up, Math.max(0.05, this.mapDist * 0.002)));
+    this.camera.up.copy(this.mapHeading(up));
+    this.camera.position.copy(this.mapTarget).addScaledVector(up, this.mapDist);
+    this.camera.lookAt(this.mapTarget);
+    this.controls.target.copy(this.mapTarget);
+  }
+
+  private mapPan(dxPx: number, dyPx: number) {
+    const h = this.renderer.domElement.clientHeight || 1;
+    const kmPerPx = (2 * this.mapDist * Math.tan((this.camera.fov * Math.PI) / 360)) / h;
+    const up = this.mapTarget.clone().sub(MOON_CENTER).normalize();
+    const north = this.mapHeading(up);
+    const right = north.clone().cross(up).normalize();
+    const move = right.multiplyScalar(-dxPx * kmPerPx).addScaledVector(north, dyPx * kmPerPx);
+    const ang = move.length() / R_MOON_KM;
+    if (ang > 0) {
+      const axis = up.clone().cross(move).normalize();
+      const nd = up.clone().applyAxisAngle(axis, ang);
+      this.mapTarget.copy(MOON_CENTER).addScaledVector(nd, R_MOON_KM);
+    }
+    this.placeMapCamera();
+    this.dirty = true;
+  }
+
+  private mapKeys(dt: number): boolean {
+    if (!this.keys.size) return false;
+    const sp = (this.keys.has("shift") ? 3 : 1) * 500 * dt;
+    let dx = 0;
+    let dy = 0;
+    if (this.keys.has("w")) dy += sp;
+    if (this.keys.has("s")) dy -= sp;
+    if (this.keys.has("a")) dx += sp;
+    if (this.keys.has("d")) dx -= sp;
+    if (this.keys.has("r")) this.mapDist = Math.min(3500, this.mapDist * (1 + 1.2 * dt));
+    if (this.keys.has("f")) this.mapDist = Math.max(0.6, this.mapDist * (1 - 1.2 * dt));
+    if (dx || dy) this.mapPan(dx, dy);
+    else this.placeMapCamera();
+    return true;
+  }
+
+  private bindMapInput() {
+    const el = this.renderer.domElement;
+    el.addEventListener("pointerdown", (e) => {
+      if (!this.mapMode) return;
+      this.mapDrag = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener("pointermove", (e) => {
+      if (!this.mapMode || !this.mapDrag) return;
+      this.mapPan(e.clientX - this.mapDrag.x, e.clientY - this.mapDrag.y);
+      this.mapDrag = { x: e.clientX, y: e.clientY };
+    });
+    const end = () => (this.mapDrag = null);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    el.addEventListener(
+      "wheel",
+      (e) => {
+        if (!this.mapMode) return;
+        e.preventDefault();
+        this.mapDist = Math.min(3500, Math.max(0.6, this.mapDist * Math.exp(e.deltaY * 0.0015)));
+        this.placeMapCamera();
+        this.dirty = true;
+      },
+      { passive: false },
+    );
+  }
+
+  // Ground point under a screen position, for hover readouts
+  pickAt(clientX: number, clientY: number): { lat: number; lon: number; heightM: number; inPatch: boolean } | null {
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+    const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
+    if (!hit) return null;
+    const [lat, lon] = latLonFromWorld(hit.point);
+    const heightM = (hit.point.distanceTo(MOON_CENTER) - R_MOON_KM) * 1000;
+    return { lat, lon, heightM, inPatch: hit.object === this.terrainMesh };
+  }
+
   private groundRadius(dir: THREE.Vector3, spacingKm: number) {
     if (!this.globe) return R_MOON_KM;
     return R_MOON_KM + surfaceHeightM(this.globe, dir, spacingKm).h / 1000;
@@ -588,7 +728,7 @@ export class MoonScene {
     el.addEventListener(
       "wheel",
       (e) => {
-        if (this.flight) return;
+        if (this.flight || this.mapMode) return;
         const d = this.camera.position.distanceTo(this.controls.target);
         if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
           this.flyToOrbit(1.8);
@@ -734,6 +874,8 @@ export class MoonScene {
         if (this.cutPending) this.applyCut();
       }
       this.dirty = true;
+    } else if (this.mapMode) {
+      if (this.mapKeys(dt)) this.dirty = true;
     } else {
       if (this.orbitMode) {
         const alt = this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM;
@@ -773,6 +915,7 @@ export class MoonScene {
     }
     this.lod = new LodTerrain(g, tex);
     this.lod.setQuality(this.quality);
+    this.lod.material.uniforms.uMapLight.value = this.mapMode ? 1 : 0;
     if (this.gOverlay) setTimeout(() => this.setGlobalOverlay(this.gOverlay), 0);
     this.setCutUniforms(this.cutOn && !this.cutPending);
     this.globeMats = [this.lod.material];
@@ -1042,7 +1185,7 @@ export class MoonScene {
     if (q !== "high") this.dpr = this.maxDpr;
     this.renderer.setPixelRatio(this.dpr);
     this.composer.setPixelRatio(this.dpr);
-    this.bloom.enabled = q !== "saver";
+    this.bloom.enabled = q !== "saver" && !this.mapMode;
     this.lod?.setQuality(q);
     this.resize();
     this.dirty = true;

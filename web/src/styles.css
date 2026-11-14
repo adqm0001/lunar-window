@@ -255,3 +255,4 @@ button { font: inherit; color: inherit; }
 .contact-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
 .contact-row .c-station { color: var(--text); }
 .contact-row .c-time, .contact-row .c-dur { font-family: var(--mono); color: var(--muted); font-size: 10.5px; }
+.hover-tip { position: absolute; pointer-events: none; z-index: 5; font: 11px var(--mono); color: var(--text); background: rgba(6,8,14,0.82); border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 8px; white-space: nowrap; }

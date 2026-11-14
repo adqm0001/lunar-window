@@ -7,7 +7,10 @@ import { MoonScene } from "../three/MoonScene";
 import { uniqueFeatures } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
 import { useApp } from "../state/store";
-import { computeGlobal } from "../gpu/globalOverlay";
+import { computeGlobal, globalValueAt } from "../gpu/globalOverlay";
+import { formatLayerValue, layerValue } from "../gpu/layers";
+import { fieldCell } from "../data/field";
+import { formatLatLon } from "../lib/astro";
 import { GLOBAL_LAYERS } from "../gpu/layers";
 import { addPointAt } from "../lib/points";
 import { applyLate, registerScene, sharedCamera } from "../state/share";
@@ -40,6 +43,9 @@ export default function Scene3D() {
   const st = useSiteState();
   const { metrics } = useFieldMetrics();
   const lastSelected = useRef<string | null>(null);
+  const view = useApp((s) => s.view);
+  const [hover, setHover] = useState<{ x: number; y: number; text: string; value: string | null } | null>(null);
+  const hoverAt = useRef(0);
 
   const hasField = !!field;
   useEffect(() => {
@@ -95,6 +101,10 @@ export default function Scene3D() {
   useEffect(() => {
     scene?.setQuality(quality);
   }, [scene, quality]);
+
+  useEffect(() => {
+    scene?.setMapMode(view === "2d");
+  }, [scene, view]);
 
   useEffect(() => {
     scene?.setCutaway(cutaway);
@@ -154,11 +164,42 @@ export default function Scene3D() {
   }, [scene, site, st]);
 
   useEffect(() => {
-    scene?.setOverlay(layer === "now" ? null : overlayCanvas(layer, metrics, field, finder, survival));
-  }, [scene, layer, metrics, field, finder, survival]);
+    scene?.setOverlay(layer === "now" && view === "3d" ? null : overlayCanvas(layer, metrics, field, finder, survival));
+  }, [scene, layer, metrics, field, finder, survival, view]);
+
+  const onMove = (e: React.PointerEvent) => {
+    if (!scene || e.buttons) return;
+    const now = performance.now();
+    if (now - hoverAt.current < 60) return;
+    hoverAt.current = now;
+    const p = scene.pickAt(e.clientX, e.clientY);
+    if (!p) {
+      setHover(null);
+      return;
+    }
+    let value: string | null = null;
+    const f = useApp.getState().field;
+    const cell = f ? fieldCell(f, p.lat, p.lon) : null;
+    if (cell && f && layer !== "terrain") {
+      const v = layerValue(layer, metrics, f, cell.row * f.meta.horizon.size + cell.col);
+      if (v !== null) value = formatLayerValue(layer, v);
+    }
+    if (value === null && layer !== "terrain") {
+      const g = globalValueAt(p.lat, p.lon);
+      if (g && g.layer === layer) value = formatLayerValue(layer, g.value);
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHover({ x: e.clientX - rect.left, y: e.clientY - rect.top, text: `${formatLatLon(p.lat, p.lon)} · ${Math.round(p.heightM)} m`, value });
+  };
 
   return (
-    <div className="scene-host" ref={host}>
+    <div className="scene-host" ref={host} onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+      {hover && (
+        <div className="hover-tip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+          {hover.text}
+          {hover.value && <b> · {hover.value}</b>}
+        </div>
+      )}
       {!field && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
       {error && <div className="stage-msg error">{error}</div>}
     </div>

@@ -148,6 +148,7 @@ export class LodTerrain {
         uCamPos: { value: new THREE.Vector3() },
         uT64: { value: null },
         uQuality: { value: 1 },
+        uMapLight: { value: 0 },
         uCraterTex: { value: craterTexture() },
         uCutOn: { value: 0 },
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
@@ -455,6 +456,7 @@ uniform float uEarthshine;
 uniform vec3 uHole;
 uniform vec3 uCamPos;
 uniform int uQuality;
+uniform float uMapLight;
 uniform float uCutOn;
 uniform vec3 uCutA;
 uniform vec3 uCutB;
@@ -660,7 +662,7 @@ void main() {
   vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
   vec3 albedo = mix(mapAlbedo, polarAlbedo, polarW);
-  albedo *= 0.92 + 0.16 * vnoise(vec2(lon, lat) * 3.0);
+  albedo *= 0.92 + 0.16 * vnoise3(dW * 58.0);
   albedo *= 1.0 + 0.32 * halo;
   if (camDist < 150.0) albedo *= 1.0 + mottle(u * R_KM, footprint) * (1.0 - smoothstep(90.0, 150.0, camDist));
 
@@ -676,6 +678,16 @@ void main() {
   vec3 Lh = normalize(L - dW * dot(L, dW) + dW * 0.15);
   float fill = uSunPower * 0.012 * (0.35 + 0.65 * max(dot(n, Lh), 0.0)) * smoothstep(-0.12, 0.05, dot(dW, L));
   vec3 col = albedo * (vec3(1.0, 0.975, 0.94) * uSunPower * photometry * surge * lit + vec3(0.85, 0.85, 0.88) * fill + vec3(0.55, 0.68, 1.0) * uEarthshine * max(dot(n, normalize(uEarthWorld)), 0.0) + 0.0008);
+  if (uMapLight > 0.5) {
+    // map view: shaded relief lit from a fixed direction, readable everywhere
+    vec3 fixedW = vec3(-0.7, 0.0, -0.7);
+    vec3 tW = fixedW - dW * dot(fixedW, dW);
+    vec3 Lm = normalize(dW * 0.62 + (dot(tW, tW) > 1e-6 ? normalize(tW) : vec3(1.0, 0.0, 0.0)));
+    float hill = max(dot(n, Lm), 0.0);
+    col = albedo * 3.4 * (0.1 + 0.9 * hill);
+    mu0 = hill;
+  }
+
   if (any(isnan(col))) col = vec3(0.0);
   if (uGOverlayMix > 0.0) {
     vec4 o = texture(uGOverlay, uv);
