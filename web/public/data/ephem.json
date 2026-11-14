@@ -1,0 +1,28 @@
+{
+  "start": "2026-01-01T00:00:00Z",
+  "stepHours": 1,
+  "count": 26304,
+  "frame": "MOON_ME_DE421",
+  "units": "km, Moon center to body, apparent",
+  "layout": "float32 [count][sunX, sunY, sunZ, earthX, earthY, earthZ]",
+  "dsn": {
+    "layout": "int8 degrees [count][station]",
+    "stations": [
+      {
+        "name": "Goldstone",
+        "lat": 35.4259,
+        "lon": -116.8895
+      },
+      {
+        "name": "Madrid",
+        "lat": 40.4313,
+        "lon": -4.248
+      },
+      {
+        "name": "Canberra",
+        "lat": -35.4024,
+        "lon": 148.9813
+      }
+    ]
+  }
+}
