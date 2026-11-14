@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatUtc, hourToDate, useApp } from "../state/store";
 import { copyShareLink } from "../state/share";
+import ValidationPanel from "./ValidationPanel";
 import { useSelectedSite, useSiteState } from "../state/selectors";
 
 export default function TopBar() {
@@ -12,6 +13,7 @@ export default function TopBar() {
   const quality = useApp((s) => s.quality);
   const setQuality = useApp((s) => s.setQuality);
   const [copied, setCopied] = useState<null | boolean>(null);
+  const [validation, setValidation] = useState(false);
   const share = async () => {
     setCopied(await copyShareLink());
     setTimeout(() => setCopied(null), 2200);
@@ -34,6 +36,9 @@ export default function TopBar() {
           </button>
         ))}
       </div>
+      <button className="chip" onClick={() => setValidation(true)} title="How every number is checked against NASA tools and published measurements">
+        ✓ Validation
+      </button>
       <button className="chip share" onClick={share} title="Copy a link that opens this exact view: site, time, layer, your points and the camera">
         {copied === null ? "⤴ Share view" : copied ? "✓ Link copied" : "Link is in the address bar"}
       </button>
@@ -50,6 +55,7 @@ export default function TopBar() {
         <i />
         DSN LINK {st.link ? "OPEN" : "DOWN"}
       </span>
+      {validation && <ValidationPanel onClose={() => setValidation(false)} />}
     </header>
   );
 }
