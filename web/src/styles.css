@@ -256,3 +256,12 @@ button { font: inherit; color: inherit; }
 .contact-row .c-station { color: var(--text); }
 .contact-row .c-time, .contact-row .c-dur { font-family: var(--mono); color: var(--muted); font-size: 10.5px; }
 .hover-tip { position: absolute; pointer-events: none; z-index: 5; font: 11px var(--mono); color: var(--text); background: rgba(6,8,14,0.82); border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 8px; white-space: nowrap; }
+
+.skyline-btn { width: 100%; margin: 4px 0 10px; }
+.modal.skyline { max-width: 760px; }
+.sky-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--muted); margin: 6px 0 4px; }
+.sky-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.why h3 { font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
+.why-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.why-row p { flex: 1 1 280px; font-size: 12px; line-height: 1.55; margin: 0; }
+.modal .tc-label { font: 9px var(--mono); fill: var(--muted); }

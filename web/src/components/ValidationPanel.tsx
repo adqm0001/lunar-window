@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
 import { percentOn, siteSeries } from "../lib/visibility";
 import { siteThermal } from "../lib/siteThermal";
 import { useApp } from "../state/store";
@@ -38,7 +39,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
   const meanAbs = peaks.length ? peaks.reduce((s, p) => s + Math.abs(p.y2020 - p.published), 0) / peaks.length : 0;
 
-  return (
+  return createPortal(
     <div className="modal-back" onClick={onClose}>
       <div className="glass modal validation" onClick={(e) => e.stopPropagation()}>
         <div className="finder-head">
@@ -160,7 +161,8 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           </ul>
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

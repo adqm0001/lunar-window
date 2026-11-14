@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import SkylinePanel from "./SkylinePanel";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
@@ -25,6 +26,7 @@ export default function SitePanel() {
     return !inField(field, x, y);
   }, [field, site]);
   const series = useSeries();
+  const [skyline, setSkyline] = useState(false);
   const lit = (v: number) => v >= 128;
   const on = (v: number) => v === 1;
 
@@ -68,6 +70,10 @@ export default function SitePanel() {
       <div className="panel-sub">
         {formatLatLon(site.lat, site.lon)} · {site.terrain ? `${Math.round(site.height_m)} m` : "flat horizon (outside terrain map)"}
       </div>
+      <button className="btn skyline-btn" onClick={() => setSkyline(true)} title="The terrain skyline from this spot with the Sun's and Earth's paths">
+        🔭 Skyline and Sun path
+      </button>
+      {skyline && <SkylinePanel site={site} onClose={() => setSkyline(false)} />}
 
       <div className="cards">
         <div className={`card ${sunUp ? "sun" : "bad"}`}>
