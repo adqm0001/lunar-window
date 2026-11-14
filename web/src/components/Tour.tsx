@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fieldCell } from "../data/field";
 import { DEFAULT_WEIGHTS, findBestSpots } from "../gpu/finder";
 import { getEngine } from "../gpu/useFieldMetrics";
 import { isRoute, planRoute } from "../lib/rover";
-import { currentScene } from "../state/share";
+import { currentScene, openedFromLink } from "../state/share";
 import { SPEEDS, useApp } from "../state/store";
 
 interface Step {
@@ -122,9 +122,36 @@ const STEPS: Step[] = [
   },
 ];
 
+const SEEN_KEY = "lw-welcomed";
+
+function alreadyWelcomed() {
+  try {
+    return localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
+function markWelcomed() {
+  try {
+    localStorage.setItem(SEEN_KEY, "1");
+  } catch {
+    // private browsing: nothing to remember
+  }
+}
+
 export default function Tour() {
   const step = useApp((s) => s.tourStep);
   const setStep = useApp((s) => s.setTourStep);
+  const globe = useApp((s) => s.globe);
+  const [offer, setOffer] = useState(false);
+
+  // first visit (not via a shared link): offer the tour once the Moon has loaded
+  useEffect(() => {
+    if (!globe || openedFromLink() || alreadyWelcomed()) return;
+    const id = setTimeout(() => setOffer(true), 2500);
+    return () => clearTimeout(id);
+  }, [globe]);
 
   useEffect(() => {
     if (step === null) return;
@@ -140,7 +167,40 @@ export default function Tour() {
     return () => window.removeEventListener("keydown", onKey);
   }, [step, setStep]);
 
-  if (step === null) return null;
+  if (step === null) {
+    if (!offer) return null;
+    return (
+      <div className="glass tour-card welcome" role="dialog" aria-label="Welcome">
+        <div className="tour-title">Plan a landing at the Moon's south pole</div>
+        <div className="tour-text">
+          Real NASA terrain, the real Sun and Earth for any hour of 2026–2028, and GPU models of sunlight, radio contact, temperature and ice. New here? The
+          one-minute tour shows what it can do.
+        </div>
+        <div className="tour-nav">
+          <button
+            className="btn"
+            onClick={() => {
+              markWelcomed();
+              setOffer(false);
+            }}
+          >
+            Explore on my own
+          </button>
+          <span style={{ flex: 1 }} />
+          <button
+            className="btn primary"
+            onClick={() => {
+              markWelcomed();
+              setOffer(false);
+              setStep(0);
+            }}
+          >
+            ▶ Take the tour
+          </button>
+        </div>
+      </div>
+    );
+  }
   const s = STEPS[step];
   const last = step === STEPS.length - 1;
   return (

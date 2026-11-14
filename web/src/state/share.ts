@@ -56,6 +56,10 @@ function parse(hash: string): Shared | null {
 const pending = typeof location !== "undefined" ? parse(location.hash) : null;
 let applied = !pending;
 
+export function openedFromLink(): boolean {
+  return !!pending;
+}
+
 export function sharedCamera(): ViewState | null {
   return pending?.c ?? null;
 }

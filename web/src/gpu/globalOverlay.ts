@@ -24,6 +24,36 @@ export function globalRequest(layer: LayerId, hour: number, rangeDays: number) {
   return { kind, start, hours, key: `${kind}:${start}:${hours}` };
 }
 
+// Raw whole-Moon results for a kind of model and a time window (cached).
+export async function getGlobalMetrics(kind: "light" | "thermal", start: number, hours: number): Promise<GlobalMetrics | null> {
+  const st = useApp.getState();
+  if (!st.globe || !st.data) return null;
+  const key = `${kind}:${start}:${hours}`;
+  let m = cache.get(key);
+  if (!m) {
+    if (!engine && !engineError) {
+      st.setGlobalStatus("Building horizons for the whole Moon on your GPU (one time)…");
+      await new Promise((r) => setTimeout(r, 30));
+      try {
+        engine = new GlobalLayers(st.globe, st.data.ephem);
+      } catch (e) {
+        engineError = (e as Error).message;
+      }
+    }
+    if (!engine) {
+      st.setGlobalStatus(engineError);
+      return null;
+    }
+    st.setGlobalStatus(kind === "thermal" ? "Running the soil heat model for the whole Moon…" : "Computing the whole Moon…");
+    await new Promise((r) => setTimeout(r, 30));
+    m = engine.compute(kind, start, hours);
+    if (cache.size > 6) cache.clear();
+    cache.set(key, m);
+    st.setGlobalStatus(null);
+  }
+  return m;
+}
+
 export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalOverlay | null> {
   const st = useApp.getState();
   if (!st.globe || !st.data) return null;

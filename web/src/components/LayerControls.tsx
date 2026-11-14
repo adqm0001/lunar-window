@@ -1,6 +1,8 @@
 import { gradientCss, layerDef, LAYERS } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
+import { useState } from "react";
 import { formatUtc, hourToDate, useApp } from "../state/store";
+import RegionReport from "./RegionReport";
 
 const RANGES = [7, 30, 90, 365];
 
@@ -23,6 +25,7 @@ export default function LayerControls() {
   const porkchopOpen = useApp((s) => s.porkchopOpen);
   const finderOpen = useApp((s) => s.finderOpen);
   const roverOpen = useApp((s) => s.roverOpen);
+  const [report, setReport] = useState(false);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
   const def = layerDef(layer);
@@ -62,6 +65,10 @@ export default function LayerControls() {
         <button className={`chip find ${roverOpen ? "sel" : ""}`} onClick={() => useApp.getState().setRoverOpen(!roverOpen)}>
           ⛟ Rover route
         </button>
+        <button className={`chip find ${report ? "sel" : ""}`} onClick={() => setReport(true)} title="Rank NASA's Artemis III candidate regions for the chosen dates">
+          🏁 Artemis III report
+        </button>
+        {report && <RegionReport onClose={() => setReport(false)} />}
         {def.ranged && (
           <>
             <span className="chip-sep" />
