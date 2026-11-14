@@ -32,10 +32,18 @@ function startWorker(): Worker {
   return w;
 }
 
+/** The worker itself failed (script didn't load, crashed, or a message couldn't be read), not just one request. */
+export class WorkerFailedError extends Error {
+  constructor(reason: string) {
+    super(`Compute worker failed: ${reason}`);
+    this.name = "WorkerFailedError";
+  }
+}
+
 function fail(w: Worker, reason: string) {
   if (worker === w) worker = null;
   w.terminate();
-  const error = new Error(`Compute worker failed: ${reason}`);
+  const error = new WorkerFailedError(reason);
   for (const [id, p] of pending) {
     if (p.worker !== w) continue;
     pending.delete(id);
