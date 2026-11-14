@@ -1,6 +1,68 @@
 # Tasks
 
-Open work for Lunar Window. Read [ARCHITECTURE.md](ARCHITECTURE.md) first: it explains the coordinate frames, data formats, engines and conventions every task below relies on. Paths are relative to the repo root unless they start with `src/`, which means `web/src/`.
+What is built and what is left for Lunar Window: finished work is checked off under **Done**, open tasks follow with a spec each. Read [ARCHITECTURE.md](ARCHITECTURE.md) first: it explains the coordinate frames, data formats, engines and conventions every task below relies on. Paths are relative to the repo root unless they start with `src/`, which means `web/src/`.
+
+## Done
+
+Everything already built, so you know what exists before adding to it. Feature → file map in ARCHITECTURE.md §0.
+
+### Data and engine
+- [x] LOLA south polar terrain reader and projection checks (`pipeline/terrain.py`, `check_terrain.py`)
+- [x] Hourly Sun and Earth ephemeris 2026–2028 (JPL DE421 via Skyfield) and DSN station visibility (`pipeline/ephemeris.py`)
+- [x] C++ OpenMP horizon engine: 102,400 points × 180 directions in about a minute (`engine/horizon.cpp`)
+- [x] Named-site horizons (720 directions), pole horizon field, 62.5 m heights, slope maps (`build_sites.py`, `build_field.py`)
+- [x] Data compression: delta + gzip, 18 MB → 6 MB field
+- [x] Global and polar terrain for the 3D Moon: 16 px/° global, 240 m and 80 m polar, 40 m polar tiles, 64 px/° global tiles (`build_globe.py`, `build_tiles.py`, `build_global_tiles.py`)
+
+### Validation
+- [x] Sun and Earth positions vs JPL Horizons: 0.00003° (`validate_horizons.py`)
+- [x] Sunlight at five peaks of light vs Bussey et al. 2010: within 3.7 points on average (`validate_illumination.py`)
+- [x] GPU horizons vs C++ engine: within 0.01°
+- [x] Thermal model vs Diviner: equator 86–385 K (measured ≈95–390 K), Shackleton floor below 110 K
+- [x] Validation window in the app, recomputing several checks live (`ValidationPanel.tsx`)
+
+### App and rendering
+- [x] App shell: glass panels, timeline with playback, live site status, keyboard shortcuts, cinema mode (H)
+- [x] WebGL2 GPU engine: sunlight, Earth, Sun+DSN and longest-night maps for any date range in milliseconds (`gpu/engine.ts`)
+- [x] Whole-Moon 3D globe: cube-sphere level-of-detail terrain, streamed 40 m / 80 m / 64 px/° tiles, NASA 8K color map (`three/lod.ts`)
+- [x] Exact terrain shadows: horizon-field shadows on the polar patch, per-pixel ray-marched shadows everywhere else
+- [x] Sky: stars, Sun, Earth at its true position and phase, Sun/Earth rays from the selected site
+- [x] Realistic lighting: lunar-Lambert photometry, opposition surge, earthshine, auto exposure by Sun height, bounce light in shadows
+- [x] Crater detail below the data resolution (mipmapped crater texture, crater shadows), close-range rocks with long shadows, small craters and soil roughness (`three/craterTexture.ts`)
+- [x] Camera: orbit ↔ surface seamless zoom, WASD / Q E / R F, right-drag pan, collision with the ground, cinematic flights
+- [x] 2D view: full-screen top-down map of the real terrain with shaded relief, pan and zoom
+- [x] Hover readout: position, height and layer value under the cursor
+- [x] Performance: render on demand, Saver/Balanced/High power setting with fps caps, adaptive resolution (frame ≈2.5 ms at 1600×900 on the pole)
+- [x] Faster first load: Moon appears before the 25 MB polar file, which streams in the background
+- [x] Inside the Moon cutaway with interior layers (Weber et al. 2011)
+- [x] Phone layout: compact top bar, scrolling layer row, bottom tab bar with slide-up panels
+
+### Analysis layers
+- [x] Sunlight %, Earth in view %, Sun + DSN link %, longest night, safe slope (polar field)
+- [x] Surface temperature and water ice stability from a 14-layer regolith heat-flow model on the GPU (`gpu/thermal.ts`)
+- [x] Whole-Moon versions of all of these: 2.2 million points on equirectangular + two polar grids (`gpu/globalLayers.ts`)
+- [x] Regional horizon fields on demand for any area below 75°S ("Analyze this area", `gpu/regionField.ts`)
+- [x] Click anywhere: 720-direction horizon computed on the GPU in ~2 ms (`gpu/globalHorizon.ts`)
+
+### Planning tools
+- [x] Sites: peaks of light, Shackleton floor, missions, Artemis III regions; unlimited custom points (rename, remove)
+- [x] Site panel: Sun/Earth/DSN status with countdowns, 12-month stats, ground temperature now and through the year, ice depth, 7-day DSN contact windows, skyline with Sun and Earth paths
+- [x] Landing spot finder: scores 102,400 spots for a date, mission length, night limit, flat ground, priority; top 10 (`gpu/finder.ts`)
+- [x] Lander simulator: panels, battery, loads, hour by hour; GPU survival map; landing-miss Monte Carlo (10,000 touchdowns); true-scale 3D lander (`lib/lander.ts`, `lib/montecarlo.ts`, `three/landerModel.ts`)
+- [x] Landing dates (porkchop): survival for every site and landing date (`PorkchopPanel.tsx`)
+- [x] Compare: pin sites, side-by-side table, synced timeline rows
+- [x] Rover route planner: hour-by-hour light and link bitmasks on the GPU, time-dependent A*, animated rover (`lib/rover.ts`)
+- [x] Artemis III report card: nine candidate regions ranked for chosen dates (`lib/regionReport.ts`)
+
+### Sharing and presentation
+- [x] Shareable links: URL keeps time, site, layer, points and camera (`state/share.ts`)
+- [x] Video recording of the 3D view (● Rec, `lib/recorder.ts`)
+- [x] Guided tour (9 steps) and first-visit welcome card (`Tour.tsx`)
+- [x] Page title, description, icon and link preview image
+- [x] Live deployment to GitHub Pages on every push to `main` (`.github/workflows/pages.yml`)
+- [x] README, ARCHITECTURE.md, this task list
+
+---
 
 ## Workflow
 
