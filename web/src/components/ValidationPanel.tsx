@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { percentOn } from "../lib/visibility";
-import { siteThermal } from "../lib/siteThermal";
-import { getSeries, useSeriesVersion } from "../state/seriesCache";
+import { getSeries, getThermal, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
 
 // Results of the offline pipeline run for 2020 (pipeline/validate_illumination.py), same year as
@@ -34,8 +33,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
   const thermal = useMemo(() => {
     const at = (id: string) => {
       const site = data.sites.find((s) => s.id === id);
-      const series = site && getSeries(data.ephem, site);
-      return site && series ? siteThermal(data.ephem, site, 0, 24 * 365, series) : null;
+      return site ? getThermal(data.ephem, site, 0, 24 * 365) : null;
     };
     return { a: at("apollo-11"), b: at("shackleton-floor") };
   }, [data, seriesVersion]);

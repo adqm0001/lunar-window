@@ -189,7 +189,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** worker computes `siteSeries` (returns three `Uint8Array`s, transferred). Keep a main-thread cache keyed by `site.id`. `useSeries` becomes async-aware: return the cached series or `null` while computing; components render a placeholder for `null`.
   - **Verify:** selecting a site while the 3D view is moving doesn't stall (Performance panel shows no long main-thread task > 50 ms from `siteSeries`).
 
-- [ ] **32. Site temperature in the worker** (S) — Depends on 31
+- [x] **32. Site temperature in the worker** (S) — Depends on 31
   - **Files:** `src/lib/siteThermal.ts`, `src/components/SitePanel.tsx`, `ValidationPanel.tsx`.
   - **Spec:** move `siteThermal` into the worker (it needs the series from 31). `SitePanel` shows "computing…" in the temperature section until ready.
   - **Verify:** same as 31.

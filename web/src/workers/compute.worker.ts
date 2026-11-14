@@ -1,5 +1,6 @@
 import type { Ephemeris, Site } from "../data/load";
-import { siteSeries } from "../lib/visibility";
+import { siteSeries, type SiteSeries } from "../lib/visibility";
+import { siteThermal } from "../lib/siteThermal";
 
 export interface WorkerRequest {
   id: number;
@@ -24,9 +25,24 @@ scope.onmessageerror = () => {
 
 let ephem: Ephemeris | null = null;
 
+// Kept so siteThermal can reuse a site's series; the main thread gets transferred copies. Sites arrive under
+// a per-object key (state/seriesCache.ts), so an id here always means the same site.
+const seriesById = new Map<string, SiteSeries>();
+const MAX_SERIES = 64;
+
 function needEphem(): Ephemeris {
   if (!ephem) throw new Error("Compute worker used before initWorker");
   return ephem;
+}
+
+function seriesFor(site: Site): SiteSeries {
+  let s = seriesById.get(site.id);
+  if (!s) {
+    s = siteSeries(needEphem(), site);
+    if (seriesById.size >= MAX_SERIES) seriesById.delete(seriesById.keys().next().value!);
+    seriesById.set(site.id, s);
+  }
+  return s;
 }
 
 // A handler returns its result plus any buffers to transfer back instead of copying.
@@ -37,8 +53,14 @@ const handlers: Record<string, (payload: unknown) => { result: unknown; transfer
   },
   ping: (payload) => ({ result: payload }),
   siteSeries: (payload) => {
-    const s = siteSeries(needEphem(), payload as Site);
-    return { result: s, transfer: [s.sun.buffer, s.earth.buffer, s.link.buffer] };
+    const s = seriesFor(payload as Site);
+    const copy = { sun: s.sun.slice(), earth: s.earth.slice(), link: s.link.slice() };
+    return { result: copy, transfer: [copy.sun.buffer, copy.earth.buffer, copy.link.buffer] };
+  },
+  // Not transferred: siteThermal keeps its results in its own cache, so the reply is a copy.
+  siteThermal: (payload) => {
+    const { site, startHour, hours } = payload as { site: Site; startHour: number; hours: number };
+    return { result: siteThermal(needEphem(), site, startHour, hours, seriesFor(site)) };
   },
 };
 
