@@ -1,4 +1,7 @@
+import type { FieldData } from "../data/field";
 import type { Ephemeris } from "../data/load";
+import type { VisibilityBits } from "../gpu/engine";
+import type { RoverFailure, RoverParams, RoverRoute } from "../lib/rover";
 import type { WorkerRequest, WorkerResponse } from "./compute.worker";
 
 interface Pending {
@@ -65,6 +68,15 @@ function sendInit(w: Worker, ephem: Ephemeris): Promise<number> {
 
 export function call<T>(type: string, payload?: unknown, transfer: Transferable[] = []): Promise<T> {
   return post<T>(getWorker(), type, payload, transfer);
+}
+
+/**
+ * Runs planRoute in the worker. The bits are transferred (callers make fresh ones for each search); the field's
+ * slope layer is still used on the main thread, so the worker gets a copy.
+ */
+export function planRouteInWorker(field: FieldData, bits: VisibilityBits, params: RoverParams): Promise<RoverRoute | RoverFailure> {
+  const slope = field.slope.slice();
+  return call("planRoute", { meta: field.meta, slope, bits, params }, [bits.sun.buffer, bits.link.buffer, slope.buffer]);
 }
 
 /** Sends the worker its own copy of the ephemeris; the copies are transferred, so the main thread keeps its arrays. */

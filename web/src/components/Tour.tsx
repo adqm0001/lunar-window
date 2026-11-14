@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { fieldCell } from "../data/field";
 import { DEFAULT_WEIGHTS, findBestSpots } from "../gpu/finder";
 import { getEngine } from "../gpu/useFieldMetrics";
-import { isRoute, planRoute } from "../lib/rover";
+import { isRoute } from "../lib/rover";
+import { planRouteInWorker } from "../workers/client";
 import { currentScene, openedFromLink } from "../state/share";
 import { SPEEDS, useApp } from "../state/store";
 
@@ -102,13 +103,21 @@ const STEPS: Step[] = [
       const B = fieldCell(f, b.lat, b.lon);
       if (!A || !B) return;
       const bits = e.visibilityBits(Math.floor(s.hour), 14 * 24);
-      const r = planRoute(f, bits, { start: A, goal: B, speedKmh: 0.4, maxSlopeDeg: 20, needLink: false });
-      if (isRoute(r)) r.gpuMillis = bits.millis;
-      s.setRover(r);
-      if (isRoute(r)) {
-        s.setSpeedIndex(Math.max(0, SPEEDS.findIndex((x) => x.hoursPerSecond === 6)));
-        if (!s.playing) s.togglePlaying();
-      }
+      const gpuMillis = bits.millis;
+      const step = s.tourStep;
+      planRouteInWorker(f, bits, { start: A, goal: B, speedKmh: 0.4, maxSlopeDeg: 20, needLink: false })
+        .then((r) => {
+          // The search runs in the worker; ignore it if the tour has moved on meanwhile.
+          const now = st();
+          if (now.tourStep !== step) return;
+          if (isRoute(r)) r.gpuMillis = gpuMillis;
+          now.setRover(r);
+          if (isRoute(r)) {
+            now.setSpeedIndex(Math.max(0, SPEEDS.findIndex((x) => x.hoursPerSecond === 6)));
+            if (!now.playing) now.togglePlaying();
+          }
+        })
+        .catch((err: Error) => console.error(err));
       currentScene()?.flyToLatLon(-89.55, -150, 28);
     },
   },

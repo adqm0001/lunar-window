@@ -1,4 +1,7 @@
+import type { FieldData } from "../data/field";
 import type { Ephemeris } from "../data/load";
+import type { VisibilityBits } from "../gpu/engine";
+import { planRoute, type RoverParams } from "../lib/rover";
 
 export interface WorkerRequest {
   id: number;
@@ -22,6 +25,11 @@ const handlers: Record<string, (payload: unknown) => unknown> = {
     return ephem.count;
   },
   ping: (payload) => payload,
+  // planRoute reads only the field's meta and slope layer, so that is all the client sends.
+  planRoute: (payload) => {
+    const { meta, slope, bits, params } = payload as { meta: FieldData["meta"]; slope: Uint8Array; bits: VisibilityBits; params: RoverParams };
+    return planRoute({ meta, slope } as FieldData, bits, params);
+  },
 };
 
 scope.onmessage = (e) => {

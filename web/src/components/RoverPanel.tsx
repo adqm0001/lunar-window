@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { fieldCell } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
-import { isRoute, planRoute } from "../lib/rover";
+import { isRoute, type RoverFailure } from "../lib/rover";
+import { planRouteInWorker } from "../workers/client";
 import { formatDuration, formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSelectedSite, useSites } from "../state/selectors";
 
@@ -34,11 +35,18 @@ export default function RoverPanel() {
     const e = getEngine();
     if (!goal || !e) return;
     setBusy(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
+        // visibilityBits needs WebGL, so it stays here; the search itself runs in the compute worker.
         const bits = e.visibilityBits(Math.floor(hour), WINDOW_DAYS * 24);
-        const r = planRoute(field, bits, { start: fromCell, goal, speedKmh: speed, maxSlopeDeg: maxSlope, needLink });
-        if (isRoute(r)) r.gpuMillis = bits.millis;
+        const gpuMillis = bits.millis;
+        const r = await planRouteInWorker(field, bits, { start: fromCell, goal, speedKmh: speed, maxSlopeDeg: maxSlope, needLink }).catch(
+          (err: Error): RoverFailure => ({ reason: `The route search failed: ${err.message}`, expanded: 0, millis: 0 }),
+        );
+        // Drop the result if the panel was closed or the area changed while the worker was searching.
+        const now = useApp.getState();
+        if (!now.roverOpen || now.field !== field) return;
+        if (isRoute(r)) r.gpuMillis = gpuMillis;
         setRover(r);
       } finally {
         setBusy(false);
