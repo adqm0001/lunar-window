@@ -164,7 +164,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** replace static imports of `LanderPanel`, `FinderPanel`, `RoverPanel`, `PorkchopPanel`, `ComparePanel` with `React.lazy(() => import(...))`, render inside `<Suspense fallback={null}>`.
   - **Verify:** `npm run build` prints separate chunks for them; each panel still opens.
 
-- [ ] **27. Lazy-load windows** (S)
+- [x] **27. Lazy-load windows** (S)
   - **Files:** `src/components/LayerControls.tsx` (`RegionReport`), `src/components/TopBar.tsx` (`ValidationPanel`), `src/components/SitePanel.tsx` (`SkylinePanel`).
   - **Spec:** same pattern as 26.
   - **Verify:** same as 26.
