@@ -11,6 +11,7 @@ import Timeline from "./components/Timeline";
 import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
 import FinderPanel from "./components/FinderPanel";
+import ComparePanel from "./components/ComparePanel";
 
 export default function App() {
   const data = useApp((s) => s.data);
@@ -18,6 +19,7 @@ export default function App() {
   const view = useApp((s) => s.view);
   const cinema = useApp((s) => s.cinema);
   const finderOpen = useApp((s) => s.finderOpen);
+  const compareOpen = useApp((s) => s.compareOpen);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -76,6 +78,7 @@ export default function App() {
       {finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />
       <SitePanel />
+      {compareOpen && <ComparePanel />}
       <Timeline />
       <div className="kbd-hint">H hide panels · Space play · ← → hour · Shift ← → day · drag to orbit · click terrain to analyze</div>
     </div>

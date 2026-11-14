@@ -114,3 +114,10 @@ export function fieldHeight(f: FieldData, x: number, y: number): number | null {
   const at = (rr: number, cc: number) => z[rr * size + cc];
   return at(r0, c0) * (1 - fc) * (1 - fr) + at(r0, c0 + 1) * fc * (1 - fr) + at(r0 + 1, c0) * (1 - fc) * fr + at(r0 + 1, c0 + 1) * fc * fr;
 }
+
+export function fieldSafePct(f: FieldData, lat: number, lon: number): number | null {
+  const c = fieldCell(f, lat, lon);
+  if (!c) return null;
+  const n = f.meta.slope.size;
+  return f.slope[n * n + c.row * n + c.col];
+}

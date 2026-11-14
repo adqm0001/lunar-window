@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSeries } from "../state/selectors";
+import { siteSeries, type SiteSeries } from "../lib/visibility";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -18,6 +19,9 @@ export default function Timeline() {
   const speedIndex = useApp((s) => s.speedIndex);
   const { setHour, togglePlaying, setSpeedIndex } = useApp.getState();
   const series = useSeries();
+  const pinned = useApp((s) => s.pinned);
+  const compareOpen = useApp((s) => s.compareOpen);
+  const compare = compareOpen && pinned.length >= 2;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -70,25 +74,39 @@ export default function Timeline() {
     }
 
     const top = OVERVIEW_H + 18;
-    const rowH = Math.max(10, (size.h - top - 18) / 3 - 4);
-    ROWS.forEach((row, r) => {
-      const y = top + r * (rowH + 4);
+    type Spec = { label: string; arr: Uint8Array; color: number[]; kind: "sun" | "flag"; link?: Uint8Array };
+    const specs: Spec[] = compare
+      ? pinned.slice(0, 6).map((s) => {
+          const se: SiteSeries = siteSeries(data.ephem, s);
+          return { label: s.name.replace("Best spot ", "★").slice(0, 9).toUpperCase(), arr: se.sun, color: [255, 181, 71], kind: "sun", link: se.link };
+        })
+      : ROWS.map((row) => ({ label: row.label, arr: series[row.key], color: [...row.color], kind: row.key === "sun" ? "sun" : "flag" }));
+    const rowH = Math.max(8, (size.h - top - 18) / specs.length - 3);
+    specs.forEach((row, r) => {
+      const y = top + r * (rowH + 3);
       g.fillStyle = "#7d889b";
       g.font = "10px JetBrains Mono, monospace";
-      g.fillText(row.label, 8, y + rowH / 2 + 3);
+      g.fillText(row.label, 6, y + rowH / 2 + 3);
       g.fillStyle = "#0b0f17";
       g.fillRect(x0, y, W, rowH);
-      const arr = series[row.key];
       const [cr, cg, cb] = row.color;
       for (let px = 0; px < W; px++) {
         const a = Math.floor(start + (px / W) * span);
         const b = Math.max(a + 1, Math.floor(start + ((px + 1) / W) * span));
         let s = 0;
-        for (let i = a; i < b && i < total; i++) s += row.key === "sun" ? arr[i] / 255 : arr[i];
+        let l = 0;
+        for (let i = a; i < b && i < total; i++) {
+          s += row.kind === "sun" ? row.arr[i] / 255 : row.arr[i];
+          if (row.link) l += row.link[i];
+        }
         const v = s / (b - a);
         if (v > 0.02) {
           g.fillStyle = `rgba(${cr},${cg},${cb},${0.2 + 0.8 * v})`;
-          g.fillRect(x0 + px, y, 1, rowH);
+          g.fillRect(x0 + px, y, 1, row.link ? rowH - 3 : rowH);
+        }
+        if (row.link && l / (b - a) > 0.5) {
+          g.fillStyle = "rgba(61,220,151,0.95)";
+          g.fillRect(x0 + px, y + rowH - 2, 1, 2);
         }
       }
     });
@@ -108,7 +126,7 @@ export default function Timeline() {
     const cx = x0 + ((hour - start) / span) * W;
     g.fillStyle = "#ffffff";
     g.fillRect(cx - 0.75, top - 6, 1.5, size.h - top);
-  }, [data, series, size, hour, start, span, total, windowDays]);
+  }, [data, series, size, hour, start, span, total, windowDays, compare, pinned]);
 
   const hourFromEvent = (e: React.PointerEvent, mode: "main" | "overview") => {
     const rect = canvasRef.current!.getBoundingClientRect();

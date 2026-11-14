@@ -21,6 +21,10 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  pinned: Site[];
+  compareOpen: boolean;
+  togglePin: (s: Site) => void;
+  setCompareOpen: (o: boolean) => void;
   finder: FinderResult | null;
   setFinderOpen: (o: boolean) => void;
   setFinder: (r: FinderResult | null) => void;
@@ -54,6 +58,15 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  pinned: [],
+  compareOpen: false,
+  togglePin: (site) =>
+    set((s) => {
+      const has = s.pinned.some((p) => p.id === site.id);
+      const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
+      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen };
+    }),
+  setCompareOpen: (compareOpen) => set({ compareOpen }),
   finder: null,
   setFinderOpen: (finderOpen) => set({ finderOpen }),
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),

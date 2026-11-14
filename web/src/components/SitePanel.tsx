@@ -11,6 +11,8 @@ export default function SitePanel() {
   const hour = useApp((s) => s.hour);
   const site = useSelectedSite();
   const st = useSiteState();
+  const pinned = useApp((s) => s.pinned.some((p) => p.id === site.id));
+  const togglePin = useApp((s) => s.togglePin);
   const series = useSeries();
   const lit = (v: number) => v >= 128;
   const on = (v: number) => v === 1;
@@ -40,7 +42,12 @@ export default function SitePanel() {
 
   return (
     <aside className="right">
-      <h2 className="panel-title">{site.name}</h2>
+      <div className="title-row">
+        <h2 className="panel-title">{site.name}</h2>
+        <button className={`pin-btn ${pinned ? "on" : ""}`} onClick={() => togglePin(site)} title="Pin to compare">
+          {pinned ? "Pinned" : "+ Compare"}
+        </button>
+      </div>
       <div className="panel-sub">
         {formatLatLon(site.lat, site.lon)} · {site.terrain ? `${Math.round(site.height_m)} m` : "flat horizon (outside terrain map)"}
       </div>
