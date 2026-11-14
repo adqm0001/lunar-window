@@ -1,7 +1,9 @@
 import type { FieldData } from "../data/field";
 import type { FieldMetrics } from "./engine";
 
-export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "score" | "survive";
+export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "temp" | "ice" | "score" | "survive";
+
+export const THERMAL_LAYERS: LayerId[] = ["temp", "ice"];
 
 type Stop = [number, number, number, number];
 
@@ -22,6 +24,11 @@ const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 1
 export const SCORE: Stop[] = [[0, 20, 10, 40], [0.4, 110, 40, 150], [0.7, 240, 110, 90], [0.88, 255, 200, 80], [1, 255, 255, 230]];
 export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [0.999, 255, 230, 120], [1, 61, 220, 151]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
+const TEMP: Stop[] = [[0, 30, 20, 90], [0.15, 40, 90, 220], [0.3, 60, 200, 230], [0.5, 240, 220, 90], [0.75, 250, 110, 50], [1, 255, 240, 230]];
+const ICE: Stop[] = [[0, 20, 40, 120], [0.5, 60, 140, 255], [1, 190, 250, 255]];
+export const TEMP_MIN = 20;
+export const TEMP_MAX = 360;
+export const ICE_MAX_DEPTH = 0.8;
 
 export const LAYERS: LayerDef[] = [
   { id: "terrain", label: "Terrain", short: "Terrain", ranged: false, stops: [], legend: ["", ""], describe: "LOLA shaded relief" },
@@ -32,6 +39,8 @@ export const LAYERS: LayerDef[] = [
   { id: "night", label: "Longest night", short: "Night", ranged: true, stops: NIGHT, legend: ["0 d", "≥ 30 d"], describe: "Longest continuous stretch without sunlight" },
   { id: "score", label: "Landing score", short: "★ Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
   { id: "survive", label: "Lander survival", short: "♥ Survival", ranged: false, stops: SURVIVE, legend: ["dies day 1", "survives"], describe: "Share of the mission the chosen lander stays powered, simulated hour by hour at every point (green = survives the whole mission)" },
+  { id: "temp", label: "Max surface temperature", short: "Temp", ranged: true, stops: TEMP, legend: ["20 K", "360 K"], describe: "Hottest the ground gets in the period, from a heat-flow model of the soil run for every point on your GPU (sunlight on the real slope and horizon, heat soaking into the ground, glowing back to space)" },
+  { id: "ice", label: "Water ice stability", short: "❄ Ice", ranged: false, stops: ICE, legend: ["≤ 80 cm down", "at surface"], describe: "Where water ice can survive: it stays put wherever the warmest temperature all year is below 110 K. Bright = stable right at the surface, darker blue = stable once you dig down. Uses a full year of sunlight." },
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
 
@@ -65,6 +74,8 @@ export function layerValue(id: LayerId, m: FieldMetrics | null, field: FieldData
   if (id === "earth") return d[i * 4 + 1];
   if (id === "link") return d[i * 4 + 2];
   if (id === "night") return d[i * 4 + 3];
+  if (id === "temp") return d[i * 4];
+  if (id === "ice") return d[i * 4 + 3];
   return null;
 }
 
@@ -73,6 +84,8 @@ export function formatLayerValue(id: LayerId, v: number | null): string {
   if (id === "night") return v < 48 ? `${Math.round(v)} h` : `${(v / 24).toFixed(1)} d`;
   if (id === "now") return v >= 0.5 ? "lit" : "shadow";
   if (id === "terrain") return "";
+  if (id === "temp") return `${Math.round(v)} K (${Math.round(v - 273.15)} °C)`;
+  if (id === "ice") return v < 0 ? "too warm for ice" : v === 0 ? "ice stable at the surface" : `ice stable below ${Math.round(v * 100)} cm`;
   return `${(v * 100).toFixed(1)}%`;
 }
 
@@ -138,7 +151,22 @@ export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img
       }
       continue;
     }
-    const t = id === "night" ? Math.sqrt(v / NIGHT_SCALE_HOURS) : v;
+    if (id === "ice") {
+      if (v < 0) {
+        px[o] = 10;
+        px[o + 1] = 8;
+        px[o + 2] = 6;
+        px[o + 3] = 90;
+        continue;
+      }
+      const [r, g, b] = sample(def.stops, 1 - Math.min(1, v / ICE_MAX_DEPTH));
+      px[o] = r;
+      px[o + 1] = g;
+      px[o + 2] = b;
+      px[o + 3] = 235;
+      continue;
+    }
+    const t = id === "night" ? Math.sqrt(v / NIGHT_SCALE_HOURS) : id === "temp" ? (v - TEMP_MIN) / (TEMP_MAX - TEMP_MIN) : v;
     const [r, g, b] = sample(def.stops, t);
     px[o] = r;
     px[o + 1] = g;

@@ -1,6 +1,7 @@
 import type { Ephemeris } from "../data/load";
 import type { FieldData } from "../data/field";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
+import { THERMAL_MAIN } from "./thermal";
 
 const ROW = 4096;
 
@@ -156,6 +157,9 @@ export class GpuEngine {
   private prog: WebGLProgram;
   private survProg: WebGLProgram;
   private survUni: Record<string, WebGLUniformLocation | null> = {};
+  private thermProg: WebGLProgram | null = null;
+  private thermUni: Record<string, WebGLUniformLocation | null> = {};
+  private field: FieldData;
   private fbo: WebGLFramebuffer;
   private size: number;
   private count: number;
@@ -168,6 +172,7 @@ export class GpuEngine {
     if (!gl) throw new Error("This browser doesn't support WebGL2.");
     if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("This GPU can't render float textures (EXT_color_buffer_float).");
     this.gl = gl;
+    this.field = field;
     const { size, azimuthBins, cellMeters, decode } = field.meta.horizon;
     this.size = size;
     this.count = ephem.count;
@@ -273,6 +278,69 @@ export class GpuEngine {
     gl.uniform1f(u.uMinSoc, lander.minSocPct / 100);
     gl.uniform1i(u.uPanelMode, lander.horizontal ? 2 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, this.size, this.size, gl.RGBA, gl.FLOAT, this.buf);
+    gl.useProgram(this.prog);
+    const data = new Float32Array(this.buf.length);
+    const rowLen = this.size * 4;
+    for (let r = 0; r < this.size; r++) data.set(this.buf.subarray((this.size - 1 - r) * rowLen, (this.size - r) * rowLen), r * rowLen);
+    return { size: this.size, hours: steps * stride, stride, data, millis: performance.now() - t0 };
+  }
+
+  // Surface temperature through time for every cell (see thermal.ts). Output per cell:
+  // max, mean and min surface temperature (K) and the shallowest depth (m) where ice stays stable.
+  computeThermal(startHour: number, hours: number): FieldMetrics {
+    const gl = this.gl;
+    if (!this.thermProg) {
+      this.thermProg = link(gl, VERT, FRAG.split("void main() {")[0] + THERMAL_MAIN);
+      gl.useProgram(this.thermProg);
+      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uSpin"]) {
+        this.thermUni[n] = gl.getUniformLocation(this.thermProg, n);
+      }
+      const f = this.field;
+      const { size: hs, cellMeters: hc } = f.meta.heights;
+      const hf = new Float32Array(hs * hs);
+      for (let i = 0; i < hf.length; i++) hf[i] = f.heights[i];
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, hs, hs, 0, gl.RED, gl.FLOAT, hf);
+      nearest(gl, gl.TEXTURE_2D);
+      gl.activeTexture(gl.TEXTURE3);
+      const { azimuthBins, cellMeters, decode } = f.meta.horizon;
+      const u = this.thermUni;
+      gl.uniform1i(u.uField, 0);
+      gl.uniform1i(u.uSun, 1);
+      gl.uniform1i(u.uEarth, 2);
+      gl.uniform1i(u.uHeights, 4);
+      gl.uniform1i(u.uSize, this.size);
+      gl.uniform1i(u.uAzBins, azimuthBins);
+      gl.uniform1f(u.uCell, cellMeters);
+      gl.uniform1f(u.uExtent, f.meta.extentMeters);
+      gl.uniform2f(u.uCenter, f.meta.centerX ?? 0, f.meta.centerY ?? 0);
+      gl.uniform1f(u.uDecodeStep, decode.stepDeg);
+      gl.uniform1f(u.uDecodeOffset, decode.offsetDeg);
+      gl.uniform1i(u.uHSize, hs);
+      gl.uniform1f(u.uHCell, hc);
+    }
+    const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
+    const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
+    const stride = Math.max(1, Math.ceil(len / 2200));
+    const steps = Math.max(1, Math.floor(len / stride));
+    const t0 = performance.now();
+    gl.useProgram(this.thermProg);
+    const u = this.thermUni;
+    gl.uniform1i(u.uStart, start);
+    gl.uniform1i(u.uSteps, steps);
+    gl.uniform1i(u.uStride, stride);
+    gl.uniform1i(u.uSpin, Math.min(Math.floor(steps / 4), Math.round(709 / stride)));
+    // draw in bands so no single GPU job runs long enough to trip the driver watchdog
+    gl.enable(gl.SCISSOR_TEST);
+    const band = 32;
+    for (let y = 0; y < this.size; y += band) {
+      gl.scissor(0, y, this.size, Math.min(band, this.size - y));
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.flush();
+    }
+    gl.disable(gl.SCISSOR_TEST);
     gl.readPixels(0, 0, this.size, this.size, gl.RGBA, gl.FLOAT, this.buf);
     gl.useProgram(this.prog);
     const data = new Float32Array(this.buf.length);

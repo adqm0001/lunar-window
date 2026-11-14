@@ -82,15 +82,21 @@ export default function LayerControls() {
         <div className="legend-desc">
           {view === "3d" && layer === "terrain" ? "Every pixel tests the Sun against its own terrain horizon, every frame." : def.describe}
         </div>
-        {def.ranged && (
+        {(def.ranged || layer === "ice") && (
           <div className="legend-desc mono">
             {formatUtc(hourToDate(data, start)).slice(0, 10)} → {formatUtc(hourToDate(data, start + hours)).slice(0, 10)}
           </div>
         )}
-        {metrics && def.ranged && (
+        {metrics && (def.ranged || layer === "ice") && (
           <div className="legend-gpu">
-            GPU · {(metrics.size * metrics.size).toLocaleString()} points × {Math.round(metrics.hours / metrics.stride).toLocaleString()} steps ·{" "}
-            {metrics.millis.toFixed(0)} ms
+            GPU · {(metrics.size * metrics.size).toLocaleString()} points × {Math.round(metrics.hours / metrics.stride).toLocaleString()} steps
+            {(layer === "temp" || layer === "ice") && " × 14 soil layers"} · {metrics.millis.toFixed(0)} ms
+          </div>
+        )}
+        {(layer === "temp" || layer === "ice") && (
+          <div className="legend-desc">
+            Soil physics from Hayne et al. 2017 (Diviner). Leaves out light and heat bounced off nearby slopes, so the darkest crater floors come out colder than
+            measured (~25 K vs 30–50 K).
           </div>
         )}
         {field && <div className="legend-desc mono">Area: {field.meta.label ?? "south pole (C++ engine, 40 m)"}</div>}
