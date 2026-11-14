@@ -5,3 +5,5 @@ __pycache__/
 node_modules/
 web/dist/
 .DS_Store
+engine/*.exe
+engine/horizon

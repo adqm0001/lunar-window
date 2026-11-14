@@ -73,8 +73,13 @@ class Terrain:
         return bool(np.hypot(x, y) < self.coarse.valid_radius)
 
     def height_xy(self, x, y):
+        x = np.asarray(x, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
         h = self.fine.height(x, y)
-        return np.where(np.isnan(h), self.coarse.height(x, y), h)
+        miss = np.isnan(h)
+        if miss.any():
+            h[miss] = self.coarse.height(x[miss], y[miss])
+        return h
 
     def height(self, lat_deg, lon_deg):
         x, y = to_map(lat_deg, lon_deg)
