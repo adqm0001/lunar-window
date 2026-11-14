@@ -14,6 +14,9 @@ const requested = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 let worker: { ephem: Ephemeris; ready: Promise<number> } | null = null;
+// After a failed request, wait this long before a render may ask again, so a missing worker script
+// doesn't start a new worker on every frame during playback.
+const RETRY_MS = 2000;
 
 /** Returns the cached value, or null after starting one worker request for `key`. */
 function cached<T>(e: Ephemeris, store: Map<string, T>, key: string, type: string, payload: unknown): T | null {
@@ -22,7 +25,8 @@ function cached<T>(e: Ephemeris, store: Map<string, T>, key: string, type: strin
   const id = `${type}:${key}`;
   if (requested.has(id)) return null;
   requested.add(id);
-  if (worker?.ephem !== e) worker = { ephem: e, ready: initWorker(e) };
+  // If init fails, the client re-sends the ephemeris to the next worker it starts, so requests still go ahead.
+  if (worker?.ephem !== e) worker = { ephem: e, ready: initWorker(e).catch(() => 0) };
   worker.ready
     .then(() => call<T>(type, payload))
     .then((value) => {
@@ -36,7 +40,7 @@ function cached<T>(e: Ephemeris, store: Map<string, T>, key: string, type: strin
       for (const l of listeners) l();
     })
     .catch((err) => {
-      requested.delete(id);
+      setTimeout(() => requested.delete(id), RETRY_MS);
       console.error(err);
     });
   return null;
