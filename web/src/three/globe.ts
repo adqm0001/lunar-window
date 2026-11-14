@@ -84,6 +84,31 @@ float polarH(vec2 m, out bool ok) {
   return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);
 }
 
+float craterH(vec2 p, float cellSize, float seed) {
+  vec2 g = p / cellSize;
+  vec2 gi = floor(g);
+  float h = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 c = gi + vec2(float(i), float(j));
+      if (hashf(c + seed) > 0.6) continue;
+      vec2 center = c + vec2(hashf(c + seed + 3.1), hashf(c + seed + 7.7));
+      float radius = mix(0.18, 0.48, hashf(c + seed + 11.3));
+      float r = length(g - center) / radius;
+      float prof = r < 1.0 ? (r * r - 1.0) * 0.55 + 0.22 * exp(-pow((r - 1.0) * 4.5, 2.0)) : (r < 2.2 ? 0.22 * exp(-pow((r - 1.0) * 4.5, 2.0)) + 0.12 * exp(-(r - 1.0) * 3.0) : 0.0);
+      h += prof * radius * cellSize * 0.32;
+    }
+  }
+  return h;
+}
+
+float terrainH(vec2 m, float lod) {
+  bool ok;
+  float h = polarH(m, ok);
+  h += craterH(m, 900.0, 5.0) + (lod > 0.3 ? craterH(m, 260.0, 19.0) * lod : 0.0);
+  return h;
+}
+
 void main() {
   float lat = radians(vLL.x);
   float lon = radians(vLL.y);
@@ -129,6 +154,18 @@ void main() {
     }
   }
   vec3 n = normalize(vNormal);
+  if (uShadows > 0.5 && vLL.x < -82.0) {
+    float camDist = length(cameraPosition - vWorld);
+    float lod = clamp(1.0 - camDist / 60.0, 0.0, 1.0);
+    float e = max(60.0, camDist * 4.0);
+    float h0 = terrainH(mp, lod);
+    float hx = terrainH(mp + vec2(e, 0.0), lod);
+    float hy = terrainH(mp + vec2(0.0, e), lod);
+    vec3 upW = normalize(vWorld - vec3(0.0, -1737.4, 0.0));
+    vec3 tx = normalize(vec3(1.0, 0.0, 0.0) - upW * upW.x);
+    vec3 ty = normalize(vec3(0.0, 0.0, -1.0) + upW * upW.z);
+    n = normalize(upW - tx * (hx - h0) / e - ty * (hy - h0) / e);
+  }
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);
   float mu0 = max(dot(n, L), 0.0);

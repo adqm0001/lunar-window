@@ -44,6 +44,7 @@ function pickGlobal(lat: number, lon: number) {
     computedMs: millis,
   };
   st.setCustomSite(site);
+  if (lat < -75) analyzeArea("Custom point", lat, lon);
 }
 
 export default function Scene3D() {

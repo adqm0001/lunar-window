@@ -1,5 +1,5 @@
 import type { FieldData } from "../data/field";
-import { inField } from "../data/field";
+import { customSiteAt, inField } from "../data/field";
 import { toMap } from "../lib/astro";
 import { useApp } from "../state/store";
 import { buildRegionField } from "./regionField";
@@ -34,8 +34,15 @@ export async function analyzeArea(label: string, lat: number, lon: number) {
   try {
     const f = await buildRegionField(g, { label, centerX: x, centerY: y, extentMeters: REGION_HALF_M }, (p) => useApp.getState().setRegionStatus({ label, progress: p }));
     cache.set(key, f);
-    useApp.getState().setActiveField(f);
-    useApp.getState().setRegionStatus(null);
+    const now = useApp.getState();
+    now.setActiveField(f);
+    now.setRegionStatus(null);
+    const custom = now.customSite;
+    if (custom && now.selectedId === custom.id) {
+      const [cx, cy] = toMap(custom.lat, custom.lon);
+      const better = inField(f, cx, cy) ? customSiteAt(f, cx, cy) : null;
+      if (better) now.setCustomSite({ ...better, id: custom.id, name: custom.name });
+    }
   } catch (e) {
     useApp.getState().setRegionStatus({ label, progress: 1, error: (e as Error).message });
   } finally {
