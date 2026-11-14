@@ -4,6 +4,8 @@ import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
 import { MOON_CENTER } from "./globe";
+import { onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
+import { GpuTileCache, TILE_CACHE_GLSL } from "./tileCache";
 
 const GRID = 32;
 const MAX_LEVEL = 12;
@@ -41,22 +43,45 @@ function dataResKm(lat: number, lon: number): number {
   return 1.9;
 }
 
-export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpacingKm: number): number {
+export interface Surface {
+  h: number;
+  res: number;
+  want: number;
+}
+
+const surf: Surface = { h: 0, res: 0, want: -1 };
+
+export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpacingKm: number): Surface {
   const ux = -dirWorld.z;
   const uy = dirWorld.x;
   const uz = -dirWorld.y;
   const lat = (Math.asin(Math.max(-1, Math.min(1, uz))) * 180) / Math.PI;
   const lon = (Math.atan2(uy, ux) * 180) / Math.PI;
-  const base = globeHeight(g, lat, lon);
-  const res = dataResKm(lat, lon);
+  let res = dataResKm(lat, lon);
+  let base: number;
+  surf.want = -1;
+  if (res > 1 && vertexSpacingKm < 2.0) {
+    const h64 = sampleGlobal64(lat, lon);
+    if (h64 !== null) {
+      base = h64;
+      res = 0.474;
+    } else {
+      surf.want = tileFor(lat, lon);
+      base = globeHeight(g, lat, lon);
+    }
+  } else base = globeHeight(g, lat, lon);
   const detail = craterDetailKm(ux * R_MOON_KM, uy * R_MOON_KM, uz * R_MOON_KM, vertexSpacingKm * 2.5, res * 2.5);
-  return base + detail * 1000;
+  surf.h = base + detail * 1000;
+  surf.res = res;
+  return surf;
 }
 
 class Node {
   key: string;
   mesh: THREE.Mesh | null = null;
   lastUsed = 0;
+  pending = new Set<number>();
+  dirty = false;
   center = new THREE.Vector3();
   constructor(
     public face: number,
@@ -83,6 +108,7 @@ export class LodTerrain {
   private frame = 0;
   private tmp = new THREE.Vector3();
   meshes: THREE.Mesh[] = [];
+  private cache = new GpuTileCache();
 
   constructor(
     private g: GlobeData,
@@ -110,9 +136,18 @@ export class LodTerrain {
         uEarthshine: { value: 0 },
         uHole: { value: new THREE.Vector3(0, 0, 0) },
         uCamPos: { value: new THREE.Vector3() },
+        uT64: { value: null },
+        uT64Index: { value: null },
       },
     });
     this.group.name = "lod-terrain";
+    this.material.uniforms.uT64.value = this.cache.array;
+    this.material.uniforms.uT64Index.value = this.cache.index;
+    onGlobalTile((key) => {
+      for (const n of this.nodes.values()) {
+        if (n.pending.has(key)) n.dirty = true;
+      }
+    });
   }
 
   private node(face: number, level: number, i: number, j: number): Node {
@@ -160,6 +195,7 @@ export class LodTerrain {
     };
     for (let f = 0; f < 6; f++) visit(this.node(f, 0, 0, 0));
 
+    for (const n of visible) if (n.dirty) this.queue.push(n);
     const seen = new Set<string>();
     this.queue = this.queue.filter((n) => (seen.has(n.key) ? false : (seen.add(n.key), true)));
     this.queue.sort((a, b) => a.level - b.level || this.tmp.copy(a.center).distanceTo(camDir) - this.tmp.copy(b.center).distanceTo(camDir));
@@ -202,13 +238,22 @@ export class LodTerrain {
     const spacingKm = n.sizeKm / GRID;
     const E = GRID + 3;
     const world = new Float32Array(E * E * 3);
+    const resArr = new Float32Array(E * E);
     const dir = new THREE.Vector3();
+    n.pending.clear();
+    n.dirty = false;
     for (let r = 0; r < E; r++) {
       for (let c = 0; c < E; c++) {
         const a = a0 + ((c - 1) / GRID) * span;
         const b = b0 + ((r - 1) / GRID) * span;
         cubeToDir(f, a, b, dir);
-        const h = surfaceHeightM(this.g, dir, spacingKm) / 1000;
+        const s = surfaceHeightM(this.g, dir, spacingKm);
+        if (s.want >= 0 && !n.pending.has(s.want)) {
+          n.pending.add(s.want);
+          requestGlobalTile(s.want);
+        }
+        resArr[r * E + c] = s.res;
+        const h = s.h / 1000;
         const k = (r * E + c) * 3;
         world[k] = dir.x * (R_MOON_KM + h);
         world[k + 1] = dir.y * (R_MOON_KM + h);
@@ -223,6 +268,7 @@ export class LodTerrain {
     const skirtDepth = spacingKm * 1.5;
     const total = V * V + 4 * V;
     const pos = new Float32Array(total * 3);
+    const resV = new Float32Array(total).fill(1.9);
     const nor = new Float32Array(total * 3);
     const at = (r: number, c: number) => (r * E + c) * 3;
     for (let r = 0; r < V; r++) {
@@ -232,6 +278,7 @@ export class LodTerrain {
         pos[o] = world[k] - ox;
         pos[o + 1] = world[k + 1] - oy;
         pos[o + 2] = world[k + 2] - oz;
+        resV[r * V + c] = resArr[(r + 1) * E + c + 1];
         const L = at(r + 1, c);
         const Rr = at(r + 1, c + 2);
         const D = at(r, c + 1);
@@ -303,11 +350,16 @@ export class LodTerrain {
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
     geo.setAttribute("aSpacing", new THREE.BufferAttribute(new Float32Array(total).fill(spacingKm), 1));
+    geo.setAttribute("aRes", new THREE.BufferAttribute(resV, 1));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
     const mesh = new THREE.Mesh(geo, this.material);
     mesh.position.set(ox + MOON_CENTER.x, oy + MOON_CENTER.y, oz + MOON_CENTER.z);
-    mesh.visible = false;
+    mesh.visible = n.mesh?.visible ?? false;
+    if (n.mesh) {
+      this.group.remove(n.mesh);
+      n.mesh.geometry.dispose();
+    }
     this.group.add(mesh);
     n.mesh = mesh;
   }
@@ -331,14 +383,17 @@ function intTexture(data: Int16Array, w: number, h: number) {
 
 const VERT = /* glsl */ `
 attribute float aSpacing;
+attribute float aRes;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSpacing;
+varying float vRes;
 void main() {
   vNormal = normalize(mat3(modelMatrix) * normal);
   vec4 w = modelMatrix * vec4(position, 1.0);
   vWorld = w.xyz;
   vSpacing = aSpacing;
+  vRes = aRes;
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
@@ -363,6 +418,7 @@ uniform vec3 uCamPos;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSpacing;
+varying float vRes;
 out vec4 fragColor;
 
 const float PI = 3.14159265358979;
@@ -371,6 +427,7 @@ const float R_KM = 1737.4;
 const vec3 CENTER = vec3(0.0, -1737.4, 0.0);
 
 ${PROCEDURAL_GLSL}
+${TILE_CACHE_GLSL}
 
 float hashf(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -419,8 +476,13 @@ float demH(vec3 u, out float res) {
     float h = p80(vec2(k * u.y, k * u.x), ok);
     if (ok) { res = 0.08; return h; }
   }
+  float la = degrees(asin(clamp(u.z, -1.0, 1.0)));
+  float lo = degrees(atan(u.y, u.x));
+  bool ok64;
+  float t64 = h64(la, lo, ok64);
+  if (ok64) { res = 0.474; return t64; }
   res = 1.9;
-  return globeH(degrees(asin(clamp(u.z, -1.0, 1.0))), degrees(atan(u.y, u.x)));
+  return globeH(la, lo);
 }
 
 void main() {
@@ -441,7 +503,7 @@ void main() {
 
   vec3 n = normalize(vNormal);
   float footprint = max(camDist * 0.0012, 0.004);
-  float maxCell = min(vSpacing * 2.5, res * 2.5);
+  float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
   if (maxCell > footprint * 3.0) {
     vec3 p = u * R_KM;
     vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
@@ -466,7 +528,7 @@ void main() {
     float hs = h0 + 2.0;
     float best = -1.5;
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
-    float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.05), min(vSpacing * 2.5, res * 2.5)) * 1000.0 : 0.0;
+    float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.05), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
     for (int i = 0; i < 90; i++) {
       float delta = d / R_M;
@@ -474,7 +536,7 @@ void main() {
       vec3 q = cos(delta) * u + sin(delta) * sdir;
       float r2;
       float dh = demH(q, r2) - hs;
-      if (camDist < 30.0 && i < 28) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, res * 2.5)) * 1000.0;
+      if (camDist < 30.0 && i < 28) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
       best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
       if (best > sel + 0.02) break;
       d *= 1.075;
