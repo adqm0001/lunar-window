@@ -8,6 +8,7 @@ import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
 import { LANDER_PRESETS, type Lander } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
+import type { RoverFailure, RoverRoute } from "../lib/rover";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -37,6 +38,10 @@ interface AppState {
   setRegionStatus: (s: { label: string; progress: number; error?: string } | null) => void;
   setActiveField: (f: FieldData) => void;
   landerOpen: boolean;
+  roverOpen: boolean;
+  rover: RoverRoute | RoverFailure | null;
+  setRoverOpen: (o: boolean) => void;
+  setRover: (r: RoverRoute | RoverFailure | null) => void;
   lander: Lander;
   survival: FieldMetrics | null;
   mc: MonteCarloResult | null;
@@ -122,14 +127,19 @@ export const useApp = create<AppState>((set, get) => ({
       finder: null,
       survival: null,
       mc: null,
+      rover: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
     })),
   landerOpen: false,
+  roverOpen: false,
+  rover: null,
+  setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
+  setRover: (rover) => set({ rover }),
   lander: LANDER_PRESETS[0],
   survival: null,
   mc: null,
   flyRequest: null,
-  setLanderOpen: (landerOpen) => set((s) => ({ landerOpen, finderOpen: landerOpen ? false : s.finderOpen })),
+  setLanderOpen: (landerOpen) => set((s) => ({ landerOpen, finderOpen: landerOpen ? false : s.finderOpen, roverOpen: landerOpen ? false : s.roverOpen })),
   setLander: (lander) => set({ lander }),
   setSurvival: (survival) => set((s) => ({ survival, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
   setMc: (mc) => set({ mc }),
@@ -148,7 +158,7 @@ export const useApp = create<AppState>((set, get) => ({
     }),
   setCompareOpen: (compareOpen) => set({ compareOpen }),
   finder: null,
-  setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen })),
+  setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),

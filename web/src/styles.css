@@ -222,3 +222,8 @@ button { font: inherit; color: inherit; }
 .chip.share { min-width: 112px; }
 .temp-chart { display: block; margin: 6px 0 4px; }
 .temp-chart .tc-label { font: 8.5px var(--mono); fill: var(--muted); }
+.f-select { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 8px; font-size: 12px; }
+.f-check { display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; color: var(--muted); margin: 12px 0 4px; cursor: pointer; }
+.f-hint.error { color: #ff8a8a; }
+.rover-kv { margin-top: 12px; }
+.site-label.rover-label { background: rgba(20,80,60,0.85); border-color: rgba(125,255,200,0.6); color: #c9ffe9; }

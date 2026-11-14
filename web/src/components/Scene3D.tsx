@@ -29,6 +29,7 @@ export default function Scene3D() {
   const layer = useApp((s) => s.layer);
   const finder = useApp((s) => s.finder);
   const survival = useApp((s) => s.survival);
+  const rover = useApp((s) => s.rover);
   const sites = useSites();
   const site = useSelectedSite();
   const st = useSiteState();
@@ -101,6 +102,14 @@ export default function Scene3D() {
   useEffect(() => {
     scene?.setScatter(mc ? mc.points : null);
   }, [scene, mc]);
+
+  useEffect(() => {
+    scene?.setRoute(rover && "stops" in rover ? rover : null);
+  }, [scene, rover, field]);
+
+  useEffect(() => {
+    scene?.setRoverHour(hour);
+  }, [scene, hour, rover]);
 
   useEffect(() => {
     const { sun, earth } = ephemAt(data.ephem, hour);

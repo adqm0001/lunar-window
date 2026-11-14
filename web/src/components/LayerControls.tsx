@@ -20,6 +20,7 @@ export default function LayerControls() {
   const landerOpen = useApp((s) => s.landerOpen);
   const porkchopOpen = useApp((s) => s.porkchopOpen);
   const finderOpen = useApp((s) => s.finderOpen);
+  const roverOpen = useApp((s) => s.roverOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
   const def = layerDef(layer);
@@ -55,6 +56,9 @@ export default function LayerControls() {
         </button>
         <button className={`chip find ${finderOpen ? "sel" : ""}`} onClick={() => useApp.getState().setFinderOpen(!finderOpen)}>
           ★ Find landing spot
+        </button>
+        <button className={`chip find ${roverOpen ? "sel" : ""}`} onClick={() => useApp.getState().setRoverOpen(!roverOpen)}>
+          ⛟ Rover route
         </button>
         {def.ranged && (
           <>

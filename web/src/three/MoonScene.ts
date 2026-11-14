@@ -20,6 +20,7 @@ import { Cutaway } from "./cutaway";
 import { craterTexture } from "./craterTexture";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
+import { roverAt, type RoverRoute } from "../lib/rover";
 import type { ArtemisRegion } from "../data/artemis";
 import { dirFromLatLon } from "./globe";
 
@@ -78,6 +79,9 @@ export class MoonScene {
   private cutOn = false;
   private cutPending = false;
   private scatter: THREE.Points | null = null;
+  private routeGroup = new THREE.Group();
+  private route: RoverRoute | null = null;
+  private rover: THREE.Group | null = null;
   private regionGroup = new THREE.Group();
   private labelObjs: CSS2DObject[] = [];
   private pendingRegions: ArtemisRegion[] | null = null;
@@ -825,6 +829,7 @@ export class MoonScene {
 
   private updateDepthAndSky() {
     this.hideOccludedLabels();
+    if (this.rover) this.rover.scale.setScalar(Math.min(1, Math.max(0.05, this.camera.position.distanceTo(this.rover.position) / 12)));
     for (const b of this.beacons.values()) {
       const k = Math.min(1, Math.max(0.06, this.camera.position.distanceTo(b.pos) / 12));
       if (Math.abs(b.group.scale.x - k) > 0.002) b.group.scale.setScalar(k);
@@ -848,6 +853,69 @@ export class MoonScene {
     this.earth.scale.setScalar(k);
     this.stars.position.copy(c);
     this.stars.scale.setScalar(k);
+  }
+
+  private cellToWorld(col: number, row: number, lift: number): THREE.Vector3 {
+    const f = this.field;
+    const cell = f.meta.horizon.cellMeters;
+    const E = f.meta.extentMeters;
+    const x = (col + 0.5) * cell - E + (f.meta.centerX ?? 0);
+    const y = E - (row + 0.5) * cell + (f.meta.centerY ?? 0);
+    const h = fieldHeight(f, x, y) ?? 0;
+    return new THREE.Vector3(x / 1000, this.worldY(x, y, h) + lift, -y / 1000);
+  }
+
+  setRoute(route: RoverRoute | null) {
+    this.dirty = true;
+    this.dropGroup(this.routeGroup);
+    this.routeGroup = new THREE.Group();
+    this.scene.add(this.routeGroup);
+    this.route = route;
+    this.rover = null;
+    if (!route || route.stops.length < 2) return;
+    const pts: THREE.Vector3[] = [];
+    const s = route.stops;
+    for (let i = 1; i < s.length; i++) {
+      for (let k = 0; k < 4; k++) {
+        const t = k / 4;
+        pts.push(this.cellToWorld(s[i - 1].col + (s[i].col - s[i - 1].col) * t, s[i - 1].row + (s[i].row - s[i - 1].row) * t, 0.03));
+      }
+    }
+    pts.push(this.cellToWorld(s[s.length - 1].col, s[s.length - 1].row, 0.03));
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(0.4, 2.2, 1.6), transparent: true, opacity: 0.95, depthTest: true }));
+    line.renderOrder = 5;
+    this.routeGroup.add(line);
+    const rover = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 3.0, 2.0) }));
+    rover.add(body);
+    const stem = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.9, 0)]),
+      new THREE.LineBasicMaterial({ color: 0x7dffc8, transparent: true, opacity: 0.7 }),
+    );
+    rover.add(stem);
+    const el = document.createElement("div");
+    el.className = "site-label rover-label";
+    el.textContent = "Rover";
+    const label = new CSS2DObject(el);
+    label.position.set(0, 1.0, 0);
+    label.center.set(0.5, 1);
+    rover.add(label);
+    this.labelObjs.push(label);
+    this.routeGroup.add(rover);
+    this.rover = rover;
+    this.setRoverHour(this.lastHour);
+  }
+
+  private lastHour = 0;
+  setRoverHour(hour: number) {
+    this.lastHour = hour;
+    if (!this.route || !this.rover) return;
+    const [c, r] = roverAt(this.route, hour);
+    const p = this.cellToWorld(c, r, 0.02);
+    this.rover.position.copy(p);
+    const k = Math.min(1, Math.max(0.05, this.camera.position.distanceTo(p) / 12));
+    this.rover.scale.setScalar(k);
+    this.dirty = true;
   }
 
   setScatter(points: ScatterPoint[] | null) {

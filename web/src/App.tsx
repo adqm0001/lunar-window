@@ -15,6 +15,7 @@ import LayerControls from "./components/LayerControls";
 import FinderPanel from "./components/FinderPanel";
 import ComparePanel from "./components/ComparePanel";
 import LanderPanel from "./components/LanderPanel";
+import RoverPanel from "./components/RoverPanel";
 import PorkchopPanel from "./components/PorkchopPanel";
 
 let startedField = false;
@@ -28,6 +29,7 @@ export default function App() {
   const finderOpen = useApp((s) => s.finderOpen);
   const compareOpen = useApp((s) => s.compareOpen);
   const landerOpen = useApp((s) => s.landerOpen);
+  const roverOpen = useApp((s) => s.roverOpen);
   const porkchopOpen = useApp((s) => s.porkchopOpen);
 
   useEffect(() => {
@@ -97,7 +99,7 @@ export default function App() {
     <div className={`app ${cinema ? "cinema" : ""}`}>
       <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
       <TopBar />
-      {landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
+      {roverOpen ? <RoverPanel /> : landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />
       <SitePanel />
       {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}

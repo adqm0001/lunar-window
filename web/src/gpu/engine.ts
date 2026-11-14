@@ -135,6 +135,59 @@ void main() {
   outColor = vec4(diedAt < 0.0 ? 1.0 : diedAt / total, minSoc, sunSum / float(uSteps), diedAt);
 }`;
 
+// Packs "Sun up" and "link to Earth" into bits: 4 x 32-bit words = 128 hours per pass.
+const BITS_MAIN = `
+uniform int uMode;
+uniform int uEnd;
+void main() {
+  int col = int(gl_FragCoord.x);
+  int row = uSize - 1 - int(gl_FragCoord.y);
+  float x = (float(col) + 0.5) * uCell - uExtent + uCenter.x;
+  float y = uExtent - (float(row) + 0.5) * uCell + uCenter.y;
+  float rho = length(vec2(x, y));
+  float lat = -(PI / 2.0 - 2.0 * atan(rho / (2.0 * R_M)));
+  float lon = atan(x, y);
+  vec3 up = vec3(cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat));
+  vec3 east = vec3(-sin(lon), cos(lon), 0.0);
+  vec3 north = cross(up, east);
+  vec3 site = up * R_KM;
+  uvec4 bits = uvec4(0u);
+  for (int w = 0; w < 4; w++) {
+    uint word = 0u;
+    for (int b = 0; b < 32; b++) {
+      int i = uStart + w * 32 + b;
+      if (i >= uEnd) break;
+      bool on;
+      if (uMode == 0) {
+        vec3 sv = normalize(texelFetch(uSun, tc(i), 0).xyz - site);
+        float sel = degrees(asin(dot(sv, up)));
+        float saz = degrees(atan(dot(sv, east), dot(sv, north)));
+        if (saz < 0.0) saz += 360.0;
+        on = sel - horizonAt(col, row, saz) > 0.0;
+      } else {
+        vec4 e = texelFetch(uEarth, tc(i), 0);
+        vec3 ev = normalize(e.xyz - site);
+        float eel = degrees(asin(dot(ev, up)));
+        float eaz = degrees(atan(dot(ev, east), dot(ev, north)));
+        if (eaz < 0.0) eaz += 360.0;
+        on = e.w > 0.5 && eel > horizonAt(col, row, eaz);
+      }
+      if (on) word |= (1u << uint(b));
+    }
+    bits[w] = word;
+  }
+  outBits = bits;
+}`;
+
+export interface VisibilityBits {
+  start: number;
+  hours: number;
+  words: number;
+  sun: Uint32Array;
+  link: Uint32Array;
+  millis: number;
+}
+
 export interface SurvivalLander {
   panelW: number;
   batteryWh: number;
@@ -160,6 +213,9 @@ export class GpuEngine {
   private thermProg: WebGLProgram | null = null;
   private thermUni: Record<string, WebGLUniformLocation | null> = {};
   private field: FieldData;
+  private bitsProg: WebGLProgram | null = null;
+  private bitsUni: Record<string, WebGLUniformLocation | null> = {};
+  private bitsFbo: WebGLFramebuffer | null = null;
   private fbo: WebGLFramebuffer;
   private size: number;
   private count: number;
@@ -347,6 +403,75 @@ export class GpuEngine {
     const rowLen = this.size * 4;
     for (let r = 0; r < this.size; r++) data.set(this.buf.subarray((this.size - 1 - r) * rowLen, (this.size - r) * rowLen), r * rowLen);
     return { size: this.size, hours: steps * stride, stride, data, millis: performance.now() - t0 };
+  }
+
+  // Hour-by-hour "Sun up" and "Earth link" for every cell, packed as bits ([cell][word]).
+  visibilityBits(startHour: number, hours: number): VisibilityBits {
+    const gl = this.gl;
+    const n = this.size;
+    if (!this.bitsProg) {
+      const head = FRAG.split("void main() {")[0].replace("out vec4 outColor;", "out uvec4 outBits;");
+      this.bitsProg = link(gl, VERT, head + BITS_MAIN);
+      gl.useProgram(this.bitsProg);
+      for (const k of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uMode", "uEnd"]) {
+        this.bitsUni[k] = gl.getUniformLocation(this.bitsProg, k);
+      }
+      const f = this.field;
+      const { azimuthBins, cellMeters, decode } = f.meta.horizon;
+      const u = this.bitsUni;
+      gl.uniform1i(u.uField, 0);
+      gl.uniform1i(u.uSun, 1);
+      gl.uniform1i(u.uEarth, 2);
+      gl.uniform1i(u.uSize, n);
+      gl.uniform1i(u.uAzBins, azimuthBins);
+      gl.uniform1f(u.uCell, cellMeters);
+      gl.uniform1f(u.uExtent, f.meta.extentMeters);
+      gl.uniform2f(u.uCenter, f.meta.centerX ?? 0, f.meta.centerY ?? 0);
+      gl.uniform1f(u.uDecodeStep, decode.stepDeg);
+      gl.uniform1f(u.uDecodeOffset, decode.offsetDeg);
+      gl.activeTexture(gl.TEXTURE5);
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32UI, n, n, 0, gl.RGBA_INTEGER, gl.UNSIGNED_INT, null);
+      nearest(gl, gl.TEXTURE_2D);
+      gl.activeTexture(gl.TEXTURE3);
+      this.bitsFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.bitsFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    }
+    const t0 = performance.now();
+    const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
+    const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
+    const words = Math.ceil(len / 32);
+    const passes = Math.ceil(words / 4);
+    const sun = new Uint32Array(n * n * words);
+    const linkBits = new Uint32Array(n * n * words);
+    const buf = new Uint32Array(n * n * 4);
+    gl.useProgram(this.bitsProg);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.bitsFbo);
+    gl.viewport(0, 0, n, n);
+    gl.uniform1i(this.bitsUni.uEnd, start + len);
+    for (const [mode, out] of [[0, sun], [1, linkBits]] as const) {
+      gl.uniform1i(this.bitsUni.uMode, mode);
+      for (let p = 0; p < passes; p++) {
+        gl.uniform1i(this.bitsUni.uStart, start + p * 128);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.readPixels(0, 0, n, n, gl.RGBA_INTEGER, gl.UNSIGNED_INT, buf);
+        for (let r = 0; r < n; r++) {
+          const src = (n - 1 - r) * n;
+          for (let c = 0; c < n; c++) {
+            const cell = r * n + c;
+            for (let w = 0; w < 4; w++) {
+              const word = p * 4 + w;
+              if (word < words) out[cell * words + word] = buf[(src + c) * 4 + w];
+            }
+          }
+        }
+      }
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.useProgram(this.prog);
+    return { start, hours: len, words, sun, link: linkBits, millis: performance.now() - t0 };
   }
 
   dispose() {
