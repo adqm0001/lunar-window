@@ -7,6 +7,7 @@ import type { FieldData } from "../data/field";
 let engine: GpuEngine | null = null;
 let engineFor: FieldData | null = null;
 let engineError: string | null = null;
+let cached: { field: FieldData; key: string; metrics: FieldMetrics | null } | null = null;
 
 export function getEngine(): GpuEngine | null {
   const { field, data } = useApp.getState();
@@ -36,8 +37,11 @@ export function useFieldMetrics(): { metrics: FieldMetrics | null; error: string
 
   const metrics = useMemo(() => {
     if (!field || !active) return null;
+    const key = `${start}:${hours}`;
+    if (cached && cached.field === field && cached.key === key) return cached.metrics;
     const e = getEngine();
     const m = e ? e.compute(start, hours) : null;
+    cached = { field, key, metrics: m };
     if (import.meta.env.DEV) (window as unknown as { __lw: unknown }).__lw = { metrics: m, start, hours };
     return m;
   }, [field, active, start, hours]);

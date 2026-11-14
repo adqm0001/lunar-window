@@ -8,10 +8,13 @@ import SiteList from "./components/SiteList";
 import MapView from "./components/MapView";
 import SitePanel from "./components/SitePanel";
 import Timeline from "./components/Timeline";
+import Scene3D from "./components/Scene3D";
+import LayerControls from "./components/LayerControls";
 
 export default function App() {
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
+  const view = useApp((s) => s.view);
   const [progress, setProgress] = useState({ fraction: 0, label: "Starting" });
   const [error, setError] = useState<string | null>(null);
 
@@ -50,11 +53,10 @@ export default function App() {
 
   return (
     <div className="app">
+      <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
       <TopBar />
       <SiteList />
-      <main className="main">
-        <MapView />
-      </main>
+      <LayerControls />
       <SitePanel />
       <Timeline />
     </div>

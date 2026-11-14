@@ -1,4 +1,5 @@
-import { toMap } from "../lib/astro";
+import { toLatLon, toMap } from "../lib/astro";
+import type { Site } from "./load";
 
 export interface FieldMeta {
   extentMeters: number;
@@ -70,6 +71,22 @@ export function fieldHorizon(f: FieldData, col: number, row: number): number[] {
   const out = new Array<number>(azimuthBins);
   for (let a = 0; a < azimuthBins; a++) out[a] = f.horizon[a * size * size + row * size + col] * decode.stepDeg + decode.offsetDeg;
   return out;
+}
+
+export function customSiteAt(f: FieldData, x: number, y: number): Site | null {
+  const [lat, lon] = toLatLon(x, y);
+  const cell = fieldCell(f, lat, lon);
+  if (!cell) return null;
+  return {
+    id: `custom:${lat.toFixed(4)},${lon.toFixed(4)}`,
+    name: "Custom point",
+    lat,
+    lon,
+    group: "Custom",
+    terrain: true,
+    height_m: fieldHeight(f, x, y) ?? 0,
+    horizon: fieldHorizon(f, cell.col, cell.row),
+  };
 }
 
 export function fieldHeight(f: FieldData, x: number, y: number): number | null {

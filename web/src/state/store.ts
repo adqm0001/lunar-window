@@ -17,6 +17,8 @@ interface AppState {
   fieldError: string | null;
   layer: LayerId;
   rangeDays: number;
+  view: "3d" | "2d";
+  setView: (v: "3d" | "2d") => void;
   customSite: Site | null;
   hour: number;
   playing: boolean;
@@ -40,8 +42,10 @@ export const useApp = create<AppState>((set, get) => ({
   field: null,
   fieldProgress: 0,
   fieldError: null,
-  layer: "sun",
+  layer: "terrain",
   rangeDays: 30,
+  view: "3d",
+  setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSite: null,
   setField: (field) => set({ field }),
   setFieldProgress: (fieldProgress) => set({ fieldProgress }),

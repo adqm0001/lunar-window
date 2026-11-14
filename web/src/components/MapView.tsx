@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatLatLon, toLatLon, toMap } from "../lib/astro";
-import { fieldCell, fieldHeight, fieldHorizon } from "../data/field";
-import type { Site } from "../data/load";
-import { formatLayerValue, gradientCss, layerDef, layerValue, LAYERS, paint } from "../gpu/layers";
+import { customSiteAt, fieldCell, fieldHeight } from "../data/field";
+import { formatLayerValue, layerValue } from "../gpu/layers";
+import { overlayCanvas } from "../gpu/overlay";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
-import { formatUtc, hourToDate, useApp } from "../state/store";
+import { useApp } from "../state/store";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
 interface View {
@@ -14,21 +14,16 @@ interface View {
 }
 
 const D2R = Math.PI / 180;
-const RANGES = [7, 30, 90, 365];
 
 export default function MapView() {
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
-  const fieldProgress = useApp((s) => s.fieldProgress);
-  const fieldError = useApp((s) => s.fieldError);
   const layer = useApp((s) => s.layer);
-  const rangeDays = useApp((s) => s.rangeDays);
-  const { select, setLayer, setRangeDays, setCustomSite } = useApp.getState();
+  const { select, setCustomSite } = useApp.getState();
   const sites = useSites();
   const site = useSelectedSite();
   const st = useSiteState();
-  const { metrics, error: gpuError, start, hours } = useFieldMetrics();
-  const def = layerDef(layer);
+  const { metrics } = useFieldMetrics();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [view, setView] = useState<View>({ cx: 0, cy: 0, mpp: 110 });
@@ -44,19 +39,7 @@ export default function MapView() {
     return () => ro.disconnect();
   }, []);
 
-  const overlay = useMemo(() => {
-    if (!field || layer === "terrain") return null;
-    if (layer !== "slope" && !metrics) return null;
-    const n = field.meta.horizon.size;
-    const c = document.createElement("canvas");
-    c.width = n;
-    c.height = n;
-    const g = c.getContext("2d")!;
-    const img = g.createImageData(n, n);
-    paint(layer, metrics, field, img);
-    g.putImageData(img, 0, 0);
-    return c;
-  }, [field, layer, metrics]);
+  const overlay = useMemo(() => overlayCanvas(layer, metrics, field), [field, layer, metrics]);
 
   const toScreen = (x: number, y: number): [number, number] => [size.w / 2 + (x - view.cx) / view.mpp, size.h / 2 - (y - view.cy) / view.mpp];
   const toWorld = (sx: number, sy: number): [number, number] => [view.cx + (sx - size.w / 2) * view.mpp, view.cy - (sy - size.h / 2) * view.mpp];
@@ -210,21 +193,8 @@ export default function MapView() {
       return;
     }
     if (!field) return;
-    const [wx, wy] = toWorld(sx, sy);
-    const [lat, lon] = toLatLon(wx, wy);
-    const cell = fieldCell(field, lat, lon);
-    if (!cell) return;
-    const custom: Site = {
-      id: `custom:${lat.toFixed(4)},${lon.toFixed(4)}`,
-      name: "Custom point",
-      lat,
-      lon,
-      group: "Custom",
-      terrain: true,
-      height_m: fieldHeight(field, wx, wy) ?? 0,
-      horizon: fieldHorizon(field, cell.col, cell.row),
-    };
-    setCustomSite(custom);
+    const custom = customSiteAt(field, ...toWorld(sx, sy));
+    if (custom) setCustomSite(custom);
   };
 
   const hoverInfo = useMemo(() => {
@@ -244,7 +214,6 @@ export default function MapView() {
     return { pos: formatLatLon(lat, lon), value, height };
   }, [hover, field, layer, metrics]);
 
-  const fieldPct = Math.round(fieldProgress * 100);
 
   return (
     <>
@@ -258,56 +227,6 @@ export default function MapView() {
         onPointerLeave={() => setHover(null)}
       />
 
-      <div className="layer-bar">
-        {LAYERS.map((l) => (
-          <button key={l.id} className={`chip ${l.id === layer ? "sel" : ""}`} onClick={() => setLayer(l.id)} title={l.describe}>
-            {l.short}
-          </button>
-        ))}
-        {def.ranged && (
-          <>
-            <span className="chip-sep" />
-            {RANGES.map((d) => (
-              <button key={d} className={`chip ${d === rangeDays ? "sel" : ""}`} onClick={() => setRangeDays(d)}>
-                {d === 365 ? "1y" : `${d}d`}
-              </button>
-            ))}
-          </>
-        )}
-      </div>
-
-      <div className="map-legend">
-        <div className="legend-title">{def.label}</div>
-        {def.stops.length > 0 && (
-          <>
-            <div className="legend-bar" style={{ background: gradientCss(def.stops) }} />
-            <div className="legend-ends">
-              <span>{def.legend[0]}</span>
-              <span>{def.legend[1]}</span>
-            </div>
-          </>
-        )}
-        {layer === "now" && (
-          <div className="legend-ends">
-            <span>■ shadow</span>
-            <span style={{ color: "var(--sun)" }}>■ lit</span>
-          </div>
-        )}
-        <div className="legend-desc">{def.describe}</div>
-        {def.ranged && (
-          <div className="legend-desc">
-            {formatUtc(hourToDate(data, start)).slice(0, 10)} → {formatUtc(hourToDate(data, start + hours)).slice(0, 10)}
-          </div>
-        )}
-        {metrics && (def.ranged || layer === "now") && (
-          <div className="legend-gpu">
-            GPU · {(metrics.size * metrics.size).toLocaleString()} points × {Math.round(metrics.hours / metrics.stride).toLocaleString()} time steps in{" "}
-            {metrics.millis.toFixed(0)} ms
-          </div>
-        )}
-        {!field && !fieldError && <div className="legend-gpu">Loading terrain field {fieldPct}%</div>}
-        {(fieldError || gpuError) && <div className="legend-gpu error">{fieldError ?? gpuError}</div>}
-      </div>
 
       {hoverInfo && (
         <div className="map-hud">
