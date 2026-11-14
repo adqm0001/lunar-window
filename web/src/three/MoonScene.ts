@@ -85,7 +85,9 @@ export class MoonScene {
   private mapMode = false;
   private mapTarget = new THREE.Vector3();
   private mapDist = 120;
-  private mapDrag: { x: number; y: number } | null = null;
+  // Pointers down on the 2D map by pointerId, and the distance between two of them while pinching (0 otherwise).
+  private mapPointers = new Map<number, { x: number; y: number }>();
+  private mapPinch = 0;
   private quality: Quality = "balanced";
   private bloom!: UnrealBloomPass;
   private cutaway = new Cutaway();
@@ -652,18 +654,39 @@ export class MoonScene {
     return true;
   }
 
+  private mapPinchSpan() {
+    const [a, b] = [...this.mapPointers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
   private bindMapInput() {
     const el = this.renderer.domElement;
     el.addEventListener("pointerdown", (e) => {
       if (!this.mapMode) return;
-      this.mapDrag = { x: e.clientX, y: e.clientY };
+      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.mapPointers.size === 2) this.mapPinch = this.mapPinchSpan();
     });
     window.addEventListener("pointermove", (e) => {
-      if (!this.mapMode || !this.mapDrag) return;
-      this.mapPan(e.clientX - this.mapDrag.x, e.clientY - this.mapDrag.y);
-      this.mapDrag = { x: e.clientX, y: e.clientY };
+      const prev = this.mapPointers.get(e.pointerId);
+      if (!this.mapMode || !prev) return;
+      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.mapPointers.size >= 2) {
+        // Two fingers: zoom by how much they spread or pinch, and don't pan.
+        const span = this.mapPinchSpan();
+        if (this.mapPinch > 0 && span > 0) {
+          this.mapDist = Math.min(3500, Math.max(0.6, (this.mapDist * this.mapPinch) / span));
+          this.placeMapCamera();
+          this.dirty = true;
+        }
+        this.mapPinch = span;
+        return;
+      }
+      this.mapPan(e.clientX - prev.x, e.clientY - prev.y);
     });
-    const end = () => (this.mapDrag = null);
+    const end = (e: PointerEvent) => {
+      this.mapPointers.delete(e.pointerId);
+      if (this.mapPointers.size < 2) this.mapPinch = 0;
+    };
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     el.addEventListener(
