@@ -11,9 +11,14 @@ const requested = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 let worker: { ephem: Ephemeris; ready: Promise<number> } | null = null;
-// After a failed request, wait this long before a render may ask again, so a missing worker script
-// doesn't start a new worker on every frame during playback.
+// A failed request is retried after this long (components re-render and ask again), so a missing worker
+// script recovers on its own without starting a new worker on every frame during playback.
 const RETRY_MS = 2000;
+
+function notify() {
+  version++;
+  for (const l of listeners) l();
+}
 
 function request(e: Ephemeris, site: Site) {
   requested.add(site.id);
@@ -23,12 +28,14 @@ function request(e: Ephemeris, site: Site) {
     .then(() => call<SiteSeries>("siteSeries", site))
     .then((series) => {
       cache.set(site.id, series);
-      version++;
-      for (const l of listeners) l();
+      notify();
     })
     .catch((err) => {
-      setTimeout(() => requested.delete(site.id), RETRY_MS);
       console.error(err);
+      setTimeout(() => {
+        requested.delete(site.id);
+        notify();
+      }, RETRY_MS);
     });
 }
 
@@ -47,7 +54,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Changes whenever a new series arrives; use it as a dependency next to getSeries. */
+/** Changes when a series arrives or a failed one is due for a retry; use it as a dependency next to getSeries. */
 export function useSeriesVersion(): number {
   return useSyncExternalStore(subscribe, () => version);
 }
