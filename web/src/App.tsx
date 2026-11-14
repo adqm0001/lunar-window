@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
+import { loadField } from "./data/field";
 import { useApp } from "./state/store";
 import { usePlayback } from "./state/usePlayback";
 import TopBar from "./components/TopBar";
@@ -19,6 +20,14 @@ export default function App() {
       .then(setData)
       .catch((e: Error) => setError(e.message));
   }, [setData]);
+
+  useEffect(() => {
+    if (!data) return;
+    const s = useApp.getState();
+    loadField(s.setFieldProgress)
+      .then(s.setField)
+      .catch((e: Error) => s.setFieldError(e.message));
+  }, [data]);
 
   usePlayback();
 

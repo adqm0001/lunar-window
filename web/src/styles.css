@@ -78,7 +78,19 @@ button { font: inherit; color: inherit; }
 .map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
 .map-canvas.dragging { cursor: grabbing; }
 .map-hud { position: absolute; left: 14px; bottom: 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); background: rgba(4,6,10,0.7); padding: 5px 9px; border-radius: 6px; pointer-events: none; }
-.map-legend { position: absolute; right: 14px; top: 12px; font-size: 11px; color: var(--muted); background: rgba(4,6,10,0.7); padding: 6px 10px; border-radius: 6px; }
+.map-hud b { color: var(--text); font-weight: 500; }
+.map-hud .hint { color: var(--dim); }
+.map-legend { position: absolute; right: 14px; top: 12px; width: 236px; font-size: 11px; color: var(--muted); background: rgba(8,11,17,0.86); border: 1px solid var(--line); padding: 10px 12px; border-radius: 10px; backdrop-filter: blur(6px); }
+.legend-title { color: var(--text); font-weight: 600; font-size: 12px; margin-bottom: 6px; }
+.legend-bar { height: 8px; border-radius: 4px; }
+.legend-ends { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; margin-top: 3px; }
+.legend-desc { margin-top: 6px; line-height: 1.4; }
+.legend-gpu { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 10px; color: var(--accent); }
+.layer-bar { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 4px; max-width: calc(100% - 280px); background: rgba(8,11,17,0.86); border: 1px solid var(--line); border-radius: 10px; padding: 4px; backdrop-filter: blur(6px); }
+.chip { background: none; border: 1px solid transparent; border-radius: 7px; padding: 4px 9px; font-size: 11.5px; color: var(--muted); cursor: pointer; }
+.chip:hover { color: var(--text); }
+.chip.sel { background: rgba(139,156,255,0.14); border-color: rgba(139,156,255,0.4); color: var(--text); }
+.chip-sep { width: 1px; background: var(--line-2); margin: 3px 4px; }
 
 .loader { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 10; }
 .loader-box { width: 320px; text-align: center; }

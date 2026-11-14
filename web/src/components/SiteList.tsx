@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useApp } from "../state/store";
 import { percentOn, siteSeries } from "../lib/visibility";
+import { useSites } from "../state/selectors";
 
 const WINDOW_HOURS = 24 * 30;
 
@@ -9,19 +10,20 @@ export default function SiteList() {
   const hour = useApp((s) => s.hour);
   const selectedId = useApp((s) => s.selectedId);
   const select = useApp((s) => s.select);
+  const sites = useSites();
   const dayBucket = Math.floor(hour / 24);
 
   const sunlit = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const s of data.sites) out[s.id] = percentOn(siteSeries(data.ephem, s).sun, dayBucket * 24, dayBucket * 24 + WINDOW_HOURS, (v) => v >= 128);
+    for (const s of sites) out[s.id] = percentOn(siteSeries(data.ephem, s).sun, dayBucket * 24, dayBucket * 24 + WINDOW_HOURS, (v) => v >= 128);
     return out;
-  }, [data, dayBucket]);
+  }, [data, sites, dayBucket]);
 
   const groups = useMemo(() => {
-    const g = new Map<string, typeof data.sites>();
-    for (const s of data.sites) g.set(s.group, [...(g.get(s.group) ?? []), s]);
+    const g = new Map<string, typeof sites>();
+    for (const s of sites) g.set(s.group, [...(g.get(s.group) ?? []), s]);
     return [...g.entries()];
-  }, [data]);
+  }, [sites]);
 
   return (
     <aside className="left">

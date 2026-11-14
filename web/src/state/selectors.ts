@@ -2,10 +2,16 @@ import { useMemo } from "react";
 import { siteSeries, siteStateAt } from "../lib/visibility";
 import { useApp } from "./store";
 
-export function useSelectedSite() {
+export function useSites() {
   const data = useApp((s) => s.data)!;
+  const custom = useApp((s) => s.customSite);
+  return useMemo(() => (custom ? [...data.sites, custom] : data.sites), [data, custom]);
+}
+
+export function useSelectedSite() {
+  const sites = useSites();
   const id = useApp((s) => s.selectedId);
-  return useMemo(() => data.sites.find((s) => s.id === id) ?? data.sites[0], [data, id]);
+  return useMemo(() => sites.find((s) => s.id === id) ?? sites[0], [sites, id]);
 }
 
 export function useSiteState() {

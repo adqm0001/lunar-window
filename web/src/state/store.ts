@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { AppData } from "../data/load";
+import type { AppData, Site } from "../data/load";
+import type { FieldData } from "../data/field";
+import type { LayerId } from "../gpu/layers";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -10,10 +12,22 @@ export const SPEEDS = [
 
 interface AppState {
   data: AppData | null;
+  field: FieldData | null;
+  fieldProgress: number;
+  fieldError: string | null;
+  layer: LayerId;
+  rangeDays: number;
+  customSite: Site | null;
   hour: number;
   playing: boolean;
   speedIndex: number;
   selectedId: string;
+  setField: (f: FieldData) => void;
+  setFieldProgress: (p: number) => void;
+  setFieldError: (e: string) => void;
+  setLayer: (l: LayerId) => void;
+  setRangeDays: (d: number) => void;
+  setCustomSite: (s: Site) => void;
   setData: (d: AppData) => void;
   setHour: (h: number) => void;
   togglePlaying: () => void;
@@ -23,6 +37,18 @@ interface AppState {
 
 export const useApp = create<AppState>((set, get) => ({
   data: null,
+  field: null,
+  fieldProgress: 0,
+  fieldError: null,
+  layer: "sun",
+  rangeDays: 30,
+  customSite: null,
+  setField: (field) => set({ field }),
+  setFieldProgress: (fieldProgress) => set({ fieldProgress }),
+  setFieldError: (fieldError) => set({ fieldError }),
+  setLayer: (layer) => set({ layer }),
+  setRangeDays: (rangeDays) => set({ rangeDays }),
+  setCustomSite: (customSite) => set({ customSite, selectedId: customSite.id }),
   hour: 0,
   playing: false,
   speedIndex: 2,
