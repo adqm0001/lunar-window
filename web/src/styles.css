@@ -277,7 +277,7 @@ button { font: inherit; color: inherit; }
 .report-note { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
 /* ---- phones and narrow windows ---- */
-.mobile-nav { display: none; }
+.mobile-nav, .m-lift { display: none; }
 @media (max-width: 760px) {
   .topbar { top: 8px; left: 8px; right: 8px; height: 44px; gap: 8px; padding: 0 10px; }
   .topbar .brand small, .topbar .power, .topbar .pill, .topbar > span, .topbar .share { display: none; }
@@ -296,6 +296,9 @@ button { font: inherit; color: inherit; }
   .m-tab { flex: 1; background: none; border: none; color: var(--muted); font-size: 13px; border-radius: 8px; cursor: pointer; }
   .m-tab.sel { background: rgba(139,156,255,0.16); color: var(--text); }
   .m-tab.play { flex: 0 0 56px; color: var(--text); font-size: 15px; }
+  .m-lift { display: flex; flex-direction: column; gap: 8px; position: fixed; right: 12px; bottom: 66px; z-index: 6; }
+  .m-lift-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(16, 20, 30, 0.72); backdrop-filter: blur(10px); color: var(--text); font-size: 14px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .m-lift-btn:active { background: rgba(139, 156, 255, 0.28); }
   .tour-card { bottom: 66px; }
   .hover-tip { display: none; }
   .modal { padding: 14px; }

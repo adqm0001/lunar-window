@@ -217,7 +217,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** track active pointers by `pointerId`. With two pointers, scale `this.mapDist` by the ratio of previous to current finger distance (clamp 0.6–3500 km), and suppress panning while two are down.
   - **Verify:** Chrome DevTools device mode with touch emulation, or a real phone: pinch zooms the 2D map.
 
-- [ ] **37. Up/down buttons on phones** (S)
+- [x] **37. Up/down buttons on phones** (S)
   - **Files:** `src/three/MoonScene.ts`, `src/components/MobileNav.tsx`, `src/styles.css`.
   - **Spec:** add `setHeld(key: "r" | "f", down: boolean)` to `MoonScene` that adds/removes the key in `this.keys` (the same set the keyboard uses) and sets `dirty`. In the phone layout, two round buttons (▲ ▼) above the tab bar call it on `pointerdown` / `pointerup` / `pointercancel`.
   - **Verify:** on a phone viewport, holding ▲ raises the camera and ▼ lowers it, in surface, orbit and map modes.
