@@ -14,6 +14,7 @@ import LayerControls from "./components/LayerControls";
 import FinderPanel from "./components/FinderPanel";
 import ComparePanel from "./components/ComparePanel";
 import LanderPanel from "./components/LanderPanel";
+import PorkchopPanel from "./components/PorkchopPanel";
 
 export default function App() {
   const data = useApp((s) => s.data);
@@ -23,6 +24,7 @@ export default function App() {
   const finderOpen = useApp((s) => s.finderOpen);
   const compareOpen = useApp((s) => s.compareOpen);
   const landerOpen = useApp((s) => s.landerOpen);
+  const porkchopOpen = useApp((s) => s.porkchopOpen);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -84,7 +86,7 @@ export default function App() {
       {landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />
       <SitePanel />
-      {compareOpen && <ComparePanel />}
+      {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}
       <Timeline />
       <div className="kbd-hint">H hide panels · Space play · ← → hour · Shift ← → day · drag to orbit · click terrain to analyze</div>
     </div>

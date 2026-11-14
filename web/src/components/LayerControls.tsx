@@ -17,6 +17,7 @@ export default function LayerControls() {
   const hasFinder = useApp((s) => !!s.finder);
   const hasSurvival = useApp((s) => !!s.survival);
   const landerOpen = useApp((s) => s.landerOpen);
+  const porkchopOpen = useApp((s) => s.porkchopOpen);
   const finderOpen = useApp((s) => s.finderOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
@@ -41,6 +42,9 @@ export default function LayerControls() {
         <span className="chip-sep" />
         <button className="chip moon" onClick={() => useApp.getState().requestOrbit()} title="Zoom out to the whole Moon">
           ◐ Whole Moon
+        </button>
+        <button className={`chip find ${porkchopOpen ? "sel" : ""}`} onClick={() => useApp.getState().setPorkchopOpen(!porkchopOpen)}>
+          ▦ Landing dates
         </button>
         <button className={`chip find ${landerOpen ? "sel" : ""}`} onClick={() => useApp.getState().setLanderOpen(!landerOpen)}>
           ♥ Lander sim

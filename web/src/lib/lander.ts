@@ -83,3 +83,50 @@ export function simulate(e: Ephemeris, site: Site, lander: Lander, startHour: nu
   }
   return { soc, power, diedAtHour: died, minSocPct: minSoc, energyInKWh: energy / 1000, hours: n, panelAz };
 }
+
+export interface SunTrack {
+  frac: Float32Array;
+  az: Float32Array;
+  el: Float32Array;
+}
+
+const trackCache = new Map<string, SunTrack>();
+
+export function sunTrack(e: Ephemeris, site: Site): SunTrack {
+  const key = `${site.id}:${site.horizon.length}:${site.horizon[0]}`;
+  const hit = trackCache.get(key);
+  if (hit) return hit;
+  const frame = localFrame(site.lat, site.lon);
+  const r = siteRadiusKm(site);
+  const n = e.count;
+  const frac = new Float32Array(n);
+  const az = new Float32Array(n);
+  const el = new Float32Array(n);
+  const d = e.data;
+  for (let i = 0; i < n; i++) {
+    const o = i * 6;
+    const s = altaz([d[o], d[o + 1], d[o + 2]], frame, r);
+    az[i] = s.az;
+    el[i] = s.el;
+    frac[i] = discFraction(s.el - horizonAt(site.horizon, s.az));
+  }
+  const t = { frac, az, el };
+  trackCache.set(key, t);
+  return t;
+}
+
+export function survivedFraction(t: SunTrack, lander: Lander, start: number, hours: number): number {
+  const n = Math.min(hours, t.frac.length - start);
+  if (n <= 0) return 0;
+  const panelAz = lander.panel === "vertical" && lander.panelAz < 0 ? t.az[start] : lander.panelAz;
+  let wh = lander.batteryWh;
+  const floor = (lander.minSocPct / 100) * lander.batteryWh;
+  for (let k = 0; k < n; k++) {
+    const i = start + k;
+    const f = t.frac[i];
+    const p = lander.panelW * f * panelFactor(lander.panel, t.az[i], t.el[i], panelAz);
+    wh = Math.min(lander.batteryWh, wh + p - (f >= 0.5 ? lander.dayLoadW : lander.nightLoadW));
+    if (wh <= floor) return (k + 1) / hours;
+  }
+  return 1;
+}

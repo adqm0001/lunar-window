@@ -203,3 +203,9 @@ button { font: inherit; color: inherit; }
 .stage { z-index: 0; }
 
 .analyze-btn { width: 100%; margin-top: 12px; color: #ffd27a; border-color: rgba(255,210,122,0.45); }
+
+.porkchop { position: absolute; left: 272px; right: 354px; bottom: 168px; max-height: 330px; padding: 10px 12px; z-index: 3; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.porkchop-canvas { width: 100%; display: block; cursor: crosshair; }
+.porkchop-foot { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: -1px; }
+.sw.g { background: rgba(61,220,151,0.9); } .sw.y { background: rgba(255,200,70,0.85); } .sw.o { background: rgba(255,130,70,0.85); } .sw.r { background: rgba(200,40,60,0.85); }

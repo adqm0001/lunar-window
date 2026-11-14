@@ -25,6 +25,8 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  porkchopOpen: boolean;
+  setPorkchopOpen: (o: boolean) => void;
   poleField: FieldData | null;
   regionStatus: { label: string; progress: number; error?: string } | null;
   setRegionStatus: (s: { label: string; progress: number; error?: string } | null) => void;
@@ -80,6 +82,8 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  porkchopOpen: false,
+  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
   poleField: null,
   regionStatus: null,
   setRegionStatus: (regionStatus) => set({ regionStatus }),
