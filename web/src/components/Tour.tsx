@@ -20,6 +20,7 @@ function closePanels() {
   s.setLanderOpen(false);
   s.setRoverOpen(false);
   s.setValidationOpen(false);
+  s.setReportOpen(false);
   s.setPorkchopOpen(false);
   if (s.playing) s.togglePlaying();
 }
@@ -109,6 +110,16 @@ const STEPS: Step[] = [
         if (!s.playing) s.togglePlaying();
       }
       currentScene()?.flyToLatLon(-89.55, -150, 28);
+    },
+  },
+  {
+    title: "Rank NASA's Artemis III regions",
+    text: "The same models run for the whole Moon, so all nine candidate regions can be compared for your dates: sunlight and Earth contact at each region's best spot, the longest night there, and how much ground can hold ice. Light and ice pull in opposite directions; this shows the trade-off.",
+    enter: () => {
+      closePanels();
+      st().setRover(null);
+      st().requestOrbit();
+      st().setReportOpen(true);
     },
   },
   {

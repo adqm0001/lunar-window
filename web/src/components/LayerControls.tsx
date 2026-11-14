@@ -1,6 +1,5 @@
 import { gradientCss, layerDef, LAYERS } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
-import { useState } from "react";
 import { formatUtc, hourToDate, useApp } from "../state/store";
 import RegionReport from "./RegionReport";
 
@@ -25,7 +24,8 @@ export default function LayerControls() {
   const porkchopOpen = useApp((s) => s.porkchopOpen);
   const finderOpen = useApp((s) => s.finderOpen);
   const roverOpen = useApp((s) => s.roverOpen);
-  const [report, setReport] = useState(false);
+  const report = useApp((s) => s.reportOpen);
+  const setReport = useApp((s) => s.setReportOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
   const def = layerDef(layer);

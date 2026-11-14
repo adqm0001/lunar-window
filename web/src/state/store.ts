@@ -46,6 +46,8 @@ interface AppState {
   setGlobalInfo: (i: { points: number; steps: number; millis: number; horizonMillis: number } | null) => void;
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
+  reportOpen: boolean;
+  setReportOpen: (o: boolean) => void;
   setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
   setRoverOpen: (o: boolean) => void;
@@ -147,6 +149,8 @@ export const useApp = create<AppState>((set, get) => ({
   setGlobalInfo: (globalInfo) => set({ globalInfo }),
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
+  reportOpen: false,
+  setReportOpen: (reportOpen) => set({ reportOpen }),
   setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,
   setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
