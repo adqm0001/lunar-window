@@ -1,7 +1,7 @@
 import type { FieldData } from "../data/field";
 import type { Ephemeris } from "../data/load";
 import type { VisibilityBits } from "../gpu/engine";
-import type { RoverFailure, RoverParams, RoverRoute } from "../lib/rover";
+import { planRoute, type RoverFailure, type RoverParams, type RoverRoute } from "../lib/rover";
 import type { WorkerRequest, WorkerResponse } from "./compute.worker";
 
 interface Pending {
@@ -28,17 +28,27 @@ function startWorker(): Worker {
   };
   // Fires when the script fails to load or throws at the top level. The worker is dropped so the next
   // call starts a fresh one instead of posting to a worker that will never answer.
-  w.onerror = (e) => {
-    if (worker === w) worker = null;
-    w.terminate();
-    const error = new Error(`Compute worker failed: ${(e as ErrorEvent).message || "could not load the worker script"}`);
-    for (const [id, p] of pending) {
-      if (p.worker !== w) continue;
-      pending.delete(id);
-      p.reject(error);
-    }
-  };
+  w.onerror = (e) => fail(w, (e as ErrorEvent).message || "could not load the worker script");
   return w;
+}
+
+/** The worker itself failed (script didn't load, crashed, or a message couldn't be read), not just one request. */
+export class WorkerFailedError extends Error {
+  constructor(reason: string) {
+    super(`Compute worker failed: ${reason}`);
+    this.name = "WorkerFailedError";
+  }
+}
+
+function fail(w: Worker, reason: string) {
+  if (worker === w) worker = null;
+  w.terminate();
+  const error = new WorkerFailedError(reason);
+  for (const [id, p] of pending) {
+    if (p.worker !== w) continue;
+    pending.delete(id);
+    p.reject(error);
+  }
 }
 
 function getWorker(): Worker {
@@ -71,12 +81,20 @@ export function call<T>(type: string, payload?: unknown, transfer: Transferable[
 }
 
 /**
- * Runs planRoute in the worker. The bits are transferred (callers make fresh ones for each search); the field's
- * slope layer is still used on the main thread, so the worker gets a copy.
+ * Runs planRoute in the worker, or on the main thread if the worker itself fails (e.g. a tab left open across a
+ * deploy that removed its file). The worker gets transferred copies, so the originals are still here for that.
  */
-export function planRouteInWorker(field: FieldData, bits: VisibilityBits, params: RoverParams): Promise<RoverRoute | RoverFailure> {
+export async function planRouteInWorker(field: FieldData, bits: VisibilityBits, params: RoverParams): Promise<RoverRoute | RoverFailure> {
+  const sun = bits.sun.slice();
+  const link = bits.link.slice();
   const slope = field.slope.slice();
-  return call("planRoute", { meta: field.meta, slope, bits, params }, [bits.sun.buffer, bits.link.buffer, slope.buffer]);
+  try {
+    return await call<RoverRoute | RoverFailure>("planRoute", { meta: field.meta, slope, bits: { ...bits, sun, link }, params }, [sun.buffer, link.buffer, slope.buffer]);
+  } catch (err) {
+    if (!(err instanceof WorkerFailedError)) throw err;
+    console.warn("Compute worker unavailable; planning the route on the main thread instead.", err);
+    return planRoute(field, bits, params);
+  }
 }
 
 /** Sends the worker its own copy of the ephemeris; the copies are transferred, so the main thread keeps its arrays. */
