@@ -194,9 +194,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** move `siteThermal` into the worker (it needs the series from 31). `SitePanel` shows "computing…" in the temperature section until ready.
   - **Verify:** same as 31.
 
-- [ ] **33. Rover search in the worker** (S) — Depends on 30
+- [x] **33. Rover search in the worker** (S) — Depends on 30
   - **Files:** `src/components/RoverPanel.tsx`, `src/components/Tour.tsx`, worker.
-  - **Spec:** `visibilityBits` stays on the main thread (WebGL). Transfer `bits.sun`, `bits.link`, `field.slope` and the needed `meta` fields to the worker; run `planRoute` there.
+  - **Spec:** `visibilityBits` stays on the main thread (WebGL). Transfer copies of `bits.sun`, `bits.link` and `field.slope` (the field keeps using its slope, and the originals allow a main-thread fallback if the worker can't load) and the needed `meta` fields to the worker; run `planRoute` there.
   - **Verify:** Plan route keeps the UI responsive; route identical to before for Connecting ridge B → Shackleton ridge A.
 
 - [ ] **34. Tile the 80 m polar file** (M)

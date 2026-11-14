@@ -1,4 +1,7 @@
+import type { FieldData } from "../data/field";
 import type { Ephemeris, Site } from "../data/load";
+import type { VisibilityBits } from "../gpu/engine";
+import { planRoute, type RoverParams } from "../lib/rover";
 import { siteSeries, type SiteSeries } from "../lib/visibility";
 import { siteThermal } from "../lib/siteThermal";
 
@@ -61,6 +64,11 @@ const handlers: Record<string, (payload: unknown) => { result: unknown; transfer
   siteThermal: (payload) => {
     const { site, startHour, hours } = payload as { site: Site; startHour: number; hours: number };
     return { result: siteThermal(needEphem(), site, startHour, hours, seriesFor(site)) };
+  },
+  // planRoute reads only the field's meta and slope layer, so that is all the client sends.
+  planRoute: (payload) => {
+    const { meta, slope, bits, params } = payload as { meta: FieldData["meta"]; slope: Uint8Array; bits: VisibilityBits; params: RoverParams };
+    return { result: planRoute({ meta, slope } as FieldData, bits, params) };
   },
 };
 
