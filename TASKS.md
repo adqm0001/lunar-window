@@ -125,7 +125,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 3: Tests and code health
 
-- [ ] **20. Add Vitest** (S)
+- [x] **20. Add Vitest** (S)
   - **Files:** `web/package.json`, new `web/vitest.config.ts`.
   - **Spec:** `npm install -D vitest`. Script `"test": "vitest run"`. Config: `environment: "node"`, `include: ["src/**/*.test.ts"]`. Tests import pure modules from `src/lib` only (no WebGL, no DOM).
   - **Verify:** `npm test` runs and reports 0 tests or a trivial passing test.
