@@ -4,6 +4,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import type { FieldData } from "../data/field";
 import { fieldHeight } from "../data/field";
@@ -12,7 +13,7 @@ import type { Vec3 } from "../lib/astro";
 import { toMap, R_MOON_M } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 
-export const EXAGGERATION = 1.6;
+export const EXAGGERATION = 1.0;
 const SKY_R = 6000;
 
 export function meToWorld(v: Vec3): THREE.Vector3 {
@@ -26,6 +27,7 @@ export class MoonScene {
   private camera: THREE.PerspectiveCamera;
   private controls: OrbitControls;
   private composer: EffectComposer;
+  private lens: ShaderPass;
   private terrainMat: THREE.ShaderMaterial;
   private sun: THREE.Sprite;
   private sunHalo: THREE.Sprite;
@@ -103,7 +105,11 @@ export class MoonScene {
         uOffset: { value: h.decode.offsetDeg },
         uOverlay: { value: new THREE.Texture() },
         uOverlayMix: { value: 0 },
-        uSunPower: { value: 4.2 },
+        uSunPower: { value: 14.0 },
+        uEarth: { value: new THREE.Vector3(0, 0, 1) },
+        uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
+        uEarthshine: { value: 0 },
+        uExaggeration: { value: EXAGGERATION },
         uTime: { value: 0 },
       },
     });
@@ -138,6 +144,8 @@ export class MoonScene {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.5, 1.6));
     this.composer.addPass(new OutputPass());
+    this.lens = new ShaderPass(LENS_SHADER);
+    this.composer.addPass(this.lens);
 
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
@@ -204,7 +212,7 @@ export class MoonScene {
       const t = Math.random() * Math.PI * 2;
       const s = Math.sqrt(1 - u * u);
       pos.set([s * Math.cos(t) * SKY_R * 1.2, u * SKY_R * 1.2, s * Math.sin(t) * SKY_R * 1.2], i * 3);
-      const b = Math.pow(Math.random(), 6) * 2.2 + 0.15;
+      const b = (Math.pow(Math.random(), 7) * 1.6 + 0.05) * 0.45;
       const tint = Math.random();
       col.set([b * (0.85 + 0.15 * tint), b * 0.9, b * (1.05 - 0.2 * tint)], i * 3);
     }
@@ -219,6 +227,12 @@ export class MoonScene {
     const e = meToWorld(earthMe);
     this.terrainMat.uniforms.uSun.value.set(sunMe[0], sunMe[1], sunMe[2]);
     this.terrainMat.uniforms.uSunWorld.value.copy(s);
+    this.terrainMat.uniforms.uEarth.value.set(earthMe[0], earthMe[1], earthMe[2]);
+    this.terrainMat.uniforms.uEarthWorld.value.copy(e);
+    const se = new THREE.Vector3(sunMe[0] - earthMe[0], sunMe[1] - earthMe[1], sunMe[2] - earthMe[2]).normalize();
+    const me = new THREE.Vector3(-earthMe[0], -earthMe[1], -earthMe[2]).normalize();
+    const earthLitFraction = (1 + se.dot(me)) / 2;
+    this.terrainMat.uniforms.uEarthshine.value = 0.035 * earthLitFraction;
     this.sun.position.copy(s).multiplyScalar(SKY_R);
     this.sunHalo.position.copy(s).multiplyScalar(SKY_R * 0.99);
     this.earth.position.copy(e).multiplyScalar(SKY_R * 0.95);
@@ -367,6 +381,7 @@ export class MoonScene {
     this.controls.update();
     this.adaptResolution(dt, now);
     this.terrainMat.uniforms.uTime.value = now / 1000;
+    this.lens.uniforms.uTime.value = (now / 1000) % 100;
     this.composer.render();
     this.labels.render(this.scene, this.camera);
   };
@@ -399,6 +414,26 @@ export class MoonScene {
     this.labels.domElement.remove();
   }
 }
+
+const LENS_SHADER = {
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
+    float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233)) + uTime * 61.7) * 43758.5453); }
+    void main() {
+      vec2 c = vUv - 0.5;
+      float ca = 0.0012 * length(c);
+      vec3 col;
+      col.r = texture2D(tDiffuse, vUv + c * ca).r;
+      col.g = texture2D(tDiffuse, vUv).g;
+      col.b = texture2D(tDiffuse, vUv - c * ca).b;
+      float vig = smoothstep(0.95, 0.25, length(c * vec2(1.15, 1.0)));
+      col *= mix(0.62, 1.0, vig);
+      col += (h(vUv * 913.0) - 0.5) * 0.028;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+};
 
 function rayLine(color: number) {
   const line = new THREE.Line(
