@@ -385,6 +385,10 @@ export class MoonScene {
     this.startFlight(p, offset, dur, up);
   }
 
+  get canvas(): HTMLCanvasElement {
+    return this.renderer.domElement;
+  }
+
   getView(): ViewState {
     const t = latLonFromWorld(this.controls.target);
     const c = latLonFromWorld(this.camera.position);

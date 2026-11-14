@@ -21,6 +21,10 @@ export function registerScene(s: MoonScene | null) {
   scene = s;
 }
 
+export function currentScene() {
+  return scene;
+}
+
 const fix = (n: number, d: number) => Number(n.toFixed(d));
 
 function parse(hash: string): Shared | null {

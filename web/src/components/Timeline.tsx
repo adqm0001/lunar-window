@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSeries } from "../state/selectors";
 import { siteSeries, type SiteSeries } from "../lib/visibility";
+import { canRecord, startRecording, stopRecording } from "../lib/recorder";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -27,6 +28,25 @@ export default function Timeline() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [windowDays, setWindowDays] = useState(30);
   const scrubbing = useRef<"main" | "overview" | null>(null);
+  const view = useApp((s) => s.view);
+  const [recStart, setRecStart] = useState<number | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (recStart === null) return;
+    const id = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [recStart]);
+  const toggleRec = async () => {
+    if (recStart !== null) {
+      setRecStart(null);
+      await stopRecording(`lunar-window-${formatUtc(hourToDate(data, hour)).replace(/[: ]/g, "-")}`);
+      return;
+    }
+    if (startRecording()) {
+      setRecStart(Date.now());
+      if (!useApp.getState().playing) togglePlaying();
+    }
+  };
 
   const total = data.ephem.count;
   const span = windowDays * 24;
@@ -148,6 +168,11 @@ export default function Timeline() {
           <button className="btn" onClick={() => setHour(Math.floor(hour) + 24)}>
             +1d
           </button>
+          {view === "3d" && canRecord() && (
+            <button className={`btn rec ${recStart !== null ? "on" : ""}`} onClick={toggleRec} title="Record the 3D view to a video file (plays time while recording)">
+              {recStart === null ? "● Rec" : `■ ${Math.floor((Date.now() - recStart) / 1000)}s`}
+            </button>
+          )}
         </div>
         <div className="row">
           {SPEEDS.map((s, i) => (
