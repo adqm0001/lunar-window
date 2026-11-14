@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import SkylinePanel from "./SkylinePanel";
+import { lazy, useMemo, useState } from "react";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
@@ -10,6 +9,9 @@ import { contactWindows } from "../lib/contacts";
 import { formatUtc, hourToDate } from "../state/store";
 import { formatDuration, useApp } from "../state/store";
 import { useSelectedSite, useSeries, useSiteState } from "../state/selectors";
+import LazyPanel from "./LazyPanel";
+
+const SkylinePanel = lazy(() => import("./SkylinePanel"));
 
 const YEAR = 24 * 365;
 
@@ -76,7 +78,11 @@ export default function SitePanel() {
       <button className="btn skyline-btn" onClick={() => setSkyline(true)} title="The terrain skyline from this spot with the Sun's and Earth's paths">
         🔭 Skyline and Sun path
       </button>
-      {skyline && <SkylinePanel site={site} onClose={() => setSkyline(false)} />}
+      {skyline && (
+        <LazyPanel name="the skyline view" onClose={() => setSkyline(false)}>
+          <SkylinePanel site={site} onClose={() => setSkyline(false)} />
+        </LazyPanel>
+      )}
 
       <div className="cards">
         <div className={`card ${sunUp ? "sun" : "bad"}`}>

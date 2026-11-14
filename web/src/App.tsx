@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
 import { loadGlobe, loadPolar80 } from "./data/globe";
@@ -11,13 +11,15 @@ import SitePanel from "./components/SitePanel";
 import Timeline from "./components/Timeline";
 import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
-import FinderPanel from "./components/FinderPanel";
-import ComparePanel from "./components/ComparePanel";
-import LanderPanel from "./components/LanderPanel";
-import RoverPanel from "./components/RoverPanel";
 import Tour from "./components/Tour";
 import MobileNav from "./components/MobileNav";
-import PorkchopPanel from "./components/PorkchopPanel";
+import LazyPanel from "./components/LazyPanel";
+
+const FinderPanel = lazy(() => import("./components/FinderPanel"));
+const ComparePanel = lazy(() => import("./components/ComparePanel"));
+const LanderPanel = lazy(() => import("./components/LanderPanel"));
+const RoverPanel = lazy(() => import("./components/RoverPanel"));
+const PorkchopPanel = lazy(() => import("./components/PorkchopPanel"));
 
 let startedField = false;
 let startedData = false;
@@ -107,10 +109,34 @@ export default function App() {
         <Scene3D />
       </main>
       <TopBar />
-      {roverOpen ? <RoverPanel /> : landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
+      {roverOpen ? (
+        <LazyPanel key="rover" name="the rover route planner" onClose={() => useApp.getState().setRoverOpen(false)}>
+          <RoverPanel />
+        </LazyPanel>
+      ) : landerOpen ? (
+        <LazyPanel key="lander" name="the lander simulator" onClose={() => useApp.getState().setLanderOpen(false)}>
+          <LanderPanel />
+        </LazyPanel>
+      ) : finderOpen ? (
+        <LazyPanel key="finder" name="the landing spot finder" onClose={() => useApp.getState().setFinderOpen(false)}>
+          <FinderPanel />
+        </LazyPanel>
+      ) : (
+        <SiteList />
+      )}
       <LayerControls />
       <SitePanel />
-      {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}
+      {porkchopOpen ? (
+        <LazyPanel key="porkchop" name="the landing dates chart" onClose={() => useApp.getState().setPorkchopOpen(false)}>
+          <PorkchopPanel />
+        </LazyPanel>
+      ) : (
+        compareOpen && (
+          <LazyPanel key="compare" name="the compare table" onClose={() => useApp.getState().setCompareOpen(false)}>
+            <ComparePanel />
+          </LazyPanel>
+        )
+      )}
       <Timeline />
       <Tour />
       <MobileNav />

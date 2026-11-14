@@ -13,13 +13,22 @@ export type WorkerResponse = { id: number; ok: true; result: unknown } | { id: n
 // The project's lib is DOM, which types `self` as Window; this is the dedicated worker scope we actually get.
 const scope = self as unknown as {
   onmessage: ((e: MessageEvent<WorkerRequest>) => void) | null;
+  onmessageerror: (() => void) | null;
   postMessage(msg: WorkerResponse, transfer?: Transferable[]): void;
+};
+
+// A request that can't be read has no id to answer, so its caller would wait forever. Throwing turns it into
+// an error event on the main thread, where the client fails this worker's calls and starts a fresh one.
+scope.onmessageerror = () => {
+  throw new Error("could not read a request");
 };
 
 let ephem: Ephemeris | null = null;
 
-// Kept so siteThermal can reuse a site's series; the main thread gets transferred copies.
+// Kept so siteThermal can reuse a site's series; the main thread gets transferred copies. Sites arrive under
+// a per-object key (state/seriesCache.ts), so an id here always means the same site.
 const seriesById = new Map<string, SiteSeries>();
+const MAX_SERIES = 64;
 
 function needEphem(): Ephemeris {
   if (!ephem) throw new Error("Compute worker used before initWorker");
@@ -30,6 +39,7 @@ function seriesFor(site: Site): SiteSeries {
   let s = seriesById.get(site.id);
   if (!s) {
     s = siteSeries(needEphem(), site);
+    if (seriesById.size >= MAX_SERIES) seriesById.delete(seriesById.keys().next().value!);
     seriesById.set(site.id, s);
   }
   return s;

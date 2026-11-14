@@ -159,22 +159,22 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** in the `build` job, add `- name: Test` / `working-directory: web` / `run: npm test` between Install and Build. A failing test must stop the deploy.
   - **Verify:** `npm test` passes locally and the step order in the YAML is Install → Test → Build. After merge, the Actions run on `main` shows the Test step passing. (The workflow only runs on `main`; to see a failure block the deploy, temporarily break a test on `main` in a test fork.)
 
-- [ ] **26. Lazy-load tool panels** (S)
+- [x] **26. Lazy-load tool panels** (S)
   - **Files:** `src/App.tsx`.
   - **Spec:** replace static imports of `LanderPanel`, `FinderPanel`, `RoverPanel`, `PorkchopPanel`, `ComparePanel` with `React.lazy(() => import(...))`, render inside `<Suspense fallback={null}>`.
   - **Verify:** `npm run build` prints separate chunks for them; each panel still opens.
 
-- [ ] **27. Lazy-load windows** (S)
+- [x] **27. Lazy-load windows** (S)
   - **Files:** `src/components/LayerControls.tsx` (`RegionReport`), `src/components/TopBar.tsx` (`ValidationPanel`), `src/components/SitePanel.tsx` (`SkylinePanel`).
   - **Spec:** same pattern as 26.
   - **Verify:** same as 26.
 
-- [ ] **28. Separate three.js chunk** (S)
+- [x] **28. Separate three.js chunk** (S)
   - **Files:** `web/vite.config.ts`.
-  - **Spec:** `build.rollupOptions.output.manualChunks: { three: ["three"] }` (and the three/examples imports resolve into it).
+  - **Spec:** `build.rollupOptions.output.manualChunks` as a function that returns `"three"` for any id under `/node_modules/three/`. The object form `{ three: ["three"] }` only takes the core package and leaves the three/examples imports (OrbitControls, EffectComposer and passes, CSS2DRenderer) in the main chunk.
   - **Verify:** `npm run build` shows a `three-*.js` chunk; the main chunk is below 500 kB minified; the app works from `npm run preview`.
 
-- [ ] **29. Remove dead rendering code** (S)
+- [x] **29. Remove dead rendering code** (S)
   - **Files:** `src/three/globe.ts`.
   - **Spec:** `buildGlobe`, `buildSkirt`, `globeMaterial`, `polarTexture`, `setPolarUniforms` and the `VERT`/`FRAG` shader strings they use are not referenced anywhere (`grep -rn` to confirm). Delete them. Keep `MOON_CENTER`, `dirFromLatLon`, `worldFromLatLon`, `latLonFromWorld`.
   - **Verify:** `npx tsc --noEmit -p .` and `npm run build` pass; app looks unchanged.
