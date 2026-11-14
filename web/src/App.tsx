@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
 import { loadGlobe, loadPolar80 } from "./data/globe";
@@ -13,6 +13,7 @@ import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
 import Tour from "./components/Tour";
 import MobileNav from "./components/MobileNav";
+import LazyPanel from "./components/LazyPanel";
 
 const FinderPanel = lazy(() => import("./components/FinderPanel"));
 const ComparePanel = lazy(() => import("./components/ComparePanel"));
@@ -108,12 +109,34 @@ export default function App() {
         <Scene3D />
       </main>
       <TopBar />
-      <Suspense fallback={null}>
-        {roverOpen ? <RoverPanel /> : landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
-      </Suspense>
+      {roverOpen ? (
+        <LazyPanel key="rover" name="the rover route planner" onClose={() => useApp.getState().setRoverOpen(false)}>
+          <RoverPanel />
+        </LazyPanel>
+      ) : landerOpen ? (
+        <LazyPanel key="lander" name="the lander simulator" onClose={() => useApp.getState().setLanderOpen(false)}>
+          <LanderPanel />
+        </LazyPanel>
+      ) : finderOpen ? (
+        <LazyPanel key="finder" name="the landing spot finder" onClose={() => useApp.getState().setFinderOpen(false)}>
+          <FinderPanel />
+        </LazyPanel>
+      ) : (
+        <SiteList />
+      )}
       <LayerControls />
       <SitePanel />
-      <Suspense fallback={null}>{porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}</Suspense>
+      {porkchopOpen ? (
+        <LazyPanel key="porkchop" name="the landing dates chart" onClose={() => useApp.getState().setPorkchopOpen(false)}>
+          <PorkchopPanel />
+        </LazyPanel>
+      ) : (
+        compareOpen && (
+          <LazyPanel key="compare" name="the compare table" onClose={() => useApp.getState().setCompareOpen(false)}>
+            <ComparePanel />
+          </LazyPanel>
+        )
+      )}
       <Timeline />
       <Tour />
       <MobileNav />
