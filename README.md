@@ -137,7 +137,7 @@ docs/        screenshots for this page
 
 ## Contributing
 
-The list of open work, with details for each task, is in **[TASKS.md](TASKS.md)**. Pick one, put your name on it, and go.
+The list of open work, with a spec for each task, is in **[TASKS.md](TASKS.md)**. Read **[ARCHITECTURE.md](ARCHITECTURE.md)** first: coordinate frames, data formats, engines and conventions.
 
 1. Fork the repo (or create a branch if you've been added as a collaborator).
 2. Run the app locally (see above) and make your change on a branch named after the task, for example `thermal-bounced-light`.
