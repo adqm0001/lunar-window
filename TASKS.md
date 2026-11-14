@@ -135,7 +135,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** for `(lat, lon)` in `{(-89.9, 0), (-89.5, 45), (-85, -120), (-80, 179.9), (-75, -179.9)}`: `toLatLon(...toMap(lat, lon))` equals the input within 1e-6° (compare lon modulo 360). Also `toMap(-90, any)` is `[0, 0]` within 1e-6 m.
   - **Verify:** `npm test` green.
 
-- [ ] **22. Tests: Sun disc and horizon lookup** (S) — Depends on 20
+- [x] **22. Tests: Sun disc and horizon lookup** (S) — Depends on 20
   - **Files:** `src/lib/astro.test.ts`.
   - **Spec:** `discFraction(0) = 0.5`, `discFraction(0.2665) = 1`, `discFraction(-0.2665) = 0`, monotonic on [−0.3, 0.3]. `horizonAt(h, az)` with `h = [0, 10, 20, 30]` (4 bins = 90° each): `az = 45 → 5`, `az = 0 → 0`, `az = 315 → 15` (interpolates bin 3 → bin 0, i.e. wraps), `az = 360 → 0`, `az = -45 → 15`.
   - **Verify:** `npm test` green.
