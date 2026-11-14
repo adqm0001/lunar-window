@@ -25,6 +25,10 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  poleField: FieldData | null;
+  regionStatus: { label: string; progress: number; error?: string } | null;
+  setRegionStatus: (s: { label: string; progress: number; error?: string } | null) => void;
+  setActiveField: (f: FieldData) => void;
   landerOpen: boolean;
   lander: Lander;
   survival: FieldMetrics | null;
@@ -76,6 +80,17 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  poleField: null,
+  regionStatus: null,
+  setRegionStatus: (regionStatus) => set({ regionStatus }),
+  setActiveField: (field) =>
+    set((s) => ({
+      field,
+      finder: null,
+      survival: null,
+      mc: null,
+      layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
+    })),
   landerOpen: false,
   lander: LANDER_PRESETS[0],
   survival: null,
@@ -105,7 +120,7 @@ export const useApp = create<AppState>((set, get) => ({
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSite: null,
-  setField: (field) => set({ field }),
+  setField: (field) => set({ field, poleField: field }),
   setFieldProgress: (fieldProgress) => set({ fieldProgress }),
   setFieldError: (fieldError) => set({ fieldError }),
   setLayer: (layer) => set({ layer }),

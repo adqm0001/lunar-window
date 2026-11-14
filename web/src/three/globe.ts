@@ -55,7 +55,8 @@ uniform vec3 uSunWorld;
 uniform vec3 uEarthWorld;
 uniform float uSunPower;
 uniform float uEarthshine;
-uniform float uHole;
+uniform vec3 uHoleA;
+uniform vec3 uHoleB;
 varying vec2 vLL;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -86,10 +87,11 @@ float polarH(vec2 m, out bool ok) {
 void main() {
   float lat = radians(vLL.x);
   float lon = radians(vLL.y);
-  if (vLL.x < -80.0 && uHole > 0.0) {
+  if (vLL.x < -80.0) {
     float k = 2.0 * R_M * tan(PI / 4.0 + lat / 2.0);
     vec2 m = vec2(k * sin(lon), k * cos(lon));
-    if (abs(m.x) < uHole && abs(m.y) < uHole) discard;
+    if (uHoleA.z > 0.0 && abs(m.x - uHoleA.x) < uHoleA.z && abs(m.y - uHoleA.y) < uHoleA.z) discard;
+    if (uHoleB.z > 0.0 && abs(m.x - uHoleB.x) < uHoleB.z && abs(m.y - uHoleB.y) < uHoleB.z) discard;
   }
   vec2 uv = vec2((vLL.y + 180.0) / 360.0, (vLL.x + 90.0) / 180.0);
   vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
@@ -150,7 +152,8 @@ export function globeMaterial(color: THREE.Texture, hole: number): THREE.ShaderM
       uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
       uSunPower: { value: 14 },
       uEarthshine: { value: 0 },
-      uHole: { value: hole },
+      uHoleA: { value: new THREE.Vector3(0, 0, hole) },
+      uHoleB: { value: new THREE.Vector3(0, 0, 0) },
       uPolar: { value: null },
       uPolarSize: { value: 0 },
       uPolarCell: { value: 240 },

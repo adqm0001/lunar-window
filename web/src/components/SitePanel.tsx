@@ -1,5 +1,7 @@
 import { useMemo } from "react";
-import { formatLatLon } from "../lib/astro";
+import { formatLatLon, toMap } from "../lib/astro";
+import { inField } from "../data/field";
+import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
 import { formatDuration, useApp } from "../state/store";
 import { useSelectedSite, useSeries, useSiteState } from "../state/selectors";
@@ -13,6 +15,12 @@ export default function SitePanel() {
   const st = useSiteState();
   const pinned = useApp((s) => s.pinned.some((p) => p.id === site.id));
   const togglePin = useApp((s) => s.togglePin);
+  const field = useApp((s) => s.field);
+  const outside = useMemo(() => {
+    if (!field) return false;
+    const [x, y] = toMap(site.lat, site.lon);
+    return !inField(field, x, y);
+  }, [field, site]);
   const series = useSeries();
   const lit = (v: number) => v >= 128;
   const on = (v: number) => v === 1;
@@ -108,6 +116,12 @@ export default function SitePanel() {
         <dt>Longest night</dt>
         <dd>{formatDuration(yearStats.night)}</dd>
       </dl>
+
+      {outside && site.lat < -75 && (
+        <button className="btn analyze-btn" onClick={() => analyzeArea(site.name, site.lat, site.lon)}>
+          ⚡ Analyze this area in detail
+        </button>
+      )}
 
       {site.computedMs !== undefined && (
         <div className="note">Horizon computed live on your GPU from NASA LOLA global elevation: 720 directions in {site.computedMs.toFixed(1)} ms.</div>

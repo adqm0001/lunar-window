@@ -3,6 +3,10 @@ import type { Site } from "./load";
 
 export interface FieldMeta {
   extentMeters: number;
+  centerX?: number;
+  centerY?: number;
+  label?: string;
+  source?: string;
   horizon: { size: number; cellMeters: number; azimuthBins: number; observerHeightM: number; decode: { offsetDeg: number; stepDeg: number } };
   heights: { size: number; cellMeters: number; min: number; max: number };
   slope: { size: number; cellMeters: number };
@@ -67,12 +71,23 @@ export async function loadField(onProgress: (f: number) => void): Promise<FieldD
   return { meta, horizon, heights: new Int16Array(heights.buffer, heights.byteOffset, heights.byteLength / 2), slope };
 }
 
+export function fieldCenter(f: FieldData): [number, number] {
+  return [f.meta.centerX ?? 0, f.meta.centerY ?? 0];
+}
+
+export function inField(f: FieldData, x: number, y: number): boolean {
+  const [cx, cy] = fieldCenter(f);
+  const E = f.meta.extentMeters;
+  return Math.abs(x - cx) < E && Math.abs(y - cy) < E;
+}
+
 export function fieldCell(f: FieldData, lat: number, lon: number): { col: number; row: number } | null {
   const [x, y] = toMap(lat, lon);
   const { size, cellMeters } = f.meta.horizon;
   const E = f.meta.extentMeters;
-  const col = Math.floor((x + E) / cellMeters);
-  const row = Math.floor((E - y) / cellMeters);
+  const [cx, cy] = fieldCenter(f);
+  const col = Math.floor((x - cx + E) / cellMeters);
+  const row = Math.floor((E - (y - cy)) / cellMeters);
   if (col < 0 || row < 0 || col >= size || row >= size) return null;
   return { col, row };
 }
@@ -103,8 +118,9 @@ export function customSiteAt(f: FieldData, x: number, y: number): Site | null {
 export function fieldHeight(f: FieldData, x: number, y: number): number | null {
   const { size, cellMeters } = f.meta.heights;
   const E = f.meta.extentMeters;
-  const c = (x + E) / cellMeters - 0.5;
-  const r = (E - y) / cellMeters - 0.5;
+  const [cx, cy] = fieldCenter(f);
+  const c = (x - cx + E) / cellMeters - 0.5;
+  const r = (E - (y - cy)) / cellMeters - 0.5;
   const c0 = Math.floor(c);
   const r0 = Math.floor(r);
   if (c0 < 0 || r0 < 0 || c0 >= size - 1 || r0 >= size - 1) return null;

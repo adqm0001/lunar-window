@@ -13,6 +13,7 @@ export function getEngine(): GpuEngine | null {
   const { field, data } = useApp.getState();
   if (!field || !data) return null;
   if (engineFor !== field) {
+    engine?.dispose();
     engineFor = field;
     try {
       engine = new GpuEngine(field, data.ephem);

@@ -3,6 +3,7 @@ import { useApp } from "../state/store";
 import { percentOn, siteSeries } from "../lib/visibility";
 import { useSites } from "../state/selectors";
 import { ARTEMIS_REGIONS, ARTEMIS_SOURCE } from "../data/artemis";
+import { analyzeArea } from "../gpu/regions";
 
 const WINDOW_HOURS = 24 * 30;
 
@@ -49,13 +50,16 @@ export default function SiteList() {
         Artemis III candidate regions
       </div>
       {ARTEMIS_REGIONS.map((r) => (
-        <button key={r.name} className="site-row" onClick={() => useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3))} title={`Named feature: ${r.feature} (IAU)`}>
+        <button key={r.name} className="site-row" onClick={() => {
+            useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3));
+            analyzeArea(r.name, r.lat, r.lon);
+          }} title={`Named feature: ${r.feature} (IAU)`}>
           <span className="name">{r.name}</span>
-          <span className="meta">fly ↗</span>
+          <span className="meta">analyze ↗</span>
         </button>
       ))}
       <div className="f-hint" style={{ margin: "6px 8px" }}>
-        Shown at each region's named feature (IAU). NASA hasn't published exact outlines. Click the terrain inside to analyze any spot.
+        Shown at each region's named feature (IAU); NASA hasn't published outlines. Clicking one computes a 56 × 56 km horizon field there on your GPU, so every tool works in it.
       </div>
     </aside>
   );

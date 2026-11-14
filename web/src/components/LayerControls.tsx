@@ -12,6 +12,8 @@ export default function LayerControls() {
   const layer = useApp((s) => s.layer);
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
+  const poleField = useApp((s) => s.poleField);
+  const regionStatus = useApp((s) => s.regionStatus);
   const hasFinder = useApp((s) => !!s.finder);
   const hasSurvival = useApp((s) => !!s.survival);
   const landerOpen = useApp((s) => s.landerOpen);
@@ -81,6 +83,18 @@ export default function LayerControls() {
           <div className="legend-gpu">
             GPU · {(metrics.size * metrics.size).toLocaleString()} points × {Math.round(metrics.hours / metrics.stride).toLocaleString()} steps ·{" "}
             {metrics.millis.toFixed(0)} ms
+          </div>
+        )}
+        {field && <div className="legend-desc mono">Area: {field.meta.label ?? "south pole (C++ engine, 40 m)"}</div>}
+        {field?.meta.source && <div className="legend-desc mono">{field.meta.source}</div>}
+        {field?.meta.label && poleField && (
+          <button className="chip" style={{ marginTop: 6 }} onClick={() => useApp.getState().setActiveField(poleField)}>
+            ← Back to south pole area
+          </button>
+        )}
+        {regionStatus && (
+          <div className={`legend-gpu ${regionStatus.error ? "error" : ""}`}>
+            {regionStatus.error ?? `Computing ${regionStatus.label} horizons on your GPU… ${Math.round(regionStatus.progress * 100)}%`}
           </div>
         )}
         {!field && !fieldError && <div className="legend-gpu">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}

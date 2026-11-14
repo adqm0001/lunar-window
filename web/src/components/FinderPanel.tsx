@@ -30,6 +30,9 @@ export default function FinderPanel() {
   const [minFlat, setMinFlat] = useState(50);
   const [priority, setPriority] = useState(0);
   const [busy, setBusy] = useState(false);
+  const spots = field ? field.meta.horizon.size ** 2 : 0;
+  const km = field ? Math.round((2 * field.meta.extentMeters) / 1000) : 0;
+  const areaLabel = field?.meta.label ? `the ${km} × ${km} km ${field.meta.label} area` : `the ${km} × ${km} km polar area`;
 
   const start = Math.floor(hour);
   const run = () => {
@@ -57,7 +60,7 @@ export default function FinderPanel() {
       <div className="finder-head">
         <div>
           <div className="finder-title">Find a landing spot</div>
-          <div className="finder-sub">Scores every 250 m cell in the 80 × 80 km polar region</div>
+          <div className="finder-sub">Scores every 250 m cell in {areaLabel}</div>
         </div>
         <button className="icon-btn" onClick={() => setFinderOpen(false)} aria-label="Close">
           ✕
@@ -105,7 +108,7 @@ export default function FinderPanel() {
       </div>
 
       <button className="btn primary search-btn" onClick={run} disabled={!field || busy}>
-        {!field ? "Loading terrain…" : busy ? "Searching…" : "Search 102,400 spots"}
+        {!field ? "Loading terrain…" : busy ? "Searching…" : `Search ${spots.toLocaleString()} spots`}
       </button>
 
       {result && (

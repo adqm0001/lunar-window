@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toMap } from "../lib/astro";
 import { LANDER_PRESETS, PANEL_LABEL, simulate, type Lander, type PanelMode, type SimResult } from "../lib/lander";
 import { monteCarlo } from "../lib/montecarlo";
+import { inField } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 import { useSelectedSite } from "../state/selectors";
@@ -30,10 +31,10 @@ export default function LanderPanel() {
 
   const sim: SimResult = useMemo(() => simulate(data.ephem, site, lander, start, missionDays * 24), [data, site, lander, start, missionDays]);
 
-  const inField = useMemo(() => {
+  const siteInField = useMemo(() => {
     if (!field) return false;
     const [x, y] = toMap(site.lat, site.lon);
-    return Math.abs(x) < field.meta.extentMeters && Math.abs(y) < field.meta.extentMeters;
+    return inField(field, x, y);
   }, [field, site]);
 
   const set = (patch: Partial<Lander>) => setLander({ ...lander, ...patch, name: "Custom" });
@@ -54,7 +55,7 @@ export default function LanderPanel() {
           horizontal: lander.panel === "horizontal",
         });
         setSurvival(m);
-        if (inField) {
+        if (siteInField) {
           const [x, y] = toMap(site.lat, site.lon);
           setMc(monteCarlo(field, m, x, y, miss));
         } else setMc(null);
@@ -65,10 +66,10 @@ export default function LanderPanel() {
   };
 
   useEffect(() => {
-    if (!survival || !field || !inField) return;
+    if (!survival || !field || !siteInField) return;
     const [x, y] = toMap(site.lat, site.lon);
     setMc(monteCarlo(field, survival, x, y, miss));
-  }, [miss, site, survival, field, inField]);
+  }, [miss, site, survival, field, siteInField]);
 
   const survived = sim.diedAtHour === null;
 
@@ -135,7 +136,7 @@ export default function LanderPanel() {
       <SocChart sim={sim} minSoc={lander.minSocPct} />
 
       <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy}>
-        {busy ? "Simulating…" : "Simulate 102,400 landing spots"}
+        {busy ? "Simulating…" : `Simulate ${field ? (field.meta.horizon.size ** 2).toLocaleString() : ""} landing spots`}
       </button>
       {survival && (
         <div className="f-stats">
@@ -152,8 +153,8 @@ export default function LanderPanel() {
         ))}
       </div>
       {!survival && <div className="f-hint">Run the map simulation first, then 4,000 random touchdowns are scored around this site.</div>}
-      {survival && !inField && <div className="f-hint">Landing-miss odds use the high-detail polar area. Pick a site inside it.</div>}
-      {mc && inField && (
+      {survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Use “⚡ Analyze this area in detail” in the right panel.</div>}
+      {mc && siteInField && (
         <div className="mc">
           <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "#ffd27a" : "var(--danger)" }}>
             {mc.okPct.toFixed(1)}%

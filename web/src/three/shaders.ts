@@ -20,6 +20,7 @@ uniform int uSize;
 uniform int uAzBins;
 uniform float uCell;
 uniform float uExtent;
+uniform vec2 uCenter;
 uniform float uStep;
 uniform float uOffset;
 uniform sampler2D uOverlay;
@@ -57,7 +58,7 @@ float binAt(ivec2 c, float az) {
 }
 
 float horizonAt(vec2 m, float az) {
-  vec2 p = vec2((m.x + uExtent) / uCell - 0.5, (uExtent - m.y) / uCell - 0.5);
+  vec2 p = vec2((m.x - uCenter.x + uExtent) / uCell - 0.5, (uExtent - (m.y - uCenter.y)) / uCell - 0.5);
   p = clamp(p, vec2(0.0), vec2(float(uSize) - 1.001));
   ivec2 c0 = ivec2(floor(p));
   vec2 w = p - floor(p);
@@ -153,7 +154,7 @@ void main() {
   vec3 col = albedo * (sunCol * photometry * surge * lit + earthshine + vec3(0.0008, 0.0009, 0.0012));
 
   if (uOverlayMix > 0.0) {
-    vec2 uv = vec2((vMap.x + uExtent) / (2.0 * uExtent), (vMap.y + uExtent) / (2.0 * uExtent));
+    vec2 uv = vec2((vMap.x - uCenter.x + uExtent) / (2.0 * uExtent), (vMap.y - uCenter.y + uExtent) / (2.0 * uExtent));
     vec4 o = texture(uOverlay, uv);
     float relief = clamp(0.4 + 2.5 * mu0, 0.4, 1.3);
     col = mix(col, o.rgb * relief * 0.9, o.a * uOverlayMix);

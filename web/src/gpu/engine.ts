@@ -19,6 +19,7 @@ uniform int uSize;
 uniform int uAzBins;
 uniform float uCell;
 uniform float uExtent;
+uniform vec2 uCenter;
 uniform float uDecodeStep;
 uniform float uDecodeOffset;
 uniform int uStart;
@@ -46,8 +47,8 @@ float horizonAt(int col, int row, float az) {
 void main() {
   int col = int(gl_FragCoord.x);
   int row = uSize - 1 - int(gl_FragCoord.y);
-  float x = (float(col) + 0.5) * uCell - uExtent;
-  float y = uExtent - (float(row) + 0.5) * uCell;
+  float x = (float(col) + 0.5) * uCell - uExtent + uCenter.x;
+  float y = uExtent - (float(row) + 0.5) * uCell + uCenter.y;
   float rho = length(vec2(x, y));
   float lat = -(PI / 2.0 - 2.0 * atan(rho / (2.0 * R_M)));
   float lon = atan(x, y);
@@ -96,8 +97,8 @@ uniform int uPanelMode;
 void main() {
   int col = int(gl_FragCoord.x);
   int row = uSize - 1 - int(gl_FragCoord.y);
-  float x = (float(col) + 0.5) * uCell - uExtent;
-  float y = uExtent - (float(row) + 0.5) * uCell;
+  float x = (float(col) + 0.5) * uCell - uExtent + uCenter.x;
+  float y = uExtent - (float(row) + 0.5) * uCell + uCenter.y;
   float rho = length(vec2(x, y));
   float lat = -(PI / 2.0 - 2.0 * atan(rho / (2.0 * R_M)));
   float lon = atan(x, y);
@@ -177,7 +178,7 @@ export class GpuEngine {
     this.survProg = link(gl, VERT, FRAG.split("void main() {")[0] + SURVIVE_MAIN);
     this.prog = link(gl, VERT, FRAG);
     gl.useProgram(this.prog);
-    for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride"]) {
+    for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride"]) {
       this.uni[n] = gl.getUniformLocation(this.prog, n);
     }
 
@@ -222,11 +223,12 @@ export class GpuEngine {
     gl.uniform1i(this.uni.uAzBins, azimuthBins);
     gl.uniform1f(this.uni.uCell, cellMeters);
     gl.uniform1f(this.uni.uExtent, field.meta.extentMeters);
+    gl.uniform2f(this.uni.uCenter, field.meta.centerX ?? 0, field.meta.centerY ?? 0);
     gl.uniform1f(this.uni.uDecodeStep, decode.stepDeg);
     gl.uniform1f(this.uni.uDecodeOffset, decode.offsetDeg);
 
     gl.useProgram(this.survProg);
-    for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uPanelW", "uBattery", "uDayLoad", "uNightLoad", "uMinSoc", "uPanelMode"]) {
+    for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uPanelW", "uBattery", "uDayLoad", "uNightLoad", "uMinSoc", "uPanelMode"]) {
       this.survUni[n] = gl.getUniformLocation(this.survProg, n);
     }
     gl.uniform1i(this.survUni.uField, 0);
@@ -236,6 +238,7 @@ export class GpuEngine {
     gl.uniform1i(this.survUni.uAzBins, azimuthBins);
     gl.uniform1f(this.survUni.uCell, cellMeters);
     gl.uniform1f(this.survUni.uExtent, field.meta.extentMeters);
+    gl.uniform2f(this.survUni.uCenter, field.meta.centerX ?? 0, field.meta.centerY ?? 0);
     gl.uniform1f(this.survUni.uDecodeStep, decode.stepDeg);
     gl.uniform1f(this.survUni.uDecodeOffset, decode.offsetDeg);
     gl.useProgram(this.prog);
@@ -276,6 +279,10 @@ export class GpuEngine {
     const rowLen = this.size * 4;
     for (let r = 0; r < this.size; r++) data.set(this.buf.subarray((this.size - 1 - r) * rowLen, (this.size - r) * rowLen), r * rowLen);
     return { size: this.size, hours: steps * stride, stride, data, millis: performance.now() - t0 };
+  }
+
+  dispose() {
+    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 
   compute(startHour: number, hours: number, maxSteps = 2000): FieldMetrics {

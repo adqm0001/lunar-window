@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ephemAt } from "../data/load";
-import { customSiteAt } from "../data/field";
+import { customSiteAt, inField } from "../data/field";
 import { overlayCanvas } from "../gpu/overlay";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { MoonScene } from "../three/MoonScene";
@@ -9,6 +9,7 @@ import { globeHeight } from "../data/globe";
 import { toMap } from "../lib/astro";
 import type { Site } from "../data/load";
 import { uniqueFeatures } from "../data/artemis";
+import { analyzeArea } from "../gpu/regions";
 import { useApp } from "../state/store";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
@@ -19,7 +20,7 @@ function pickGlobal(lat: number, lon: number) {
   const g = st.globe;
   if (!g) return;
   const [x, y] = toMap(lat, lon);
-  if (st.field && Math.abs(x) < st.field.meta.extentMeters && Math.abs(y) < st.field.meta.extentMeters) {
+  if (st.field && inField(st.field, x, y)) {
     const c = customSiteAt(st.field, x, y);
     if (c) st.setCustomSite(c);
     return;
@@ -66,7 +67,9 @@ export default function Scene3D() {
   const { metrics } = useFieldMetrics();
   const lastSelected = useRef<string | null>(null);
 
+  const hasField = !!field;
   useEffect(() => {
+    const field = useApp.getState().field;
     if (!field || !host.current) return;
     let s: MoonScene;
     try {
@@ -77,11 +80,15 @@ export default function Scene3D() {
     }
     s.onSelectSite = (id) => useApp.getState().select(id);
     s.onPick = (x, y) => {
-      const c = customSiteAt(field, x, y);
+      const f = useApp.getState().field;
+      const c = f ? customSiteAt(f, x, y) : null;
       if (c) useApp.getState().setCustomSite(c);
     };
     s.onPickLatLon = (lat, lon) => pickGlobal(lat, lon);
-    s.onFlyRegion = (r) => useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3));
+    s.onFlyRegion = (r) => {
+      useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3));
+      analyzeArea(r.name, r.lat, r.lon);
+    };
     s.setRegions(uniqueFeatures());
     lastSelected.current = null;
     setScene(s);
@@ -89,7 +96,11 @@ export default function Scene3D() {
       s.dispose();
       setScene(null);
     };
-  }, [field]);
+  }, [hasField]);
+
+  useEffect(() => {
+    if (scene && field) scene.setField(field);
+  }, [scene, field]);
 
   useEffect(() => {
     if (scene && globe) scene.setGlobe(globe);

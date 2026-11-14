@@ -45,6 +45,8 @@ export function findBestSpots(field: FieldData, params: FinderParams): FinderRes
   const n = field.meta.horizon.size;
   const cell = field.meta.horizon.cellMeters;
   const E = field.meta.extentMeters;
+  const cx = field.meta.centerX ?? 0;
+  const cy = field.meta.centerY ?? 0;
   const safeLayer = field.slope.subarray(n * n, 2 * n * n);
   const scores = new Float32Array(n * n);
   const w = params.weights;
@@ -72,8 +74,8 @@ export function findBestSpots(field: FieldData, params: FinderParams): FinderRes
     if (picked.length >= TOP_N) break;
     const row = Math.floor(i / n);
     const col = i % n;
-    const x = (col + 0.5) * cell - E;
-    const y = E - (row + 0.5) * cell;
+    const x = (col + 0.5) * cell - E + cx;
+    const y = E - (row + 0.5) * cell + cy;
     if (picked.some((p) => Math.hypot(p.x - x, p.y - y) < MIN_SPACING_M)) continue;
     const site = customSiteAt(field, x, y);
     if (!site) continue;

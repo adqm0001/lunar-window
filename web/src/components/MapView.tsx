@@ -66,7 +66,8 @@ export default function MapView() {
 
     if (overlay && field) {
       const FE = field.meta.extentMeters;
-      const [ol, ot] = toScreen(-FE, FE);
+      const [fcx, fcy] = [field.meta.centerX ?? 0, field.meta.centerY ?? 0];
+      const [ol, ot] = toScreen(fcx - FE, fcy + FE);
       g.imageSmoothingEnabled = view.mpp > 60;
       g.drawImage(overlay, ol, ot, (2 * FE) / view.mpp, (2 * FE) / view.mpp);
       g.imageSmoothingEnabled = true;

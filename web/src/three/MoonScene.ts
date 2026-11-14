@@ -7,7 +7,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import type { FieldData } from "../data/field";
-import { fieldHeight } from "../data/field";
+import { fieldHeight, inField } from "../data/field";
 import type { Site } from "../data/load";
 import type { Vec3 } from "../lib/astro";
 import { toMap, R_MOON_M } from "../lib/astro";
@@ -102,14 +102,7 @@ export class MoonScene {
 
     const { geometry } = this.makeTerrain();
     const h = field.meta.horizon;
-    const tex = new THREE.DataArrayTexture(field.horizon, h.size, h.size, h.azimuthBins);
-    tex.format = THREE.RedIntegerFormat;
-    tex.type = THREE.UnsignedByteType;
-    tex.internalFormat = "R8UI";
-    tex.minFilter = THREE.NearestFilter;
-    tex.magFilter = THREE.NearestFilter;
-    tex.unpackAlignment = 1;
-    tex.needsUpdate = true;
+    const tex = fieldTexture(field);
     this.terrainMat = new THREE.ShaderMaterial({
       vertexShader: TERRAIN_VERT,
       fragmentShader: TERRAIN_FRAG,
@@ -122,6 +115,7 @@ export class MoonScene {
         uAzBins: { value: h.azimuthBins },
         uCell: { value: h.cellMeters },
         uExtent: { value: field.meta.extentMeters },
+        uCenter: { value: new THREE.Vector2(field.meta.centerX ?? 0, field.meta.centerY ?? 0) },
         uStep: { value: h.decode.stepDeg },
         uOffset: { value: h.decode.offsetDeg },
         uOverlay: { value: new THREE.Texture() },
@@ -182,13 +176,15 @@ export class MoonScene {
     const n = f.meta.heights.size;
     const cell = f.meta.heights.cellMeters;
     const E = f.meta.extentMeters;
+    const cx = f.meta.centerX ?? 0;
+    const cy = f.meta.centerY ?? 0;
     const pos = new Float32Array(n * n * 3);
     const map = new Float32Array(n * n * 2);
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
         const i = r * n + c;
-        const x = (c + 0.5) * cell - E;
-        const y = E - (r + 0.5) * cell;
+        const x = (c + 0.5) * cell - E + cx;
+        const y = E - (r + 0.5) * cell + cy;
         const h = f.heights[i];
         pos[i * 3] = x / 1000;
         pos[i * 3 + 1] = this.worldY(x, y, h);
@@ -285,8 +281,7 @@ export class MoonScene {
 
   sitePosition(site: Site): THREE.Vector3 | null {
     const [x, y] = toMap(site.lat, site.lon);
-    const E = this.field.meta.extentMeters;
-    if (Math.abs(x) > E || Math.abs(y) > E) {
+    if (!inField(this.field, x, y)) {
       if (!this.globe) return null;
       return worldFromLatLon(site.lat, site.lon, globeHeight(this.globe, site.lat, site.lon));
     }
@@ -483,13 +478,14 @@ export class MoonScene {
     tex.anisotropy = 8;
     tex.needsUpdate = true;
     const globeMat = globeMaterial(tex, 199000);
-    const skirtMat = globeMaterial(tex, this.field.meta.extentMeters);
+    const skirtMat = globeMaterial(tex, 0);
     const globe = new THREE.Mesh(buildGlobe(g), globeMat);
     const skirt = new THREE.Mesh(buildSkirt(g, 200000, 500), skirtMat);
     const ptex = polarTexture(g);
     setPolarUniforms(globeMat, g, ptex, false);
     setPolarUniforms(skirtMat, g, ptex, true);
     this.globeMats = [globeMat, skirtMat];
+    this.updateHoles();
     this.globeMeshes = [skirt, globe];
     this.scene.add(globe, skirt);
     for (const m of this.globeMats) {
@@ -509,6 +505,42 @@ export class MoonScene {
       this.pendingIntro = null;
       this.select(s, true);
     }
+  }
+
+  setField(field: FieldData) {
+    if (field === this.field) return;
+    this.field = field;
+    const old = this.terrainMesh;
+    this.scene.remove(old);
+    old.geometry.dispose();
+    (this.terrainMat.uniforms.uField.value as THREE.Texture).dispose();
+    const u = this.terrainMat.uniforms;
+    const h = field.meta.horizon;
+    u.uField.value = fieldTexture(field);
+    u.uSize.value = h.size;
+    u.uAzBins.value = h.azimuthBins;
+    u.uCell.value = h.cellMeters;
+    u.uExtent.value = field.meta.extentMeters;
+    u.uCenter.value.set(field.meta.centerX ?? 0, field.meta.centerY ?? 0);
+    u.uStep.value = h.decode.stepDeg;
+    u.uOffset.value = h.decode.offsetDeg;
+    u.uOverlayMix.value = 0;
+    this.terrainMesh = new THREE.Mesh(this.makeTerrain().geometry, this.terrainMat);
+    this.scene.add(this.terrainMesh);
+    this.updateHoles();
+    this.setScatter(null);
+    this.setSites(this.lastSites);
+  }
+
+  private updateHoles() {
+    const cx = this.field.meta.centerX ?? 0;
+    const cy = this.field.meta.centerY ?? 0;
+    const e = this.field.meta.extentMeters;
+    const [globeMat, skirtMat] = this.globeMats;
+    if (!globeMat) return;
+    globeMat.uniforms.uHoleB.value.set(cx, cy, e);
+    skirtMat.uniforms.uHoleA.value.set(cx, cy, e);
+    skirtMat.uniforms.uHoleB.value.set(0, 0, 0);
   }
 
   private beaconLabel(o: CSS2DObject) {
@@ -680,6 +712,19 @@ const LENS_SHADER = {
       gl_FragColor = vec4(col, 1.0);
     }`,
 };
+
+function fieldTexture(field: FieldData) {
+  const h = field.meta.horizon;
+  const tex = new THREE.DataArrayTexture(field.horizon, h.size, h.size, h.azimuthBins);
+  tex.format = THREE.RedIntegerFormat;
+  tex.type = THREE.UnsignedByteType;
+  tex.internalFormat = "R8UI";
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.unpackAlignment = 1;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 function rayLine(color: number) {
   const line = new THREE.Line(

@@ -26,6 +26,8 @@ export function monteCarlo(field: FieldData, survival: FieldMetrics, x0: number,
   const size = survival.size;
   const cell = field.meta.horizon.cellMeters;
   const E = field.meta.extentMeters;
+  const cx = field.meta.centerX ?? 0;
+  const cy = field.meta.centerY ?? 0;
   const sigma = radiusM / 2;
   const points: ScatterPoint[] = [];
   let ok = 0;
@@ -34,8 +36,8 @@ export function monteCarlo(field: FieldData, survival: FieldMetrics, x0: number,
   for (let k = 0; k < n; k++) {
     const x = x0 + gauss() * sigma;
     const y = y0 + gauss() * sigma;
-    const col = Math.floor((x + E) / cell);
-    const row = Math.floor((E - y) / cell);
+    const col = Math.floor((x - cx + E) / cell);
+    const row = Math.floor((E - (y - cy)) / cell);
     if (col < 0 || row < 0 || col >= size || row >= size) continue;
     const lived = survival.data[(row * size + col) * 4];
     const good = lived >= 0.999;
