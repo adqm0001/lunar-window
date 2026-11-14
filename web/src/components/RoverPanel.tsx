@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fieldCell } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
 import { isRoute, type RoverFailure } from "../lib/rover";
@@ -23,6 +23,16 @@ export default function RoverPanel() {
   const [maxSlope, setMaxSlope] = useState(20);
   const [needLink, setNeedLink] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A result only counts for the search that asked for it, in this panel: starting another search or closing the
+  // panel (even if it's reopened right away) makes earlier searches stale.
+  const searchSeq = useRef(0);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const inArea = useMemo(() => (field ? sites.filter((s) => fieldCell(field, s.lat, s.lon)) : []), [field, sites]);
   const fromCell = field ? fieldCell(field, from.lat, from.lon) : null;
@@ -34,22 +44,23 @@ export default function RoverPanel() {
     const goal = fieldCell(field, to.lat, to.lon);
     const e = getEngine();
     if (!goal || !e) return;
+    const search = ++searchSeq.current;
+    const current = () => mounted.current && search === searchSeq.current && useApp.getState().field === field;
     setBusy(true);
     setTimeout(async () => {
       try {
+        if (!current()) return;
         // visibilityBits needs WebGL, so it stays here; the search itself runs in the compute worker.
         const bits = e.visibilityBits(Math.floor(hour), WINDOW_DAYS * 24);
         const gpuMillis = bits.millis;
         const r = await planRouteInWorker(field, bits, { start: fromCell, goal, speedKmh: speed, maxSlopeDeg: maxSlope, needLink }).catch(
           (err: Error): RoverFailure => ({ reason: `The route search failed: ${err.message}`, expanded: 0, millis: 0 }),
         );
-        // Drop the result if the panel was closed or the area changed while the worker was searching.
-        const now = useApp.getState();
-        if (!now.roverOpen || now.field !== field) return;
+        if (!current()) return;
         if (isRoute(r)) r.gpuMillis = gpuMillis;
         setRover(r);
       } finally {
-        setBusy(false);
+        if (mounted.current && search === searchSeq.current) setBusy(false);
       }
     }, 30);
   };

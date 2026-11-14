@@ -15,6 +15,10 @@ interface Step {
 
 const st = () => useApp.getState();
 
+// Counts every step change (including closing the tour), so async work started by a step can tell whether the
+// visit that started it is still the current one.
+let stepVisit = 0;
+
 function closePanels() {
   const s = st();
   s.setFinderOpen(false);
@@ -104,12 +108,13 @@ const STEPS: Step[] = [
       if (!A || !B) return;
       const bits = e.visibilityBits(Math.floor(s.hour), 14 * 24);
       const gpuMillis = bits.millis;
-      const step = s.tourStep;
+      const visit = stepVisit;
       planRouteInWorker(f, bits, { start: A, goal: B, speedKmh: 0.4, maxSlopeDeg: 20, needLink: false })
         .then((r) => {
-          // The search runs in the worker; ignore it if the tour has moved on meanwhile.
+          // The search runs in the worker; ignore it if this visit to the step has ended meanwhile, even if the
+          // tour has since come back to the same step.
+          if (visit !== stepVisit) return;
           const now = st();
-          if (now.tourStep !== step) return;
           if (isRoute(r)) r.gpuMillis = gpuMillis;
           now.setRover(r);
           if (isRoute(r)) {
@@ -174,6 +179,7 @@ export default function Tour() {
   }, [globe]);
 
   useEffect(() => {
+    stepVisit++;
     if (step === null) return;
     STEPS[step]?.enter();
   }, [step]);
