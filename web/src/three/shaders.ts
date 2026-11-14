@@ -1,4 +1,4 @@
-import { CRATER_TEX_GLSL } from "./craterTexture";
+import { CRATER_TEX_GLSL, GROUND_GLSL } from "./craterTexture";
 export const TERRAIN_VERT = /* glsl */ `
 attribute vec2 aMap;
 varying vec2 vMap;
@@ -76,6 +76,7 @@ float horizonAt(vec2 m, float az) {
 }
 
 ${CRATER_TEX_GLSL}
+${GROUND_GLSL}
 
 void main() {
   if (uCutOn > 0.5) {
@@ -116,6 +117,17 @@ void main() {
       lit *= mix(1.0, cs, fade * smoothstep(3.0, 6.0, sel));
     }
   }
+  float rockAlb = 1.0;
+  if (camDist < 0.3) {
+    float fd = 1.0 - smoothstep(0.12, 0.3, camDist);
+    vec3 Lr = normalize(uSunWorld);
+    vec2 sdr = normalize(vec2(Lr.x, -Lr.z) + vec2(1e-6, 0.0));
+    float rmask;
+    vec2 g = groundDetail(vMap, rmask);
+    n = normalize(n + vec3(-g.x, 0.0, g.y) * fd);
+    if (lit > 0.0 && sel > 0.0) lit *= mix(1.0, rockShadow(vMap, sdr, tan(radians(sel))), fd);
+    rockAlb = mix(1.0, 1.2, rmask * fd);
+  }
 
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);
@@ -129,6 +141,7 @@ void main() {
   float tone = vnoise(vMap / 2600.0) * 0.55 + vnoise(vMap / 700.0) * 0.3 + vnoise(vMap / 150.0) * 0.15;
   vec3 albedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
   albedo *= 1.0 + 0.32 * halo;
+  albedo *= rockAlb;
 
   vec3 sunCol = vec3(1.0, 0.975, 0.94) * uSunPower;
   vec3 earthshine = vec3(0.55, 0.68, 1.0) * uEarthshine * earthVis * (0.35 + 0.65 * max(dot(n, normalize(uEarthWorld)), 0.0));

@@ -3,7 +3,7 @@ import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
-import { craterTexture, CRATER_TEX_GLSL } from "./craterTexture";
+import { craterTexture, CRATER_TEX_GLSL, GROUND_GLSL } from "./craterTexture";
 import { POLAR_EXTENT_M } from "../gpu/globalLayers";
 import { MOON_CENTER } from "./globe";
 import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
@@ -474,6 +474,7 @@ const vec3 CENTER = vec3(0.0, -1737.4, 0.0);
 ${PROCEDURAL_GLSL}
 ${TILE_CACHE_GLSL}
 ${CRATER_TEX_GLSL}
+${GROUND_GLSL}
 
 // The crater tile projected onto the sphere from three directions, blended by which way the
 // ground faces, so it covers the whole Moon without seams. Returns the 3D slope and halo.
@@ -656,6 +657,28 @@ void main() {
     }
   }
 
+  float rockAlb = 1.0;
+  if (camDist < 0.3) {
+    float fd = 1.0 - smoothstep(0.12, 0.3, camDist);
+    vec3 aw = abs(dW);
+    vec3 pw = vWorld * 1000.0;
+    vec3 Lr = normalize(uSunWorld);
+    vec2 m;
+    vec2 sdp;
+    int ax;
+    if (aw.x >= aw.y && aw.x >= aw.z) { m = pw.yz; sdp = vec2(Lr.y, Lr.z); ax = 0; }
+    else if (aw.y >= aw.z) { m = pw.zx; sdp = vec2(Lr.z, Lr.x); ax = 1; }
+    else { m = pw.xy; sdp = vec2(Lr.x, Lr.y); ax = 2; }
+    float rmask;
+    vec2 g = groundDetail(m, rmask);
+    vec3 G = ax == 0 ? vec3(0.0, g.x, g.y) : ax == 1 ? vec3(g.y, 0.0, g.x) : vec3(g.x, g.y, 0.0);
+    G -= dW * dot(G, dW);
+    n = normalize(n - G * fd);
+    float sinR = dot(Lr, dW);
+    if (lit > 0.0 && sinR > 0.0) lit *= mix(1.0, rockShadow(m, normalize(sdp + vec2(1e-6, 0.0)), sinR / sqrt(max(1.0 - sinR * sinR, 1e-4))), fd);
+    rockAlb = mix(1.0, 1.2, rmask * fd);
+  }
+
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
   vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
   float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
@@ -664,6 +687,7 @@ void main() {
   vec3 albedo = mix(mapAlbedo, polarAlbedo, polarW);
   albedo *= 0.92 + 0.16 * vnoise3(dW * 58.0);
   albedo *= 1.0 + 0.32 * halo;
+  albedo *= rockAlb;
   if (camDist < 150.0) albedo *= 1.0 + mottle(u * R_KM, footprint) * (1.0 - smoothstep(90.0, 150.0, camDist));
 
   vec3 L = normalize(uSunWorld);
