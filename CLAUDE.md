@@ -25,4 +25,5 @@ npm test                  # once task 20 is done
 - Check visual changes with the console snippet in ARCHITECTURE.md §5 and compare before/after screenshots.
 - Commit messages: one plain sentence describing the change. No prefixes, no co-author or sign-off lines.
 - Never commit `notes/` or `data/raw/`.
-- When a task is done, tick its box in TASKS.md in the same PR. If a spec was wrong, correct it there and explain in the PR.
+- **Marking tasks done:** after finishing a task, run its **Verify** steps yourself, plus `npx tsc --noEmit -p .` and `npm run build`. Only when all of them pass, change that task's `- [ ]` to `- [x]` in TASKS.md, in the same commit or PR. Never tick a task you haven't verified; if part of it can't be checked, leave it unchecked and explain why.
+- If a spec in TASKS.md turns out to be wrong, correct the spec there and explain in the PR.
