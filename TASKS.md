@@ -227,7 +227,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** currently `pointerdown` records only `button === 0` and `pointerup` checks movement < 4 px. Make it work for touch (`pointerType === "touch"`): use a 10 px threshold and ignore if a second pointer went down in between (pinch).
   - **Verify:** on a phone viewport, a tap adds a point; a drag or pinch doesn't.
 
-- [ ] **39. Focus outlines** (S)
+- [x] **39. Focus outlines** (S)
   - **Files:** `src/styles.css`.
   - **Spec:** `:focus-visible` outline (2 px, `rgba(139,156,255,0.9)`, offset 2 px) for `.btn`, `.chip`, `.icon-btn`, `.m-tab`, `.result`, list rows; don't remove outlines anywhere.
   - **Verify:** Tab through the page; every control shows the outline.
