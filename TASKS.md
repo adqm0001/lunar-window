@@ -222,7 +222,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add `setHeld(key: "r" | "f", down: boolean)` to `MoonScene` that adds/removes the key in `this.keys` (the same set the keyboard uses) and sets `dirty`. In the phone layout, two round buttons (▲ ▼) above the tab bar call it on `pointerdown` / `pointerup` / `pointercancel`.
   - **Verify:** on a phone viewport, holding ▲ raises the camera and ▼ lowers it, in surface, orbit and map modes.
 
-- [ ] **38. Tap to add a point on touch screens** (S)
+- [x] **38. Tap to add a point on touch screens** (S)
   - **Files:** `src/three/MoonScene.ts` (`bindPicking`).
   - **Spec:** currently `pointerdown` records only `button === 0` and `pointerup` checks movement < 4 px. Make it work for touch (`pointerType === "touch"`): use a 10 px threshold and ignore if a second pointer went down in between (pinch).
   - **Verify:** on a phone viewport, a tap adds a point; a drag or pinch doesn't.
