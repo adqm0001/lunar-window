@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { formatUtc, hourToDate, useApp } from "../state/store";
 import { copyShareLink } from "../state/share";
-import ValidationPanel from "./ValidationPanel";
 import { useSelectedSite, useSiteState } from "../state/selectors";
+
+const ValidationPanel = lazy(() => import("./ValidationPanel"));
 
 export default function TopBar() {
   const data = useApp((s) => s.data)!;
@@ -62,7 +63,7 @@ export default function TopBar() {
         <i />
         DSN LINK {st.link ? "OPEN" : "DOWN"}
       </span>
-      {validation && <ValidationPanel onClose={() => setValidation(false)} />}
+      <Suspense fallback={null}>{validation && <ValidationPanel onClose={() => setValidation(false)} />}</Suspense>
     </header>
   );
 }
