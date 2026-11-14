@@ -140,7 +140,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `discFraction(0) = 0.5`, `discFraction(0.2665) = 1`, `discFraction(-0.2665) = 0`, monotonic on [−0.3, 0.3]. `horizonAt(h, az)` with `h = [0, 10, 20, 30]` (4 bins = 90° each): `az = 45 → 5`, `az = 0 → 0`, `az = 315 → 15` (interpolates bin 3 → bin 0, i.e. wraps), `az = 360 → 0`, `az = -45 → 15`.
   - **Verify:** `npm test` green.
 
-- [ ] **23. Tests: rover planner** (M) — Depends on 20
+- [x] **23. Tests: rover planner** (M) — Depends on 20
   - **Files:** new `src/lib/rover.test.ts`.
   - **Spec:** build a minimal `FieldData` (only `meta.horizon.size`, `meta.horizon.cellMeters = 250`, `meta.slope.size`, and `slope: Uint8Array` of length `2·n²` are read by `planRoute`; cast the rest). Build a `VisibilityBits` by hand: `words = ceil(hours/32)`, bit `h` of cell `c` at `sun[c·words + (h>>5)] >>> (h & 31) & 1`. Cases on a 5×5 grid, 48 h:
     1. All cells sunlit always: route from (0,2) to (4,2) has 5 stops, `waitHours ≈ 0`, `distanceKm = 1.0`.
