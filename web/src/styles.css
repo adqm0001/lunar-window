@@ -220,3 +220,5 @@ button { font: inherit; color: inherit; }
 .layer-label b { font-weight: 600; font-size: 11.5px; }
 .layer-label span { color: var(--muted); font-size: 10px; font-family: var(--mono); }
 .chip.share { min-width: 112px; }
+.temp-chart { display: block; margin: 6px 0 4px; }
+.temp-chart .tc-label { font: 8.5px var(--mono); fill: var(--muted); }

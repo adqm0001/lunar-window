@@ -3,6 +3,7 @@ import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
+import { siteThermal, type SiteThermal } from "../lib/siteThermal";
 import { formatDuration, useApp } from "../state/store";
 import { useSelectedSite, useSeries, useSiteState } from "../state/selectors";
 
@@ -44,6 +45,10 @@ export default function SitePanel() {
       night: longestRun(series.sun, from, from + YEAR, (v) => v < 128),
     };
   }, [series, Math.floor(hourBucket / 24)]);
+
+  const thermStart = Math.floor(hourBucket / 720) * 720;
+  const therm = useMemo(() => siteThermal(data.ephem, site, thermStart, 24 * 395), [data, site, thermStart]);
+  const tNow = therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))];
 
   const sunUp = st.sunFraction >= 0.5;
   const bestStation = st.dsn.reduce((b, v, i) => (v > st.dsn[b] ? i : b), 0);
@@ -117,6 +122,23 @@ export default function SitePanel() {
         <dd>{formatDuration(yearStats.night)}</dd>
       </dl>
 
+      <div className="section-label" style={{ margin: "16px 0 6px" }}>Ground temperature</div>
+      <dl className="kv">
+        <dt>Right now</dt>
+        <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
+          {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
+        </dd>
+        <dt>Coldest / hottest (13 months)</dt>
+        <dd>
+          {Math.round(therm.min)} K / {Math.round(therm.max)} K
+        </dd>
+        <dt>Water ice</dt>
+        <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
+          {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
+        </dd>
+      </dl>
+      <TempChart t={therm} nowDay={Math.floor((hourBucket - therm.start) / 24)} />
+
       {outside && site.lat < -75 && (
         <button className="btn analyze-btn" onClick={() => analyzeArea(site.name, site.lat, site.lon)}>
           ⚡ Analyze this area in detail
@@ -134,6 +156,33 @@ export default function SitePanel() {
         </div>
       )}
     </aside>
+  );
+}
+
+function TempChart({ t, nowDay }: { t: SiteThermal; nowDay: number }) {
+  const W = 260;
+  const H = 54;
+  const lo = 20;
+  const hi = Math.max(160, Math.ceil(t.max / 50) * 50);
+  const n = t.dailyMax.length;
+  const x = (d: number) => (d / Math.max(1, n - 1)) * W;
+  const y = (v: number) => H - ((v - lo) / (hi - lo)) * H;
+  let band = "";
+  for (let d = 0; d < n; d++) band += `${d ? "L" : "M"}${x(d).toFixed(1)},${y(t.dailyMax[d]).toFixed(1)}`;
+  for (let d = n - 1; d >= 0; d--) band += `L${x(d).toFixed(1)},${y(t.dailyMin[d]).toFixed(1)}`;
+  return (
+    <svg className="temp-chart" viewBox={`0 0 ${W} ${H + 12}`} width="100%" role="img" aria-label="Daily temperature range over the next 13 months">
+      <path d={band + "Z"} fill="rgba(255,160,90,0.35)" stroke="rgba(255,170,100,0.8)" strokeWidth="0.6" />
+      {110 > lo && 110 < hi && (
+        <>
+          <line x1={0} x2={W} y1={y(110)} y2={y(110)} stroke="rgba(120,190,255,0.7)" strokeDasharray="3 3" strokeWidth="0.8" />
+          <text x={W - 2} y={y(110) - 2} textAnchor="end" className="tc-label">110 K ice limit</text>
+        </>
+      )}
+      {nowDay >= 0 && nowDay < n && <line x1={x(nowDay)} x2={x(nowDay)} y1={0} y2={H} stroke="rgba(255,255,255,0.7)" strokeWidth="0.8" />}
+      <text x={0} y={H + 10} className="tc-label">{lo} K</text>
+      <text x={W} y={10} textAnchor="end" className="tc-label">{hi} K</text>
+    </svg>
   );
 }
 
