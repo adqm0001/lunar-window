@@ -8,6 +8,7 @@ function devShots(): Plugin {
     name: "dev-shots",
     apply: "serve",
     configureServer(server) {
+      server.watcher.on("error", (e) => console.warn("watcher:", (e as Error).message));
       server.middlewares.use("/__shot", (req, res) => {
         let body = "";
         req.on("data", (c) => (body += c));

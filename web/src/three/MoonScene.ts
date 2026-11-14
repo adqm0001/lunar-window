@@ -15,7 +15,7 @@ import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
-import { LodTerrain, type Quality } from "./lod";
+import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
@@ -60,6 +60,10 @@ export class MoonScene {
   onPickLatLon: ((lat: number, lon: number) => void) | null = null;
   private dirty = true;
   private lastRender = 0;
+  private orbitMode = true;
+  private keys = new Set<string>();
+  private dragging = false;
+  private upDirty = false;
   private quality: Quality = "balanced";
   private bloom!: UnrealBloomPass;
   private cutaway = new Cutaway();
@@ -104,6 +108,7 @@ export class MoonScene {
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(MOON_CENTER);
     this.configureControls(true);
+    this.bindMovement();
 
     this.scene.background = new THREE.Color(0x000000);
     this.stars = this.makeStars();
@@ -368,10 +373,10 @@ export class MoonScene {
     this.startFlight(p, offset, dur, up);
   }
 
-  flyToOrbit() {
+  flyToOrbit(dur = 3.5) {
     const dir = this.camera.position.clone().sub(MOON_CENTER).normalize();
     if (dir.y > 0.97) dir.set(0, 0.62, 1).normalize();
-    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), 3.5, null);
+    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), dur, null);
   }
 
   private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null) {
@@ -389,16 +394,146 @@ export class MoonScene {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(target);
+    this.orbitMode = orbit;
+    this.controls.addEventListener("start", () => (this.dragging = true));
+    this.controls.addEventListener("end", () => (this.dragging = false));
     if (orbit) {
-      this.controls.minDistance = R_MOON_KM + 40;
+      this.controls.minDistance = R_MOON_KM + 120;
       this.controls.maxDistance = R_MOON_KM + 14000;
       this.controls.rotateSpeed = 0.5;
       this.controls.zoomSpeed = 0.8;
+      this.controls.enablePan = false;
     } else {
       this.controls.maxPolarAngle = Math.PI * 0.495;
-      this.controls.minDistance = 0.6;
-      this.controls.maxDistance = 420;
+      this.controls.minDistance = 0.4;
+      this.controls.maxDistance = 600;
+      this.controls.enablePan = true;
+      this.controls.screenSpacePanning = false;
+      this.controls.panSpeed = 1.2;
     }
+  }
+
+  private groundRadius(dir: THREE.Vector3, spacingKm: number) {
+    if (!this.globe) return R_MOON_KM;
+    return R_MOON_KM + surfaceHeightM(this.globe, dir, spacingKm).h / 1000;
+  }
+
+  private syncControlsUp() {
+    const c = this.controls as unknown as { _quat: THREE.Quaternion; _quatInverse: THREE.Quaternion };
+    c._quat.setFromUnitVectors(this.camera.up, new THREE.Vector3(0, 1, 0));
+    c._quatInverse.copy(c._quat).invert();
+  }
+
+  private moveOnSurface(dt: number) {
+    const target = this.controls.target;
+    const up = target.clone().sub(MOON_CENTER).normalize();
+    const dist = this.camera.position.distanceTo(target);
+    if (this.keys.size) {
+      const fwd = target.clone().sub(this.camera.position).projectOnPlane(up);
+      if (fwd.lengthSq() < 1e-9) fwd.set(0, 0, -1).projectOnPlane(up);
+      fwd.normalize();
+      const right = fwd.clone().cross(up);
+      const v = new THREE.Vector3();
+      if (this.keys.has("w")) v.add(fwd);
+      if (this.keys.has("s")) v.sub(fwd);
+      if (this.keys.has("d")) v.add(right);
+      if (this.keys.has("a")) v.sub(right);
+      if (v.lengthSq() > 0) {
+        const fast = this.keys.has("shift") ? 3 : 1;
+        v.setLength(Math.max(0.3, dist) * 0.9 * fast * dt);
+        target.add(v);
+        this.camera.position.add(v);
+      }
+      const turn = (this.keys.has("e") ? 1 : 0) - (this.keys.has("q") ? 1 : 0);
+      if (turn) {
+        const off = this.camera.position.clone().sub(target).applyAxisAngle(up, -turn * 1.4 * dt);
+        this.camera.position.copy(target).add(off);
+      }
+    }
+    const tDir = target.clone().sub(MOON_CENTER).normalize();
+    const tR = this.groundRadius(tDir, Math.max(0.03, dist * 0.004));
+    const tPos = MOON_CENTER.clone().addScaledVector(tDir, tR);
+    const shift = tPos.clone().sub(target);
+    if (shift.lengthSq() > 1e-10) {
+      target.copy(tPos);
+      this.camera.position.add(shift);
+    }
+    if (tDir.angleTo(this.camera.up) > 0.002) {
+      this.camera.up.copy(tDir);
+      this.upDirty = true;
+    }
+    if (this.upDirty && !this.dragging) {
+      this.upDirty = false;
+      this.syncControlsUp();
+    }
+  }
+
+  private keepAboveGround(): boolean {
+    const rel = this.camera.position.clone().sub(MOON_CENTER);
+    const d = rel.length();
+    if (d - R_MOON_KM > 40) return false;
+    const dir = rel.divideScalar(d);
+    const minR = this.groundRadius(dir, 0.05) + 0.12;
+    if (d >= minR) return false;
+    this.camera.position.copy(MOON_CENTER).addScaledVector(dir, minR);
+    return true;
+  }
+
+  private bindMovement() {
+    const el = this.renderer.domElement;
+    el.addEventListener(
+      "wheel",
+      (e) => {
+        if (this.flight) return;
+        const d = this.camera.position.distanceTo(this.controls.target);
+        if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
+          this.flyToOrbit(1.8);
+          return;
+        }
+        if (this.orbitMode && e.deltaY < 0 && d < this.controls.minDistance * 1.01 + 30) {
+          const rect = el.getBoundingClientRect();
+          const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+          const ray = new THREE.Raycaster();
+          ray.setFromCamera(ndc, this.camera);
+          const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
+          if (hit) this.diveTo(hit.point);
+        }
+      },
+      { passive: true },
+    );
+    const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    window.addEventListener("keydown", (e) => {
+      if (typing(e) || e.ctrlKey || e.metaKey) return;
+      const k = e.key.toLowerCase();
+      if (k.length === 1 && "wasdqe".includes(k)) this.keys.add(k);
+      if (k === "shift") this.keys.add("shift");
+    });
+    window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
+    window.addEventListener("blur", () => this.keys.clear());
+  }
+
+  private diveTo(p: THREE.Vector3) {
+    const up = p.clone().sub(MOON_CENTER).normalize();
+    const back = this.camera.position.clone().sub(p).projectOnPlane(up);
+    if (back.lengthSq() < 1e-6) back.set(1, 0, 0).projectOnPlane(up);
+    this.startFlight(p, back.setLength(70).add(up.clone().multiplyScalar(45)), 1.8, up);
+  }
+
+  private spinOrbit(dt: number) {
+    const moving = ["w", "a", "s", "d"].some((k) => this.keys.has(k));
+    if (!moving) return;
+    const off = this.camera.position.clone().sub(MOON_CENTER);
+    const alt = off.length() - R_MOON_KM;
+    const rate = 0.9 * Math.min(1, Math.max(0.08, alt / 3000)) * (this.keys.has("shift") ? 2.5 : 1) * dt;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    if (this.keys.has("a")) off.applyAxisAngle(camUp, -rate);
+    if (this.keys.has("d")) off.applyAxisAngle(camUp, rate);
+    if (this.keys.has("w")) off.applyAxisAngle(right, -rate);
+    if (this.keys.has("s")) off.applyAxisAngle(right, rate);
+    if (Math.abs(off.clone().normalize().y) > 0.995) return;
+    this.camera.position.copy(MOON_CENTER).add(off);
+    this.camera.lookAt(MOON_CENTER);
   }
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
@@ -428,7 +563,7 @@ export class MoonScene {
   private bindPicking() {
     const el = this.renderer.domElement;
     let down: { x: number; y: number } | null = null;
-    el.addEventListener("pointerdown", (e) => (down = { x: e.clientX, y: e.clientY }));
+    el.addEventListener("pointerdown", (e) => (down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null));
     el.addEventListener("pointerup", (e) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) return;
       down = null;
@@ -482,15 +617,25 @@ export class MoonScene {
         if (this.cutPending) this.applyCut();
       }
       this.dirty = true;
-    } else if (this.controls.update()) {
-      this.dirty = true;
+    } else {
+      if (this.orbitMode) {
+        const alt = this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM;
+        this.controls.rotateSpeed = 0.5 * Math.min(1, Math.max(0.05, alt / 3000));
+        this.spinOrbit(dt);
+      } else this.moveOnSurface(dt);
+      if (this.controls.update() || this.keys.size) this.dirty = true;
+      if (this.keepAboveGround()) this.dirty = true;
     }
     this.updateDepthAndSky();
     if (this.lod?.update(this.camera)) this.dirty = true;
     if (!this.dirty) return;
-    const minGap = this.quality === "saver" ? 32 : 0;
-    if (now - this.lastRender < minGap) return;
-    this.lastRender = now;
+    const fps = this.quality === "saver" ? 30 : this.quality === "balanced" ? 60 : 0;
+    if (fps) {
+      const gap = 1000 / fps;
+      const since = now - this.lastRender;
+      if (since < gap - 2) return;
+      this.lastRender = now - Math.min(Math.max(since - gap, 0), gap);
+    } else this.lastRender = now;
     this.dirty = false;
     this.adaptResolution(dt, now);
     this.composer.render();

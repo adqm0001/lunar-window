@@ -77,6 +77,7 @@ export default function Scene3D() {
     let s: MoonScene;
     try {
       s = new MoonScene(host.current, field);
+      if (import.meta.env.DEV) (window as unknown as { __scene: MoonScene }).__scene = s;
     } catch (e) {
       setError((e as Error).message);
       return;
