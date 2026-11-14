@@ -579,6 +579,11 @@ export class MoonScene {
     this.camera.lookAt(this.controls.target);
   }
 
+  refreshPolar80() {
+    this.lod?.refreshPolar80();
+    this.dirty = true;
+  }
+
   get isMapMode() {
     return this.mapMode;
   }

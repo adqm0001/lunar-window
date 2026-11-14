@@ -183,6 +183,19 @@ export class LodTerrain {
   private hasWork = true;
   private changedFlag = false;
 
+  // the 80 m polar data arrived after the globe: upload it and rebuild the polar tiles
+  refreshPolar80() {
+    const g = this.g;
+    const u = this.material.uniforms;
+    (u.uP80.value as THREE.Texture).dispose();
+    u.uP80.value = intTexture(g.p80, g.p80Size, g.p80Size);
+    u.uP80Size.value = g.p80Size;
+    u.uP80Cell.value = g.p80Cell;
+    u.uP80First.value = g.p80First;
+    for (const n of this.nodes.values()) if (n.center.y > 0.97) n.dirty = true;
+    this.hasWork = true;
+  }
+
   setQuality(q: Quality) {
     this.material.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
   }

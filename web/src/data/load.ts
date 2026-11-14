@@ -28,15 +28,9 @@ export interface Ephemeris {
   stations: Station[];
 }
 
-export interface Basemap {
-  image: HTMLImageElement;
-  extentMeters: number;
-}
-
 export interface AppData {
   ephem: Ephemeris;
   sites: Site[];
-  basemap: Basemap;
 }
 
 const base = `${import.meta.env.BASE_URL}data/`;
@@ -69,15 +63,6 @@ async function fetchJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function loadImage(path: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Couldn't load ${path}`));
-    img.src = base + path;
-  });
-}
-
 const EXPECTED_BYTES = 631296 + 78912;
 
 export async function loadAppData(onProgress: (fraction: number, label: string) => void): Promise<AppData> {
@@ -88,12 +73,10 @@ export async function loadAppData(onProgress: (fraction: number, label: string) 
   };
   onProgress(0, "Ephemeris");
   const meta = await fetchJson<{ start: string; stepHours: number; count: number; dsn: { stations: Station[] } }>("ephem.json");
-  const [ephemBuf, dsnBuf, sitesJson, image, basemapMeta] = await Promise.all([
+  const [ephemBuf, dsnBuf, sitesJson] = await Promise.all([
     fetchWithProgress("ephem.bin", tick("Sun and Earth positions")),
     fetchWithProgress("dsn.bin", tick("Deep Space Network")),
     fetchJson<{ sites: Site[] }>("sites.json"),
-    loadImage("basemap.png"),
-    fetchJson<{ extentMeters: number }>("basemap.json"),
   ]);
   onProgress(1, "Ready");
   return {
@@ -106,7 +89,6 @@ export async function loadAppData(onProgress: (fraction: number, label: string) 
       stations: meta.dsn.stations,
     },
     sites: sitesJson.sites,
-    basemap: { image, extentMeters: basemapMeta.extentMeters },
   };
 }
 

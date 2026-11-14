@@ -48,7 +48,9 @@ function loadImage(path: string): Promise<HTMLImageElement> {
 
 export async function loadGlobe(): Promise<GlobeData> {
   const meta = await (await fetch(base + "globe.json")).json();
-  const [g, p, p80, color] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), gunzipFetch(meta.polar80.file), loadImage(meta.color.file)]);
+  // the 25 MB 80 m polar file is fetched afterwards (loadPolar80) so the Moon appears sooner
+  const [g, p, color] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), loadImage(meta.color.file)]);
+  polar80Meta = meta.polar80;
   return {
     globe: undelta(g, meta.globe.width),
     width: meta.globe.width,
@@ -59,8 +61,8 @@ export async function loadGlobe(): Promise<GlobeData> {
     polarSize: meta.polar.size,
     polarCell: meta.polar.cellMeters,
     polarFirst: meta.polar.firstCenterMeters,
-    p80: undelta(p80, meta.polar80.size),
-    p80Size: meta.polar80.size,
+    p80: new Int16Array(4).fill(-32768),
+    p80Size: 2,
     p80Cell: meta.polar80.cellMeters,
     p80First: meta.polar80.firstCenterMeters,
     color,
@@ -68,6 +70,19 @@ export async function loadGlobe(): Promise<GlobeData> {
 }
 
 export const P80_MISSING = -32768;
+
+let polar80Meta: { file: string; size: number; cellMeters: number; firstCenterMeters: number } | null = null;
+
+// Fills in the 80 m polar terrain on an already-loaded globe (in place).
+export async function loadPolar80(g: GlobeData): Promise<boolean> {
+  if (!polar80Meta) return false;
+  const bytes = await gunzipFetch(polar80Meta.file);
+  g.p80 = undelta(bytes, polar80Meta.size);
+  g.p80Size = polar80Meta.size;
+  g.p80Cell = polar80Meta.cellMeters;
+  g.p80First = polar80Meta.firstCenterMeters;
+  return true;
+}
 
 function p80Height(g: GlobeData, x: number, y: number): number | null {
   const c = (x - g.p80First) / g.p80Cell;
