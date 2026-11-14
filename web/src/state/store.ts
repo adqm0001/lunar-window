@@ -47,6 +47,8 @@ interface AppState {
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
   reportOpen: boolean;
+  mobilePanel: "none" | "sites" | "site" | "time";
+  setMobilePanel: (p: "none" | "sites" | "site" | "time") => void;
   setReportOpen: (o: boolean) => void;
   setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
@@ -150,6 +152,8 @@ export const useApp = create<AppState>((set, get) => ({
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
   reportOpen: false,
+  mobilePanel: "none",
+  setMobilePanel: (mobilePanel) => set({ mobilePanel }),
   setReportOpen: (reportOpen) => set({ reportOpen }),
   setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,

@@ -16,6 +16,7 @@ import ComparePanel from "./components/ComparePanel";
 import LanderPanel from "./components/LanderPanel";
 import RoverPanel from "./components/RoverPanel";
 import Tour from "./components/Tour";
+import MobileNav from "./components/MobileNav";
 import PorkchopPanel from "./components/PorkchopPanel";
 
 let startedField = false;
@@ -29,6 +30,7 @@ export default function App() {
   const compareOpen = useApp((s) => s.compareOpen);
   const landerOpen = useApp((s) => s.landerOpen);
   const roverOpen = useApp((s) => s.roverOpen);
+  const mobilePanel = useApp((s) => s.mobilePanel);
   const porkchopOpen = useApp((s) => s.porkchopOpen);
 
   useEffect(() => {
@@ -100,7 +102,7 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${cinema ? "cinema" : ""}`}>
+    <div className={`app ${cinema ? "cinema" : ""} m-${mobilePanel}`}>
       <main className="stage">
         <Scene3D />
       </main>
@@ -111,6 +113,7 @@ export default function App() {
       {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}
       <Timeline />
       <Tour />
+      <MobileNav />
       <div className="kbd-hint">WASD move · R F up/down · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
     </div>
   );
