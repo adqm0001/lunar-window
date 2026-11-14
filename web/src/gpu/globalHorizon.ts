@@ -78,20 +78,19 @@ void main() {
   vec3 east = vec3(-sin(lon), cos(lon), 0.0);
   vec3 north = cross(up, east);
   vec3 dir = cos(az) * north + sin(az) * east;
-  float r0 = R + heightAt(up) + uObserver;
-  float best = -1.0;
+  float h0 = heightAt(up) + uObserver;
+  float best = -1.5;
   float d = 60.0;
   for (int i = 0; i < 320; i++) {
     float delta = d / R;
-    float c = cos(delta);
-    vec3 p = c * up + sin(delta) * dir;
-    float r = R + heightAt(p);
-    float s = (r * c - r0) / sqrt(r * r + r0 * r0 - 2.0 * r * r0 * c);
-    best = max(best, s);
+    float sh = sin(0.5 * delta);
+    vec3 p = cos(delta) * up + sin(delta) * dir;
+    float dh = heightAt(p) - h0;
+    best = max(best, atan(dh - 2.0 * R * sh * sh, R * sin(delta)));
     d += max(60.0, d * 0.03);
     if (d > 350000.0) break;
   }
-  outColor = vec4(degrees(asin(clamp(best, -1.0, 1.0))), 0.0, 0.0, 1.0);
+  outColor = vec4(degrees(best), 0.0, 0.0, 1.0);
 }`;
 
 export class GlobalHorizon {

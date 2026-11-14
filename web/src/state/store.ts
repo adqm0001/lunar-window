@@ -119,3 +119,5 @@ export function formatDuration(hours: number | null) {
   if (hours < 48) return `${Math.round(hours)} h`;
   return `${(hours / 24).toFixed(1)} d`;
 }
+
+if (import.meta.env.DEV) (window as unknown as { __app: typeof useApp }).__app = useApp;
