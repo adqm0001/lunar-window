@@ -12,7 +12,14 @@ export type WorkerResponse = { id: number; ok: true; result: unknown } | { id: n
 // The project's lib is DOM, which types `self` as Window; this is the dedicated worker scope we actually get.
 const scope = self as unknown as {
   onmessage: ((e: MessageEvent<WorkerRequest>) => void) | null;
+  onmessageerror: (() => void) | null;
   postMessage(msg: WorkerResponse, transfer?: Transferable[]): void;
+};
+
+// A request that can't be read has no id to answer, so its caller would wait forever. Throwing turns it into
+// an error event on the main thread, where the client fails this worker's calls and starts a fresh one.
+scope.onmessageerror = () => {
+  throw new Error("could not read a request");
 };
 
 let ephem: Ephemeris | null = null;
