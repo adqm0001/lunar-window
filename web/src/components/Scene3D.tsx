@@ -1,51 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { ephemAt } from "../data/load";
-import { customSiteAt, inField } from "../data/field";
+import { customSiteAt } from "../data/field";
 import { overlayCanvas } from "../gpu/overlay";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { MoonScene } from "../three/MoonScene";
-import { GlobalHorizon } from "../gpu/globalHorizon";
-import { globeHeight } from "../data/globe";
-import { toMap } from "../lib/astro";
-import type { Site } from "../data/load";
 import { uniqueFeatures } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
 import { useApp } from "../state/store";
+import { addPointAt } from "../lib/points";
+import { applyLate, registerScene, sharedCamera } from "../state/share";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
-let globalEngine: GlobalHorizon | null = null;
-
-function pickGlobal(lat: number, lon: number) {
-  const st = useApp.getState();
-  const g = st.globe;
-  if (!g) return;
-  const [x, y] = toMap(lat, lon);
-  if (st.field && inField(st.field, x, y)) {
-    const c = customSiteAt(st.field, x, y);
-    if (c) st.setCustomSite(c);
-    return;
-  }
-  try {
-    globalEngine ??= new GlobalHorizon(g);
-  } catch (e) {
-    console.warn((e as Error).message);
-    return;
-  }
-  const { horizon, millis } = globalEngine.compute(lat, lon);
-  const site: Site = {
-    id: `custom:${lat.toFixed(4)},${lon.toFixed(4)}`,
-    name: "Custom point",
-    lat,
-    lon,
-    group: "Custom",
-    terrain: true,
-    height_m: globeHeight(g, lat, lon),
-    horizon,
-    computedMs: millis,
-  };
-  st.setCustomSite(site);
-  if (lat < -75) analyzeArea("Custom point", lat, lon);
-}
 
 export default function Scene3D() {
   const host = useRef<HTMLDivElement>(null);
@@ -88,7 +53,9 @@ export default function Scene3D() {
       const c = f ? customSiteAt(f, x, y) : null;
       if (c) useApp.getState().setCustomSite(c);
     };
-    s.onPickLatLon = (lat, lon) => pickGlobal(lat, lon);
+    s.onPickLatLon = (lat, lon) => addPointAt(lat, lon);
+    if (sharedCamera()) s.skipIntro();
+    registerScene(s);
     s.onFlyRegion = (r) => {
       useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3));
       analyzeArea(r.name, r.lat, r.lon);
@@ -97,6 +64,7 @@ export default function Scene3D() {
     lastSelected.current = null;
     setScene(s);
     return () => {
+      registerScene(null);
       s.dispose();
       setScene(null);
     };
@@ -109,6 +77,10 @@ export default function Scene3D() {
   useEffect(() => {
     if (scene && globe) scene.setGlobe(globe);
   }, [scene, globe]);
+
+  useEffect(() => {
+    if (scene && globe && field) setTimeout(applyLate, 0);
+  }, [scene, globe, field]);
 
   useEffect(() => {
     if (scene && orbitRequest > 0) scene.flyToOrbit();

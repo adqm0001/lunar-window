@@ -24,6 +24,12 @@ import type { ArtemisRegion } from "../data/artemis";
 import { dirFromLatLon } from "./globe";
 
 export const EXAGGERATION = 1.0;
+
+export interface ViewState {
+  orbit: boolean;
+  t: [number, number];
+  c: [number, number, number];
+}
 const SKY_R = 6000;
 
 export function meToWorld(v: Vec3): THREE.Vector3 {
@@ -373,6 +379,38 @@ export class MoonScene {
       offset = tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38));
     }
     this.startFlight(p, offset, dur, up);
+  }
+
+  getView(): ViewState {
+    const t = latLonFromWorld(this.controls.target);
+    const c = latLonFromWorld(this.camera.position);
+    const alt = this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM;
+    return { orbit: this.orbitMode, t, c: [c[0], c[1], alt] };
+  }
+
+  skipIntro() {
+    this.introDone = true;
+    this.pendingIntro = null;
+  }
+
+  setView(v: ViewState) {
+    this.skipIntro();
+    this.flight = null;
+    const cdir = dirFromLatLon(v.c[0], v.c[1]);
+    let target: THREE.Vector3;
+    if (v.orbit) {
+      target = MOON_CENTER.clone();
+      this.camera.up.set(0, 1, 0);
+    } else {
+      const tdir = dirFromLatLon(v.t[0], v.t[1]);
+      target = MOON_CENTER.clone().addScaledVector(tdir, this.groundRadius(tdir, 0.1));
+      this.camera.up.copy(tdir);
+    }
+    this.camera.position.copy(MOON_CENTER).addScaledVector(cdir, R_MOON_KM + Math.max(0.2, v.c[2]));
+    this.controls.target.copy(target);
+    this.configureControls(v.orbit);
+    this.camera.lookAt(target);
+    this.dirty = true;
   }
 
   flyToOrbit(dur = 3.5) {

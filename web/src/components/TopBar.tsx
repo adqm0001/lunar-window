@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { formatUtc, hourToDate, useApp } from "../state/store";
+import { copyShareLink } from "../state/share";
 import { useSelectedSite, useSiteState } from "../state/selectors";
 
 export default function TopBar() {
@@ -9,6 +11,11 @@ export default function TopBar() {
   const sunPct = Math.round(st.sunFraction * 100);
   const quality = useApp((s) => s.quality);
   const setQuality = useApp((s) => s.setQuality);
+  const [copied, setCopied] = useState<null | boolean>(null);
+  const share = async () => {
+    setCopied(await copyShareLink());
+    setTimeout(() => setCopied(null), 2200);
+  };
   return (
     <header className="topbar">
       <div className="brand">
@@ -27,6 +34,9 @@ export default function TopBar() {
           </button>
         ))}
       </div>
+      <button className="chip share" onClick={share} title="Copy a link that opens this exact view: site, time, layer, your points and the camera">
+        {copied === null ? "⤴ Share view" : copied ? "✓ Link copied" : "Link is in the address bar"}
+      </button>
       <span style={{ color: "var(--muted)", fontSize: 12 }}>{site.name}</span>
       <span className={`pill ${sunPct > 0 ? "on-sun" : ""}`}>
         <i />

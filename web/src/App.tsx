@@ -3,6 +3,7 @@ import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
 import { loadGlobe } from "./data/globe";
 import { useApp } from "./state/store";
+import { applyEarly, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
 import TopBar from "./components/TopBar";
 import SiteList from "./components/SiteList";
@@ -53,6 +54,13 @@ export default function App() {
       .then(setData)
       .catch((e: Error) => setError(e.message));
   }, [setData]);
+
+  useEffect(() => {
+    if (!data) return;
+    applyEarly();
+    const id = setInterval(syncUrl, 1000);
+    return () => clearInterval(id);
+  }, [data]);
 
   useEffect(() => {
     if (!data || startedField) return;
