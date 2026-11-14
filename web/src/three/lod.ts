@@ -4,6 +4,7 @@ import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
 import { craterTexture, CRATER_TEX_GLSL } from "./craterTexture";
+import { POLAR_EXTENT_M } from "../gpu/globalLayers";
 import { MOON_CENTER } from "./globe";
 import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
 import { GpuTileCache, TILE_CACHE_GLSL } from "./tileCache";
@@ -125,6 +126,11 @@ export class LodTerrain {
       side: THREE.DoubleSide,
       uniforms: {
         uColor: { value: color },
+        uGOverlay: { value: new THREE.Texture() },
+        uGOverlayS: { value: new THREE.Texture() },
+        uGOverlayN: { value: new THREE.Texture() },
+        uPolarExt: { value: POLAR_EXTENT_M },
+        uGOverlayMix: { value: 0 },
         uGlobe: { value: intTexture(g.globe, g.width, g.height) },
         uGlobeSize: { value: new THREE.Vector2(g.width, g.height) },
         uPpd: { value: g.ppd },
@@ -428,6 +434,11 @@ void main() {
 const FRAG = /* glsl */ `
 precision highp isampler2D;
 uniform sampler2D uColor;
+uniform sampler2D uGOverlay;
+uniform sampler2D uGOverlayS;
+uniform sampler2D uGOverlayN;
+uniform float uGOverlayMix;
+uniform float uPolarExt;
 uniform isampler2D uGlobe;
 uniform vec2 uGlobeSize;
 uniform float uPpd;
@@ -666,5 +677,19 @@ void main() {
   float fill = uSunPower * 0.012 * (0.35 + 0.65 * max(dot(n, Lh), 0.0)) * smoothstep(-0.12, 0.05, dot(dW, L));
   vec3 col = albedo * (vec3(1.0, 0.975, 0.94) * uSunPower * photometry * surge * lit + vec3(0.85, 0.85, 0.88) * fill + vec3(0.55, 0.68, 1.0) * uEarthshine * max(dot(n, normalize(uEarthWorld)), 0.0) + 0.0008);
   if (any(isnan(col))) col = vec3(0.0);
+  if (uGOverlayMix > 0.0) {
+    vec4 o = texture(uGOverlay, uv);
+    // near either pole switch to the polar grids (square cells instead of thin wedges)
+    float kp = 2.0 * R_M * tan((PI / 2.0 - abs(latR)) / 2.0);
+    vec2 pm = vec2(kp * sin(lonR), kp * cos(lonR));
+    float wp = 1.0 - smoothstep(0.8 * uPolarExt, 0.95 * uPolarExt, kp);
+    if (wp > 0.0) {
+      vec2 puv = (pm + uPolarExt) / (2.0 * uPolarExt);
+      vec4 po = latR < 0.0 ? texture(uGOverlayS, puv) : texture(uGOverlayN, puv);
+      o = mix(o, po, wp);
+    }
+    float relief = clamp(0.55 + 0.6 * mu0, 0.55, 0.95);
+    col = mix(col, o.rgb * relief, o.a * uGOverlayMix);
+  }
   fragColor = vec4(clamp(col, 0.0, 40.0), 1.0);
 }`;

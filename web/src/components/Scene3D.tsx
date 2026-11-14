@@ -7,6 +7,8 @@ import { MoonScene } from "../three/MoonScene";
 import { uniqueFeatures } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
 import { useApp } from "../state/store";
+import { computeGlobal } from "../gpu/globalOverlay";
+import { GLOBAL_LAYERS } from "../gpu/layers";
 import { addPointAt } from "../lib/points";
 import { applyLate, registerScene, sharedCamera } from "../state/share";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
@@ -30,6 +32,9 @@ export default function Scene3D() {
   const finder = useApp((s) => s.finder);
   const survival = useApp((s) => s.survival);
   const rover = useApp((s) => s.rover);
+  const rangeDays = useApp((s) => s.rangeDays);
+  const playing = useApp((s) => s.playing);
+  const day = Math.floor(hour / 24);
   const sites = useSites();
   const site = useSelectedSite();
   const st = useSiteState();
@@ -102,6 +107,24 @@ export default function Scene3D() {
   useEffect(() => {
     scene?.setScatter(mc ? mc.points : null);
   }, [scene, mc]);
+
+  // whole-Moon version of the current layer, painted onto the globe outside the detailed area
+  useEffect(() => {
+    if (!scene) return;
+    if (!globe || !GLOBAL_LAYERS.includes(layer)) {
+      scene.setGlobalOverlay(null);
+      useApp.getState().setGlobalInfo(null);
+      return;
+    }
+    if (playing) return;
+    let cancelled = false;
+    computeGlobal(layer, day * 24, rangeDays).then((c) => {
+      if (!cancelled) scene.setGlobalOverlay(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scene, globe, layer, rangeDays, day, playing]);
 
   useEffect(() => {
     scene?.setRoute(rover && "stops" in rover ? rover : null);

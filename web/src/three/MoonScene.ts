@@ -17,6 +17,7 @@ import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
+import type { GlobalOverlay } from "../gpu/globalOverlay";
 import { craterTexture } from "./craterTexture";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
@@ -294,6 +295,31 @@ export class MoonScene {
     this.earthDir.copy(e);
     this.earthMat.uniforms.uSunDir.value.copy(s);
     this.earthMat.uniforms.uSpin.value = ((hour % 24) / 24) * Math.PI * 2;
+  }
+
+  private gOverlay: GlobalOverlay | null = null;
+  setGlobalOverlay(o: GlobalOverlay | null) {
+    this.dirty = true;
+    this.gOverlay = o;
+    if (!this.lod) return;
+    const u = this.lod.material.uniforms;
+    if (!o) {
+      u.uGOverlayMix.value = 0;
+      return;
+    }
+    const tex = (canvas: HTMLCanvasElement, wrap: boolean) => {
+      const t = new THREE.CanvasTexture(canvas);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      if (wrap) t.wrapS = THREE.RepeatWrapping;
+      return t;
+    };
+    for (const [k, c, wrap] of [["uGOverlay", o.eq, true], ["uGOverlayS", o.south, false], ["uGOverlayN", o.north, false]] as const) {
+      (u[k].value as THREE.Texture).dispose();
+      u[k].value = tex(c, wrap);
+    }
+    u.uGOverlayMix.value = 0.9;
   }
 
   setOverlay(canvas: HTMLCanvasElement | null) {
@@ -747,6 +773,7 @@ export class MoonScene {
     }
     this.lod = new LodTerrain(g, tex);
     this.lod.setQuality(this.quality);
+    if (this.gOverlay) setTimeout(() => this.setGlobalOverlay(this.gOverlay), 0);
     this.setCutUniforms(this.cutOn && !this.cutPending);
     this.globeMats = [this.lod.material];
     this.updateHoles();

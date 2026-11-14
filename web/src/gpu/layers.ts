@@ -24,10 +24,10 @@ const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 1
 export const SCORE: Stop[] = [[0, 20, 10, 40], [0.4, 110, 40, 150], [0.7, 240, 110, 90], [0.88, 255, 200, 80], [1, 255, 255, 230]];
 export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [0.999, 255, 230, 120], [1, 61, 220, 151]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
-const TEMP: Stop[] = [[0, 30, 20, 90], [0.15, 40, 90, 220], [0.3, 60, 200, 230], [0.5, 240, 220, 90], [0.75, 250, 110, 50], [1, 255, 240, 230]];
+const TEMP: Stop[] = [[0, 30, 20, 90], [0.14, 40, 90, 220], [0.28, 60, 200, 230], [0.48, 240, 220, 90], [0.72, 250, 110, 50], [0.9, 220, 40, 60], [1, 255, 200, 220]];
 const ICE: Stop[] = [[0, 20, 40, 120], [0.5, 60, 140, 255], [1, 190, 250, 255]];
 export const TEMP_MIN = 20;
-export const TEMP_MAX = 360;
+export const TEMP_MAX = 400;
 export const ICE_MAX_DEPTH = 0.8;
 
 export const LAYERS: LayerDef[] = [
@@ -39,7 +39,7 @@ export const LAYERS: LayerDef[] = [
   { id: "night", label: "Longest night", short: "Night", ranged: true, stops: NIGHT, legend: ["0 d", "≥ 30 d"], describe: "Longest continuous stretch without sunlight" },
   { id: "score", label: "Landing score", short: "★ Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
   { id: "survive", label: "Lander survival", short: "♥ Survival", ranged: false, stops: SURVIVE, legend: ["dies day 1", "survives"], describe: "Share of the mission the chosen lander stays powered, simulated hour by hour at every point (green = survives the whole mission)" },
-  { id: "temp", label: "Max surface temperature", short: "Temp", ranged: true, stops: TEMP, legend: ["20 K", "360 K"], describe: "Hottest the ground gets in the period, from a heat-flow model of the soil run for every point on your GPU (sunlight on the real slope and horizon, heat soaking into the ground, glowing back to space)" },
+  { id: "temp", label: "Max surface temperature", short: "Temp", ranged: true, stops: TEMP, legend: ["20 K", "400 K"], describe: "Hottest the ground gets in the period, from a heat-flow model of the soil run for every point on your GPU (sunlight on the real slope and horizon, heat soaking into the ground, glowing back to space)" },
   { id: "ice", label: "Water ice stability", short: "❄ Ice", ranged: false, stops: ICE, legend: ["≤ 80 cm down", "at surface"], describe: "Where water ice can survive: it stays put wherever the warmest temperature all year is below 110 K. Bright = stable right at the surface, darker blue = stable once you dig down. Uses a full year of sunlight." },
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
@@ -164,6 +164,37 @@ export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img
       px[o + 1] = g;
       px[o + 2] = b;
       px[o + 3] = 235;
+      continue;
+    }
+    const t = id === "night" ? Math.sqrt(v / NIGHT_SCALE_HOURS) : id === "temp" ? (v - TEMP_MIN) / (TEMP_MAX - TEMP_MIN) : v;
+    const [r, g, b] = sample(def.stops, t);
+    px[o] = r;
+    px[o + 1] = g;
+    px[o + 2] = b;
+    px[o + 3] = 215;
+  }
+}
+
+export const GLOBAL_LAYERS: LayerId[] = ["sun", "earth", "link", "night", "temp", "ice"];
+
+// Colors a whole-Moon grid (row 0 = north, column 0 = 180°W) with the same palettes.
+export function paintGlobal(id: LayerId, data: Float32Array, w: number, h: number, img: ImageData) {
+  const def = layerDef(id);
+  const px = img.data;
+  const ch = id === "sun" || id === "temp" ? 0 : id === "earth" ? 1 : id === "link" ? 2 : 3;
+  for (let i = 0; i < w * h; i++) {
+    const v = data[i * 4 + ch];
+    const o = i * 4;
+    if (id === "ice") {
+      if (v < 0) {
+        px[o + 3] = 0;
+        continue;
+      }
+      const [r, g, b] = sample(def.stops, 1 - Math.min(1, v / ICE_MAX_DEPTH));
+      px[o] = r;
+      px[o + 1] = g;
+      px[o + 2] = b;
+      px[o + 3] = 240;
       continue;
     }
     const t = id === "night" ? Math.sqrt(v / NIGHT_SCALE_HOURS) : id === "temp" ? (v - TEMP_MIN) / (TEMP_MAX - TEMP_MIN) : v;

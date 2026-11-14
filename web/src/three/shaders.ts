@@ -139,8 +139,8 @@ void main() {
   if (uOverlayMix > 0.0) {
     vec2 uv = vec2((vMap.x - uCenter.x + uExtent) / (2.0 * uExtent), (vMap.y - uCenter.y + uExtent) / (2.0 * uExtent));
     vec4 o = texture(uOverlay, uv);
-    float relief = clamp(0.4 + 2.5 * mu0, 0.4, 1.3);
-    col = mix(col, o.rgb * relief * 0.9, o.a * uOverlayMix);
+    float relief = clamp(0.55 + 0.6 * mu0, 0.55, 0.95);
+    col = mix(col, o.rgb * relief, o.a * uOverlayMix);
   }
 
   if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);

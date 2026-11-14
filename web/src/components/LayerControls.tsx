@@ -15,6 +15,8 @@ export default function LayerControls() {
   const poleField = useApp((s) => s.poleField);
   const cutaway = useApp((s) => s.cutaway);
   const regionStatus = useApp((s) => s.regionStatus);
+  const globalStatus = useApp((s) => s.globalStatus);
+  const globalInfo = useApp((s) => s.globalInfo);
   const hasFinder = useApp((s) => !!s.finder);
   const hasSurvival = useApp((s) => !!s.survival);
   const landerOpen = useApp((s) => s.landerOpen);
@@ -103,7 +105,13 @@ export default function LayerControls() {
             measured (~25 K vs 30–50 K).
           </div>
         )}
-        {field && <div className="legend-desc mono">Area: {field.meta.label ?? "south pole (C++ engine, 40 m)"}</div>}
+        {globalStatus && <div className="legend-gpu">{globalStatus}</div>}
+        {globalInfo && view === "3d" && !globalStatus && (
+          <div className="legend-gpu">
+            Whole Moon · {globalInfo.points.toLocaleString()} points × {globalInfo.steps.toLocaleString()} steps · {globalInfo.millis.toFixed(0)} ms
+          </div>
+        )}
+        {field && <div className="legend-desc mono">Detailed area: {field.meta.label ?? "south pole (C++ engine, 40 m)"}</div>}
         {field?.meta.source && <div className="legend-desc mono">{field.meta.source}</div>}
         {field?.meta.label && poleField && (
           <button className="chip" style={{ marginTop: 6 }} onClick={() => useApp.getState().setActiveField(poleField)}>
