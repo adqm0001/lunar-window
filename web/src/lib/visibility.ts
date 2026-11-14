@@ -50,11 +50,8 @@ export interface SiteSeries {
   link: Uint8Array;
 }
 
-const cache = new Map<string, SiteSeries>();
-
+// Runs in the compute worker (src/workers); the UI reads cached results through state/seriesCache.ts.
 export function siteSeries(e: Ephemeris, site: Site): SiteSeries {
-  const hit = cache.get(site.id);
-  if (hit) return hit;
   const frame = localFrame(site.lat, site.lon);
   const r = siteRadiusKm(site);
   const n = e.count;
@@ -74,9 +71,7 @@ export function siteSeries(e: Ephemeris, site: Site): SiteSeries {
     for (let k = 0; k < ns; k++) if (e.dsn[i * ns + k] >= DSN_MIN_ELEVATION_DEG) dsnUp = true;
     link[i] = up && dsnUp ? 1 : 0;
   }
-  const series = { sun, earth, link };
-  cache.set(site.id, series);
-  return series;
+  return { sun, earth, link };
 }
 
 export function hoursUntilChange(values: Uint8Array, hour: number, isOn: (v: number) => boolean, maxHours = 24 * 400): number | null {

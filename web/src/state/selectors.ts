@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { siteSeries, siteStateAt } from "../lib/visibility";
+import { siteStateAt, type SiteSeries } from "../lib/visibility";
+import { getSeries, useSeriesVersion } from "./seriesCache";
 import { useApp } from "./store";
 
 export function useSites() {
@@ -27,8 +28,10 @@ export function useSiteState() {
   return useMemo(() => siteStateAt(data.ephem, site, hour), [data, site, hour]);
 }
 
-export function useSeries() {
+/** The selected site's series, or null while the compute worker is still working on it. */
+export function useSeries(): SiteSeries | null {
   const data = useApp((s) => s.data)!;
   const site = useSelectedSite();
-  return useMemo(() => siteSeries(data.ephem, site), [data, site]);
+  const version = useSeriesVersion();
+  return useMemo(() => getSeries(data.ephem, site), [data, site, version]);
 }

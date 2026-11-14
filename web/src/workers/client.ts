@@ -26,9 +26,12 @@ function startWorker(): Worker {
     if (msg.ok) p.resolve(msg.result);
     else p.reject(new Error(msg.error));
   };
-  // Fires when the script fails to load or throws at the top level. The worker is dropped so the next
-  // call starts a fresh one instead of posting to a worker that will never answer.
+  // Fires when the script fails to load or throws (including on a request it could not read, see
+  // compute.worker.ts). The worker is dropped so the next call starts a fresh one instead of posting to a
+  // worker that will never answer.
   w.onerror = (e) => fail(w, (e as ErrorEvent).message || "could not load the worker script");
+  // A reply that could not be read can't be matched to its request, so every call on this worker would wait forever.
+  w.onmessageerror = () => fail(w, "could not read a reply");
   return w;
 }
 
@@ -65,7 +68,13 @@ function post<T>(w: Worker, type: string, payload: unknown, transfer: Transferab
   return new Promise<T>((resolve, reject) => {
     pending.set(id, { worker: w, resolve: resolve as (result: unknown) => void, reject });
     const req: WorkerRequest = { id, type, payload };
-    w.postMessage(req, transfer);
+    try {
+      w.postMessage(req, transfer);
+    } catch (err) {
+      // e.g. a payload that can't be cloned: nothing was sent, so nothing will answer.
+      pending.delete(id);
+      throw err;
+    }
   });
 }
 

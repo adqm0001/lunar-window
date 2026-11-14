@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSeries } from "../state/selectors";
-import { siteSeries, type SiteSeries } from "../lib/visibility";
+import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { canRecord, startRecording, stopRecording } from "../lib/recorder";
 
 const WINDOWS = [7, 30, 90, 365];
@@ -20,6 +20,7 @@ export default function Timeline() {
   const speedIndex = useApp((s) => s.speedIndex);
   const { setHour, togglePlaying, setSpeedIndex } = useApp.getState();
   const series = useSeries();
+  const seriesVersion = useSeriesVersion();
   const pinned = useApp((s) => s.pinned);
   const compareOpen = useApp((s) => s.compareOpen);
   const compare = compareOpen && pinned.length >= 2;
@@ -73,9 +74,9 @@ export default function Timeline() {
 
     g.fillStyle = "#0b0f17";
     g.fillRect(x0, 8, W, OVERVIEW_H - 6);
-    const ov = series.sun;
+    const ov = series?.sun;
     const bucket = Math.max(1, Math.floor(total / W));
-    for (let px = 0; px < W; px++) {
+    for (let px = 0; ov && px < W; px++) {
       const a = Math.floor((px / W) * total);
       let s = 0;
       for (let i = a; i < Math.min(total, a + bucket); i++) s += ov[i];
@@ -94,13 +95,14 @@ export default function Timeline() {
     }
 
     const top = OVERVIEW_H + 18;
-    type Spec = { label: string; arr: Uint8Array; color: number[]; kind: "sun" | "flag"; link?: Uint8Array };
+    // arr is null while the compute worker is still producing that site's series: the row is drawn empty.
+    type Spec = { label: string; arr: Uint8Array | null; color: number[]; kind: "sun" | "flag"; link?: Uint8Array };
     const specs: Spec[] = compare
       ? pinned.slice(0, 6).map((s) => {
-          const se: SiteSeries = siteSeries(data.ephem, s);
-          return { label: s.name.replace("Best spot ", "★").slice(0, 9).toUpperCase(), arr: se.sun, color: [255, 181, 71], kind: "sun", link: se.link };
+          const se = getSeries(data.ephem, s);
+          return { label: s.name.replace("Best spot ", "★").slice(0, 9).toUpperCase(), arr: se?.sun ?? null, color: [255, 181, 71], kind: "sun", link: se?.link };
         })
-      : ROWS.map((row) => ({ label: row.label, arr: series[row.key], color: [...row.color], kind: row.key === "sun" ? "sun" : "flag" }));
+      : ROWS.map((row) => ({ label: row.label, arr: series?.[row.key] ?? null, color: [...row.color], kind: row.key === "sun" ? "sun" : "flag" }));
     const rowH = Math.max(8, (size.h - top - 18) / specs.length - 3);
     specs.forEach((row, r) => {
       const y = top + r * (rowH + 3);
@@ -110,13 +112,14 @@ export default function Timeline() {
       g.fillStyle = "#0b0f17";
       g.fillRect(x0, y, W, rowH);
       const [cr, cg, cb] = row.color;
-      for (let px = 0; px < W; px++) {
+      const arr = row.arr;
+      for (let px = 0; arr && px < W; px++) {
         const a = Math.floor(start + (px / W) * span);
         const b = Math.max(a + 1, Math.floor(start + ((px + 1) / W) * span));
         let s = 0;
         let l = 0;
         for (let i = a; i < b && i < total; i++) {
-          s += row.kind === "sun" ? row.arr[i] / 255 : row.arr[i];
+          s += row.kind === "sun" ? arr[i] / 255 : arr[i];
           if (row.link) l += row.link[i];
         }
         const v = s / (b - a);
@@ -146,7 +149,7 @@ export default function Timeline() {
     const cx = x0 + ((hour - start) / span) * W;
     g.fillStyle = "#ffffff";
     g.fillRect(cx - 0.75, top - 6, 1.5, size.h - top);
-  }, [data, series, size, hour, start, span, total, windowDays, compare, pinned]);
+  }, [data, series, seriesVersion, size, hour, start, span, total, windowDays, compare, pinned]);
 
   const hourFromEvent = (e: React.PointerEvent, mode: "main" | "overview") => {
     const rect = canvasRef.current!.getBoundingClientRect();
