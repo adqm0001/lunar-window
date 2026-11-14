@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { gradientCss, layerDef, LAYERS } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { formatUtc, hourToDate, useApp } from "../state/store";
+import LazyPanel from "./LazyPanel";
 
 const RegionReport = lazy(() => import("./RegionReport"));
 
@@ -70,7 +71,11 @@ export default function LayerControls() {
         <button className={`chip find ${report ? "sel" : ""}`} onClick={() => setReport(true)} title="Rank NASA's Artemis III candidate regions for the chosen dates">
           🏁 Artemis III report
         </button>
-        <Suspense fallback={null}>{report && <RegionReport onClose={() => setReport(false)} />}</Suspense>
+        {report && (
+          <LazyPanel name="the Artemis III report" onClose={() => setReport(false)}>
+            <RegionReport onClose={() => setReport(false)} />
+          </LazyPanel>
+        )}
         {def.ranged && (
           <>
             <span className="chip-sep" />
