@@ -179,7 +179,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `buildGlobe`, `buildSkirt`, `globeMaterial`, `polarTexture`, `setPolarUniforms` and the `VERT`/`FRAG` shader strings they use are not referenced anywhere (`grep -rn` to confirm). Delete them. Keep `MOON_CENTER`, `dirFromLatLon`, `worldFromLatLon`, `latLonFromWorld`.
   - **Verify:** `npx tsc --noEmit -p .` and `npm run build` pass; app looks unchanged.
 
-- [ ] **30. Web Worker skeleton** (M)
+- [x] **30. Web Worker skeleton** (M)
   - **Files:** new `src/workers/compute.worker.ts`, new `src/workers/client.ts`.
   - **Spec:** worker created with `new Worker(new URL("./compute.worker.ts", import.meta.url), { type: "module" })`. `client.ts` exposes `initWorker(ephem: Ephemeris)` (posts `data` and `dsn` buffers, transferred copies) and a promise-based `call<T>(type, payload): Promise<T>` with request ids.
   - **Verify:** a `ping` round trip resolves; no change in behaviour yet.
