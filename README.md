@@ -135,42 +135,9 @@ web/         TypeScript + React + three.js app
 docs/        screenshots for this page
 ```
 
-## What's left
-
-Open work, roughly in priority order. Pick something, say which one you're taking in an issue or in the team chat, and open a pull request. Items marked **good first task** don't need much context.
-
-### Before submission
-
-- [ ] **Demo video (2–3 min).** Use the ● Rec button in the timeline to capture the 3D view, then cut it together with narration. Suggested story: whole Moon → pole → sunlight map → ice → landing finder → rover → Artemis III report → validation.
-- [ ] **Slides (about 7).** Problem, solution, live demo screenshots, how it works, validation numbers, impact, team.
-- [ ] **NASA project page.** Write-up, links to the live app and this repo, screenshots from `docs/`.
-- [ ] **Test on other machines.** Laptops with integrated graphics, Mac Safari, Firefox, a phone. Note anything slow or broken. **good first task**
-
-### Science and accuracy
-
-- [ ] **Bounced light in the thermal model.** `web/src/gpu/thermal.ts` only uses direct sunlight. Adding sunlight and infrared reflected from nearby sunlit slopes would bring the darkest crater floors from about 25 K up to the 30–50 K Diviner measures.
-- [ ] **Extend the ephemeris past 2028.** `pipeline/ephemeris.py` writes hourly Sun and Earth vectors for 2026–2028. Longer coverage (or the full 18.6-year cycle) would make the long-term sunlight and ice maps more complete.
-- [ ] **Higher-resolution horizons around key sites.** The polar field is 250 m per cell. A 20 m field around the main candidate sites would sharpen the landing-miss simulation.
-- [ ] **North pole detail.** Only the south pole has the 40 m horizon field; the north pole uses the whole-Moon grid.
-- [ ] **Communications link budget.** Turn the DSN contact windows into an estimated data rate using distance, antenna size and transmitter power.
-
-### Features
-
-- [ ] **Lander shadow.** The 3D lander in `web/src/three/landerModel.ts` doesn't cast a shadow onto the terrain yet.
-- [ ] **Split-screen compare.** Two sites or two dates side by side with the timeline synced.
-- [ ] **Mission replay.** Replay a real landing (for example Intuitive Machines IM-2 near Mons Mouton), which needs ephemeris for 2025.
-- [ ] **VR mode.** Stand on a ridge in a headset with WebXR and watch the Sun circle the horizon.
-
-### Engineering
-
-- [ ] **Unit tests.** There are none yet. Start with `web/src/lib/astro.ts` (projection and sun position math) and `web/src/lib/siteThermal.ts`; the validation numbers above make good expected values. **good first task**
-- [ ] **Move heavy CPU work to a Web Worker.** Per-site time series and the rover search run on the main thread and can stutter the UI on slow machines.
-- [ ] **Code splitting.** The JavaScript bundle is about 880 KB; panels like the lander, rover and report card could load on demand. **good first task**
-- [ ] **Smaller polar terrain file.** `polar_80m.bin.gz` is 25 MB and loads in the background; a better encoding or tiling would help slow connections.
-- [ ] **Accessibility.** Keyboard navigation for the panels and color-blind-friendly palettes for the map layers.
-- [ ] **Phone layout.** A first version exists; it needs testing on real phones and touch controls for the 3D view. **good first task**
-
 ## Contributing
+
+The list of open work, with details for each task, is in **[TASKS.md](TASKS.md)**. Pick one, put your name on it, and go.
 
 1. Fork the repo (or create a branch if you've been added as a collaborator).
 2. Run the app locally (see above) and make your change on a branch named after the task, for example `thermal-bounced-light`.
