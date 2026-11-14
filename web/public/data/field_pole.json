@@ -2,7 +2,8 @@
   "extentMeters": 40000.0,
   "projection": "south polar stereographic, R=1737.4 km, x east, y toward lon 0, row 0 = +y",
   "horizon": {
-    "file": "field_pole.bin",
+    "file": "field_pole.bin.gz",
+    "encoding": "gzip; byte deltas between consecutive azimuth layers (mod 256)",
     "size": 320,
     "cellMeters": 250.0,
     "azimuthBins": 180,
@@ -14,15 +15,15 @@
     }
   },
   "heights": {
-    "file": "heights_pole.bin",
-    "size": 640,
-    "cellMeters": 125.0,
+    "file": "heights_pole.bin.gz",
+    "size": 1280,
+    "cellMeters": 62.5,
     "layout": "int16 meters [row][col]",
-    "min": -4245.90625,
-    "max": 1956.998046875
+    "min": -4247.5224609375,
+    "max": 1957.74365234375
   },
   "slope": {
-    "file": "slope_pole.bin",
+    "file": "slope_pole.bin.gz",
     "size": 320,
     "cellMeters": 250.0,
     "layout": "uint8 [layer][row][col]; layer 0 = mean slope deg * 4, layer 1 = % of cell under 10 deg"

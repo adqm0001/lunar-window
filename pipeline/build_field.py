@@ -1,3 +1,4 @@
+import gzip
 import json
 from pathlib import Path
 
@@ -14,9 +15,16 @@ N_AZ = 180
 OBSERVER_M = 2.0
 Q_OFFSET = -8.0
 Q_STEP = 0.1
-MESH_CELL_M = 125.0
+MESH_CELL_M = 62.5
 SLOPE_SAMPLE_M = 25.0
 SAFE_SLOPE_DEG = 10.0
+
+
+def save_gz(name, data: bytes):
+    (OUT / name).write_bytes(gzip.compress(data, 9))
+    for old in (OUT / name.removesuffix(".gz"),):
+        if old.exists():
+            old.unlink()
 
 
 def grid_centers(extent, cell):
@@ -31,14 +39,16 @@ def build_horizon_field():
     lat, lon = to_latlon(x.ravel(), y.ravel())
     h = engine.horizon(lat, lon, N_AZ, OBSERVER_M)
     q = np.clip(np.round((h - Q_OFFSET) / Q_STEP), 0, 255).astype(np.uint8)
-    q.reshape(n, n, N_AZ).transpose(2, 0, 1).tofile(OUT / "field_pole.bin")
+    layers = q.reshape(n, n, N_AZ).transpose(2, 0, 1).astype(np.int16)
+    delta = np.diff(layers, axis=0, prepend=0).astype(np.uint8)
+    save_gz("field_pole.bin.gz", delta.tobytes())
     return n, h
 
 
 def build_heights(terrain):
     n, x, y = grid_centers(EXTENT_M, MESH_CELL_M)
     z = terrain.height_xy(x, y)
-    np.round(z).astype("<i2").tofile(OUT / "heights_pole.bin")
+    save_gz("heights_pole.bin.gz", np.round(z).astype("<i2").tobytes())
     return n, float(np.nanmin(z)), float(np.nanmax(z))
 
 
@@ -53,7 +63,7 @@ def build_slope(terrain):
     mean = blocks.mean(axis=(1, 3))
     safe = (blocks < SAFE_SLOPE_DEG).mean(axis=(1, 3))
     out = np.stack([np.clip(np.round(mean * 4), 0, 255), np.round(safe * 100)]).astype(np.uint8)
-    out.tofile(OUT / "slope_pole.bin")
+    save_gz("slope_pole.bin.gz", out.tobytes())
     return m
 
 
@@ -67,7 +77,8 @@ def main():
         "extentMeters": EXTENT_M,
         "projection": "south polar stereographic, R=1737.4 km, x east, y toward lon 0, row 0 = +y",
         "horizon": {
-            "file": "field_pole.bin",
+            "file": "field_pole.bin.gz",
+            "encoding": "gzip; byte deltas between consecutive azimuth layers (mod 256)",
             "size": n,
             "cellMeters": CELL_M,
             "azimuthBins": N_AZ,
@@ -75,9 +86,9 @@ def main():
             "layout": "uint8 [azimuthBin][row][col], azimuth from local north toward east",
             "decode": {"offsetDeg": Q_OFFSET, "stepDeg": Q_STEP},
         },
-        "heights": {"file": "heights_pole.bin", "size": mesh_n, "cellMeters": MESH_CELL_M, "layout": "int16 meters [row][col]", "min": zmin, "max": zmax},
+        "heights": {"file": "heights_pole.bin.gz", "size": mesh_n, "cellMeters": MESH_CELL_M, "layout": "int16 meters [row][col]", "min": zmin, "max": zmax},
         "slope": {
-            "file": "slope_pole.bin",
+            "file": "slope_pole.bin.gz",
             "size": slope_n,
             "cellMeters": CELL_M,
             "layout": "uint8 [layer][row][col]; layer 0 = mean slope deg * 4, layer 1 = % of cell under 10 deg",

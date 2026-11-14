@@ -36,7 +36,12 @@ export class MoonScene {
   private sunRay: THREE.Line;
   private earthRay: THREE.Line;
   private selected: string | null = null;
-  private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number } | null = null;
+  private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number; dur: number } | null = null;
+  private introDone = false;
+  private frameTimes: number[] = [];
+  private dpr = Math.min(window.devicePixelRatio, 1.75);
+  private maxDpr = Math.min(window.devicePixelRatio, 1.75);
+  private lastDprChange = 0;
   private raf = 0;
   private last = performance.now();
   private field: FieldData;
@@ -49,7 +54,7 @@ export class MoonScene {
     this.host = host;
     this.field = field;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -60,7 +65,7 @@ export class MoonScene {
     host.appendChild(this.labels.domElement);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20000);
-    this.camera.position.set(-22, 16, 34);
+    this.camera.position.set(0, 420, 90);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
@@ -282,11 +287,18 @@ export class MoonScene {
     this.highlight(site.id);
     const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
     if (!p || !fly) return;
-    const offset = this.camera.position.clone().sub(this.controls.target);
+    let offset = this.camera.position.clone().sub(this.controls.target);
+    let dur = 1.6;
+    if (!this.introDone) {
+      this.introDone = true;
+      const s = this.sun.position.clone().setY(0).normalize();
+      offset = s.multiplyScalar(-9).add(new THREE.Vector3(0, 3.2, 0)).applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.5);
+      dur = 5.5;
+    }
     const dist = Math.min(Math.max(offset.length(), 6), 14);
     offset.setLength(dist);
-    if (offset.y < dist * 0.35) offset.y = dist * 0.35;
-    this.flight = { from: this.controls.target.clone(), to: p.clone(), camFrom: this.camera.position.clone(), camTo: p.clone().add(offset), t: 0 };
+    if (offset.y < dist * 0.22) offset.y = dist * 0.22;
+    this.flight = { from: this.controls.target.clone(), to: p.clone(), camFrom: this.camera.position.clone(), camTo: p.clone().add(offset), t: 0, dur };
   }
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
@@ -346,17 +358,36 @@ export class MoonScene {
     this.last = now;
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / 1.6);
+      f.t = Math.min(1, f.t + dt / f.dur);
       const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
       this.controls.target.lerpVectors(f.from, f.to, k);
       this.camera.position.lerpVectors(f.camFrom, f.camTo, k);
       if (f.t >= 1) this.flight = null;
     }
     this.controls.update();
+    this.adaptResolution(dt, now);
     this.terrainMat.uniforms.uTime.value = now / 1000;
     this.composer.render();
     this.labels.render(this.scene, this.camera);
   };
+
+  private adaptResolution(dt: number, now: number) {
+    this.frameTimes.push(dt);
+    if (this.frameTimes.length < 90) return;
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    this.frameTimes = [];
+    if (now - this.lastDprChange < 1500) return;
+    let next = this.dpr;
+    if (avg > 1 / 40 && this.dpr > 0.6) next = Math.max(0.6, this.dpr - 0.25);
+    else if (avg < 1 / 58 && this.dpr < this.maxDpr) next = Math.min(this.maxDpr, this.dpr + 0.25);
+    if (next !== this.dpr) {
+      this.dpr = next;
+      this.lastDprChange = now;
+      this.renderer.setPixelRatio(next);
+      this.composer.setPixelRatio(next);
+      this.resize();
+    }
+  }
 
   dispose() {
     cancelAnimationFrame(this.raf);

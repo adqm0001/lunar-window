@@ -17,43 +17,54 @@ export interface FieldData {
 
 const base = `${import.meta.env.BASE_URL}data/`;
 
-async function fetchBytes(path: string, onBytes: (n: number) => void): Promise<ArrayBuffer> {
+async function fetchBytes(path: string, onBytes: (n: number, total: number) => void): Promise<Uint8Array> {
   const res = await fetch(base + path);
   if (!res.ok || !res.body) throw new Error(`Couldn't load ${path} (${res.status})`);
+  const total = Number(res.headers.get("content-length")) || 0;
   const reader = res.body.getReader();
   const parts: Uint8Array[] = [];
-  let total = 0;
+  let got = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     parts.push(value);
-    total += value.length;
-    onBytes(value.length);
+    got += value.length;
+    onBytes(value.length, total);
   }
-  const out = new Uint8Array(total);
+  const out = new Uint8Array(got);
   let o = 0;
   for (const p of parts) {
     out.set(p, o);
     o += p.length;
   }
-  return out.buffer;
+  return out;
 }
 
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes;
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+const APPROX_BYTES = 6_300_000 + 2_150_000 + 130_000;
+
 export async function loadField(onProgress: (f: number) => void): Promise<FieldData> {
-  const meta = (await (await fetch(base + "field_pole.json")).json()) as FieldMeta;
-  const h = meta.horizon;
-  const expected = h.size * h.size * h.azimuthBins + meta.heights.size ** 2 * 2 + meta.slope.size ** 2 * 2;
+  const meta = (await (await fetch(base + "field_pole.json")).json()) as FieldMeta & { horizon: { file: string }; heights: { file: string }; slope: { file: string } };
   let got = 0;
   const tick = (n: number) => {
     got += n;
-    onProgress(Math.min(1, got / expected));
+    onProgress(Math.min(0.99, got / APPROX_BYTES));
   };
-  const [horizon, heights, slope] = await Promise.all([
-    fetchBytes("field_pole.bin", tick),
-    fetchBytes("heights_pole.bin", tick),
-    fetchBytes("slope_pole.bin", tick),
-  ]);
-  return { meta, horizon: new Uint8Array(horizon), heights: new Int16Array(heights), slope: new Uint8Array(slope) };
+  const [h, z, s] = await Promise.all([fetchBytes(meta.horizon.file, tick), fetchBytes(meta.heights.file, tick), fetchBytes(meta.slope.file, tick)]);
+  const [horizon, heights, slope] = await Promise.all([gunzip(h), gunzip(z), gunzip(s)]);
+  const layer = meta.horizon.size * meta.horizon.size;
+  for (let a = 1; a < meta.horizon.azimuthBins; a++) {
+    const o = a * layer;
+    const p = o - layer;
+    for (let i = 0; i < layer; i++) horizon[o + i] = (horizon[o + i] + horizon[p + i]) & 255;
+  }
+  onProgress(1);
+  return { meta, horizon, heights: new Int16Array(heights.buffer, heights.byteOffset, heights.byteLength / 2), slope };
 }
 
 export function fieldCell(f: FieldData, lat: number, lon: number): { col: number; row: number } | null {

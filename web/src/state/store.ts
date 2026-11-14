@@ -18,6 +18,8 @@ interface AppState {
   layer: LayerId;
   rangeDays: number;
   view: "3d" | "2d";
+  cinema: boolean;
+  toggleCinema: () => void;
   setView: (v: "3d" | "2d") => void;
   customSite: Site | null;
   hour: number;
@@ -45,6 +47,8 @@ export const useApp = create<AppState>((set, get) => ({
   layer: "terrain",
   rangeDays: 30,
   view: "3d",
+  cinema: false,
+  toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSite: null,
   setField: (field) => set({ field }),

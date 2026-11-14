@@ -15,6 +15,22 @@ export default function App() {
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
   const view = useApp((s) => s.view);
+  const cinema = useApp((s) => s.cinema);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      const s = useApp.getState();
+      if (e.key === "h" || e.key === "H") s.toggleCinema();
+      else if (e.key === " ") {
+        e.preventDefault();
+        s.togglePlaying();
+      } else if (e.key === "ArrowRight") s.setHour(s.hour + (e.shiftKey ? 24 : 1));
+      else if (e.key === "ArrowLeft") s.setHour(s.hour - (e.shiftKey ? 24 : 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [progress, setProgress] = useState({ fraction: 0, label: "Starting" });
   const [error, setError] = useState<string | null>(null);
 
@@ -52,13 +68,14 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${cinema ? "cinema" : ""}`}>
       <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
       <TopBar />
       <SiteList />
       <LayerControls />
       <SitePanel />
       <Timeline />
+      <div className="kbd-hint">H hide panels · Space play · ← → hour · Shift ← → day · drag to orbit · click terrain to analyze</div>
     </div>
   );
 }
