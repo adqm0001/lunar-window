@@ -14,9 +14,14 @@ const requested = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 let worker: { ephem: Ephemeris; ready: Promise<number> } | null = null;
-// After a failed request, wait this long before a render may ask again, so a missing worker script
-// doesn't start a new worker on every frame during playback.
+// A failed request is retried after this long (components re-render and ask again), so a missing worker
+// script recovers on its own without starting a new worker on every frame during playback.
 const RETRY_MS = 2000;
+
+function notify() {
+  version++;
+  for (const l of listeners) l();
+}
 
 /** Returns the cached value, or null after starting one worker request for `key`. */
 function cached<T>(e: Ephemeris, store: Map<string, T>, key: string, type: string, payload: unknown): T | null {
@@ -36,12 +41,14 @@ function cached<T>(e: Ephemeris, store: Map<string, T>, key: string, type: strin
         thermal.clear();
       }
       store.set(key, value);
-      version++;
-      for (const l of listeners) l();
+      notify();
     })
     .catch((err) => {
-      setTimeout(() => requested.delete(id), RETRY_MS);
       console.error(err);
+      setTimeout(() => {
+        requested.delete(id);
+        notify();
+      }, RETRY_MS);
     });
   return null;
 }
@@ -64,7 +71,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** Changes whenever a new result arrives; use it as a dependency next to getSeries / getThermal. */
+/** Changes when a result arrives or a failed one is due for a retry; use it as a dependency next to getSeries / getThermal. */
 export function useSeriesVersion(): number {
   return useSyncExternalStore(subscribe, () => version);
 }
