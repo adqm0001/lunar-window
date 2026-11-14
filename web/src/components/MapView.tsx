@@ -20,6 +20,7 @@ export default function MapView() {
   const field = useApp((s) => s.field);
   const layer = useApp((s) => s.layer);
   const finder = useApp((s) => s.finder);
+  const survival = useApp((s) => s.survival);
   const { select, setCustomSite } = useApp.getState();
   const sites = useSites();
   const site = useSelectedSite();
@@ -40,7 +41,7 @@ export default function MapView() {
     return () => ro.disconnect();
   }, []);
 
-  const overlay = useMemo(() => overlayCanvas(layer, metrics, field, finder), [field, layer, metrics, finder]);
+  const overlay = useMemo(() => overlayCanvas(layer, metrics, field, finder, survival), [field, layer, metrics, finder, survival]);
 
   const toScreen = (x: number, y: number): [number, number] => [size.w / 2 + (x - view.cx) / view.mpp, size.h / 2 - (y - view.cy) / view.mpp];
   const toWorld = (sx: number, sy: number): [number, number] => [view.cx + (sx - size.w / 2) * view.mpp, view.cy - (sy - size.h / 2) * view.mpp];

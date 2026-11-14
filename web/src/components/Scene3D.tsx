@@ -8,6 +8,7 @@ import { GlobalHorizon } from "../gpu/globalHorizon";
 import { globeHeight } from "../data/globe";
 import { toMap } from "../lib/astro";
 import type { Site } from "../data/load";
+import { uniqueFeatures } from "../data/artemis";
 import { useApp } from "../state/store";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
@@ -52,10 +53,13 @@ export default function Scene3D() {
   const field = useApp((s) => s.field);
   const globe = useApp((s) => s.globe);
   const orbitRequest = useApp((s) => s.orbitRequest);
+  const mc = useApp((s) => s.mc);
+  const flyRequest = useApp((s) => s.flyRequest);
   const fieldProgress = useApp((s) => s.fieldProgress);
   const hour = useApp((s) => s.hour);
   const layer = useApp((s) => s.layer);
   const finder = useApp((s) => s.finder);
+  const survival = useApp((s) => s.survival);
   const sites = useSites();
   const site = useSelectedSite();
   const st = useSiteState();
@@ -77,6 +81,8 @@ export default function Scene3D() {
       if (c) useApp.getState().setCustomSite(c);
     };
     s.onPickLatLon = (lat, lon) => pickGlobal(lat, lon);
+    s.onFlyRegion = (r) => useApp.getState().flyTo(r.lat, r.lon, Math.max(25, r.diameterKm * 1.3));
+    s.setRegions(uniqueFeatures());
     lastSelected.current = null;
     setScene(s);
     return () => {
@@ -92,6 +98,14 @@ export default function Scene3D() {
   useEffect(() => {
     if (scene && orbitRequest > 0) scene.flyToOrbit();
   }, [scene, orbitRequest]);
+
+  useEffect(() => {
+    if (scene && flyRequest) scene.flyToLatLon(flyRequest.lat, flyRequest.lon, flyRequest.altKm);
+  }, [scene, flyRequest]);
+
+  useEffect(() => {
+    scene?.setScatter(mc ? mc.points : null);
+  }, [scene, mc]);
 
   useEffect(() => {
     const { sun, earth } = ephemAt(data.ephem, hour);
@@ -113,8 +127,8 @@ export default function Scene3D() {
   }, [scene, site, st]);
 
   useEffect(() => {
-    scene?.setOverlay(layer === "now" ? null : overlayCanvas(layer, metrics, field, finder));
-  }, [scene, layer, metrics, field, finder]);
+    scene?.setOverlay(layer === "now" ? null : overlayCanvas(layer, metrics, field, finder, survival));
+  }, [scene, layer, metrics, field, finder, survival]);
 
   return (
     <div className="scene-host" ref={host}>

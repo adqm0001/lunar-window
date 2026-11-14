@@ -85,6 +85,63 @@ void main() {
   outColor = vec4(sunSum / n, earthSum / n, linkSum / n, best * float(uStride));
 }`;
 
+const SURVIVE_MAIN = `
+uniform float uPanelW;
+uniform float uBattery;
+uniform float uDayLoad;
+uniform float uNightLoad;
+uniform float uMinSoc;
+uniform int uPanelMode;
+
+void main() {
+  int col = int(gl_FragCoord.x);
+  int row = uSize - 1 - int(gl_FragCoord.y);
+  float x = (float(col) + 0.5) * uCell - uExtent;
+  float y = uExtent - (float(row) + 0.5) * uCell;
+  float rho = length(vec2(x, y));
+  float lat = -(PI / 2.0 - 2.0 * atan(rho / (2.0 * R_M)));
+  float lon = atan(x, y);
+  vec3 up = vec3(cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat));
+  vec3 east = vec3(-sin(lon), cos(lon), 0.0);
+  vec3 north = cross(up, east);
+  vec3 site = up * R_KM;
+  float wh = uBattery;
+  bool alive = true;
+  float diedAt = -1.0;
+  float minSoc = 1.0;
+  float sunSum = 0.0;
+  for (int k = 0; k < uSteps; k++) {
+    int i = uStart + k * uStride;
+    vec3 sv = normalize(texelFetch(uSun, tc(i), 0).xyz - site);
+    float sel = degrees(asin(dot(sv, up)));
+    float saz = degrees(atan(dot(sv, east), dot(sv, north)));
+    if (saz < 0.0) saz += 360.0;
+    float d = clamp((sel - horizonAt(col, row, saz)) / SUN_R, -1.0, 1.0);
+    float frac = (acos(-d) + d * sqrt(1.0 - d * d)) / PI;
+    float el = radians(sel);
+    float f = uPanelMode == 2 ? max(0.0, sin(el)) : max(0.0, cos(el));
+    float p = uPanelW * frac * f;
+    float load = frac >= 0.5 ? uDayLoad : uNightLoad;
+    if (alive) {
+      wh = min(uBattery, wh + (p - load) * float(uStride));
+      if (wh / uBattery <= uMinSoc) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
+    }
+    minSoc = min(minSoc, alive ? wh / uBattery : 0.0);
+    sunSum += frac;
+  }
+  float total = float(uSteps * uStride);
+  outColor = vec4(diedAt < 0.0 ? 1.0 : diedAt / total, minSoc, sunSum / float(uSteps), diedAt);
+}`;
+
+export interface SurvivalLander {
+  panelW: number;
+  batteryWh: number;
+  dayLoadW: number;
+  nightLoadW: number;
+  minSocPct: number;
+  horizontal: boolean;
+}
+
 export interface FieldMetrics {
   size: number;
   hours: number;
@@ -96,6 +153,8 @@ export interface FieldMetrics {
 export class GpuEngine {
   private gl: WebGL2RenderingContext;
   private prog: WebGLProgram;
+  private survProg: WebGLProgram;
+  private survUni: Record<string, WebGLUniformLocation | null> = {};
   private fbo: WebGLFramebuffer;
   private size: number;
   private count: number;
@@ -115,6 +174,7 @@ export class GpuEngine {
     canvas.width = size;
     canvas.height = size;
 
+    this.survProg = link(gl, VERT, FRAG.split("void main() {")[0] + SURVIVE_MAIN);
     this.prog = link(gl, VERT, FRAG);
     gl.useProgram(this.prog);
     for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride"]) {
@@ -165,6 +225,21 @@ export class GpuEngine {
     gl.uniform1f(this.uni.uDecodeStep, decode.stepDeg);
     gl.uniform1f(this.uni.uDecodeOffset, decode.offsetDeg);
 
+    gl.useProgram(this.survProg);
+    for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uPanelW", "uBattery", "uDayLoad", "uNightLoad", "uMinSoc", "uPanelMode"]) {
+      this.survUni[n] = gl.getUniformLocation(this.survProg, n);
+    }
+    gl.uniform1i(this.survUni.uField, 0);
+    gl.uniform1i(this.survUni.uSun, 1);
+    gl.uniform1i(this.survUni.uEarth, 2);
+    gl.uniform1i(this.survUni.uSize, size);
+    gl.uniform1i(this.survUni.uAzBins, azimuthBins);
+    gl.uniform1f(this.survUni.uCell, cellMeters);
+    gl.uniform1f(this.survUni.uExtent, field.meta.extentMeters);
+    gl.uniform1f(this.survUni.uDecodeStep, decode.stepDeg);
+    gl.uniform1f(this.survUni.uDecodeOffset, decode.offsetDeg);
+    gl.useProgram(this.prog);
+
     gl.activeTexture(gl.TEXTURE3);
     const out = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, out);
@@ -174,6 +249,33 @@ export class GpuEngine {
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out, 0);
     gl.viewport(0, 0, size, size);
+  }
+
+  computeSurvival(startHour: number, hours: number, lander: SurvivalLander): FieldMetrics {
+    const gl = this.gl;
+    const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
+    const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
+    const stride = Math.max(1, Math.ceil(len / 4400));
+    const steps = Math.max(1, Math.floor(len / stride));
+    const t0 = performance.now();
+    gl.useProgram(this.survProg);
+    const u = this.survUni;
+    gl.uniform1i(u.uStart, start);
+    gl.uniform1i(u.uSteps, steps);
+    gl.uniform1i(u.uStride, stride);
+    gl.uniform1f(u.uPanelW, lander.panelW);
+    gl.uniform1f(u.uBattery, lander.batteryWh);
+    gl.uniform1f(u.uDayLoad, lander.dayLoadW);
+    gl.uniform1f(u.uNightLoad, lander.nightLoadW);
+    gl.uniform1f(u.uMinSoc, lander.minSocPct / 100);
+    gl.uniform1i(u.uPanelMode, lander.horizontal ? 2 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, this.size, this.size, gl.RGBA, gl.FLOAT, this.buf);
+    gl.useProgram(this.prog);
+    const data = new Float32Array(this.buf.length);
+    const rowLen = this.size * 4;
+    for (let r = 0; r < this.size; r++) data.set(this.buf.subarray((this.size - 1 - r) * rowLen, (this.size - r) * rowLen), r * rowLen);
+    return { size: this.size, hours: steps * stride, stride, data, millis: performance.now() - t0 };
   }
 
   compute(startHour: number, hours: number, maxSteps = 2000): FieldMetrics {

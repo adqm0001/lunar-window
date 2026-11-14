@@ -16,6 +16,9 @@ import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { buildGlobe, buildSkirt, globeMaterial, latLonFromWorld, MOON_CENTER, polarTexture, setPolarUniforms, worldFromLatLon } from "./globe";
 import { R_MOON_KM } from "../lib/astro";
+import type { ScatterPoint } from "../lib/montecarlo";
+import type { ArtemisRegion } from "../data/artemis";
+import { dirFromLatLon } from "./globe";
 
 export const EXAGGERATION = 1.0;
 const SKY_R = 6000;
@@ -53,6 +56,11 @@ export class MoonScene {
   private pendingIntro: Site | null = null;
   private lastSites: Site[] = [];
   onPickLatLon: ((lat: number, lon: number) => void) | null = null;
+  private scatter: THREE.Points | null = null;
+  private regionGroup = new THREE.Group();
+  private labelObjs: CSS2DObject[] = [];
+  private pendingRegions: ArtemisRegion[] | null = null;
+  onFlyRegion: ((r: ArtemisRegion) => void) | null = null;
   private introDone = false;
   private frameTimes: number[] = [];
   private dpr = Math.min(window.devicePixelRatio, 1.75);
@@ -288,6 +296,7 @@ export class MoonScene {
 
   setSites(sites: Site[]) {
     this.lastSites = sites;
+    this.labelObjs = this.labelObjs.filter((o) => !this.beaconLabel(o));
     for (const b of this.beacons.values()) this.scene.remove(b.group);
     this.beacons.clear();
     for (const s of sites) {
@@ -310,6 +319,7 @@ export class MoonScene {
         this.onSelectSite?.(s.id);
       });
       const obj = new CSS2DObject(label);
+      this.labelObjs.push(obj);
       obj.position.set(0, 1.75, 0);
       obj.center.set(0.5, 1);
       group.add(obj);
@@ -489,6 +499,11 @@ export class MoonScene {
       m.uniforms.uEarthshine.value = this.terrainMat.uniforms.uEarthshine.value;
     }
     this.setSites(this.lastSites);
+    if (this.pendingRegions) {
+      const r = this.pendingRegions;
+      this.pendingRegions = null;
+      this.setRegions(r);
+    }
     if (this.pendingIntro) {
       const s = this.pendingIntro;
       this.pendingIntro = null;
@@ -496,7 +511,23 @@ export class MoonScene {
     }
   }
 
+  private beaconLabel(o: CSS2DObject) {
+    return (o.element as HTMLElement).classList.contains("site-label");
+  }
+
+  private hideOccludedLabels() {
+    const cam = this.camera.position.clone().sub(MOON_CENTER);
+    const p = new THREE.Vector3();
+    for (const o of this.labelObjs) {
+      o.getWorldPosition(p);
+      const v = p.sub(MOON_CENTER);
+      const toCam = cam.clone().sub(v);
+      o.visible = v.dot(toCam) / (v.length() * toCam.length()) > -0.08;
+    }
+  }
+
   private updateDepthAndSky() {
+    this.hideOccludedLabels();
     const alt = Math.max(0.05, this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM);
     const near = Math.min(20, Math.max(0.005, alt * 0.01));
     const far = alt + 2 * R_MOON_KM + 4000;
@@ -516,6 +547,89 @@ export class MoonScene {
     this.earth.scale.setScalar(k);
     this.stars.position.copy(c);
     this.stars.scale.setScalar(k);
+  }
+
+  setScatter(points: ScatterPoint[] | null) {
+    if (this.scatter) {
+      this.scene.remove(this.scatter);
+      this.scatter.geometry.dispose();
+      this.scatter = null;
+    }
+    if (!points || points.length === 0) return;
+    const pos = new Float32Array(points.length * 3);
+    const col = new Float32Array(points.length * 3);
+    points.forEach((pt, i) => {
+      const h = fieldHeight(this.field, pt.x, pt.y) ?? 0;
+      pos.set([pt.x / 1000, this.worldY(pt.x, pt.y, h) + 0.012, -pt.y / 1000], i * 3);
+      col.set(pt.ok ? [0.22, 0.85, 0.55] : [0.95, 0.3, 0.36], i * 3);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    this.scatter = new THREE.Points(g, new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true, depthWrite: false, transparent: true, opacity: 0.85 }));
+    this.scene.add(this.scatter);
+  }
+
+  setRegions(regions: ArtemisRegion[]) {
+    if (!this.globe) {
+      this.pendingRegions = regions;
+      return;
+    }
+    this.scene.remove(this.regionGroup);
+    this.regionGroup = new THREE.Group();
+    const g = this.globe;
+    for (const r of regions) {
+      const pts: THREE.Vector3[] = [];
+      const up = dirFromLatLon(r.lat, r.lon);
+      const east = new THREE.Vector3(0, 1, 0).cross(up);
+      if (east.lengthSq() < 1e-6) east.set(1, 0, 0);
+      east.normalize();
+      const north = up.clone().cross(east).normalize();
+      const ang = (r.diameterKm / 2) / R_MOON_KM;
+      for (let k = 0; k <= 96; k++) {
+        const a = (k / 96) * Math.PI * 2;
+        const d = up
+          .clone()
+          .multiplyScalar(Math.cos(ang))
+          .add(north.clone().multiplyScalar(Math.sin(ang) * Math.cos(a)))
+          .add(east.clone().multiplyScalar(Math.sin(ang) * Math.sin(a)))
+          .normalize();
+        const ux = -d.z;
+        const uy = d.x;
+        const uz = -d.y;
+        const lat = (Math.asin(uz) * 180) / Math.PI;
+        const lon = (Math.atan2(uy, ux) * 180) / Math.PI;
+        pts.push(d.multiplyScalar(R_MOON_KM + globeHeight(g, lat, lon) / 1000 + 0.35).add(MOON_CENTER));
+      }
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineDashedMaterial({ color: new THREE.Color(1.6, 1.25, 0.45), dashSize: 2.2, gapSize: 1.4, transparent: true, opacity: 0.9 }),
+      );
+      line.computeLineDistances();
+      this.regionGroup.add(line);
+      const el = document.createElement("div");
+      el.className = "region-label";
+      el.innerHTML = `<b>ARTEMIS III</b> ${r.name}`;
+      el.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation();
+        this.onFlyRegion?.(r);
+      });
+      const label = new CSS2DObject(el);
+      this.labelObjs.push(label);
+      label.position.copy(worldFromLatLon(r.lat, r.lon, globeHeight(g, r.lat, r.lon) + 2500));
+      this.regionGroup.add(label);
+    }
+    this.scene.add(this.regionGroup);
+  }
+
+  flyToLatLon(lat: number, lon: number, altKm: number) {
+    const ground = this.globe ? globeHeight(this.globe, lat, lon) : 0;
+    const p = worldFromLatLon(lat, lon, ground);
+    const up = p.clone().sub(MOON_CENTER).normalize();
+    const side = this.camera.position.clone().sub(p).projectOnPlane(up);
+    if (side.lengthSq() < 1e-6) side.set(1, 0, 0).projectOnPlane(up);
+    const offset = side.setLength(altKm * 0.75).add(up.clone().multiplyScalar(altKm));
+    this.startFlight(p, offset, 2.6, up);
   }
 
   private adaptResolution(dt: number, now: number) {

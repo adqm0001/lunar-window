@@ -1,6 +1,6 @@
 import type { FieldData } from "../data/field";
 import type { FieldMetrics } from "./engine";
-import { paint, paintScores, type LayerId } from "./layers";
+import { paint, paintScores, paintSurvival, type LayerId } from "./layers";
 import type { FinderResult } from "./finder";
 
 let lastKey: [LayerId, FieldMetrics | null, FieldData] | null = null;
@@ -9,8 +9,31 @@ let lastCanvas: HTMLCanvasElement | null = null;
 let lastScores: Float32Array | null = null;
 let lastScoreCanvas: HTMLCanvasElement | null = null;
 
-export function overlayCanvas(layer: LayerId, metrics: FieldMetrics | null, field: FieldData | null, finder?: FinderResult | null): HTMLCanvasElement | null {
+let lastSurv: FieldMetrics | null = null;
+let lastSurvCanvas: HTMLCanvasElement | null = null;
+
+export function overlayCanvas(
+  layer: LayerId,
+  metrics: FieldMetrics | null,
+  field: FieldData | null,
+  finder?: FinderResult | null,
+  survival?: FieldMetrics | null,
+): HTMLCanvasElement | null {
   if (!field || layer === "terrain") return null;
+  if (layer === "survive") {
+    if (!survival) return null;
+    if (lastSurv === survival) return lastSurvCanvas;
+    const c = document.createElement("canvas");
+    c.width = survival.size;
+    c.height = survival.size;
+    const g = c.getContext("2d")!;
+    const img = g.createImageData(survival.size, survival.size);
+    paintSurvival(survival, img);
+    g.putImageData(img, 0, 0);
+    lastSurv = survival;
+    lastSurvCanvas = c;
+    return c;
+  }
   if (layer === "score") {
     if (!finder) return null;
     if (lastScores === finder.scores) return lastScoreCanvas;

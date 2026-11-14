@@ -13,6 +13,7 @@ import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
 import FinderPanel from "./components/FinderPanel";
 import ComparePanel from "./components/ComparePanel";
+import LanderPanel from "./components/LanderPanel";
 
 export default function App() {
   const data = useApp((s) => s.data);
@@ -21,6 +22,7 @@ export default function App() {
   const cinema = useApp((s) => s.cinema);
   const finderOpen = useApp((s) => s.finderOpen);
   const compareOpen = useApp((s) => s.compareOpen);
+  const landerOpen = useApp((s) => s.landerOpen);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -79,7 +81,7 @@ export default function App() {
     <div className={`app ${cinema ? "cinema" : ""}`}>
       <main className="stage">{view === "3d" ? <Scene3D /> : <MapView />}</main>
       <TopBar />
-      {finderOpen ? <FinderPanel /> : <SiteList />}
+      {landerOpen ? <LanderPanel /> : finderOpen ? <FinderPanel /> : <SiteList />}
       <LayerControls />
       <SitePanel />
       {compareOpen && <ComparePanel />}

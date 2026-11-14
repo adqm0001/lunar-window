@@ -13,6 +13,8 @@ export default function LayerControls() {
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
   const hasFinder = useApp((s) => !!s.finder);
+  const hasSurvival = useApp((s) => !!s.survival);
+  const landerOpen = useApp((s) => s.landerOpen);
   const finderOpen = useApp((s) => s.finderOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
@@ -29,7 +31,7 @@ export default function LayerControls() {
           ))}
         </div>
         <span className="chip-sep" />
-        {LAYERS.filter((l) => !(view === "3d" && l.id === "now") && (l.id !== "score" || hasFinder)).map((l) => (
+        {LAYERS.filter((l) => !(view === "3d" && l.id === "now") && (l.id !== "score" || hasFinder) && (l.id !== "survive" || hasSurvival)).map((l) => (
           <button key={l.id} className={`chip ${l.id === layer ? "sel" : ""}`} onClick={() => setLayer(l.id)} title={l.describe}>
             {view === "3d" && l.id === "terrain" ? "Shadows" : l.short}
           </button>
@@ -37,6 +39,9 @@ export default function LayerControls() {
         <span className="chip-sep" />
         <button className="chip moon" onClick={() => useApp.getState().requestOrbit()} title="Zoom out to the whole Moon">
           ◐ Whole Moon
+        </button>
+        <button className={`chip find ${landerOpen ? "sel" : ""}`} onClick={() => useApp.getState().setLanderOpen(!landerOpen)}>
+          ♥ Lander sim
         </button>
         <button className={`chip find ${finderOpen ? "sel" : ""}`} onClick={() => useApp.getState().setFinderOpen(!finderOpen)}>
           ★ Find landing spot

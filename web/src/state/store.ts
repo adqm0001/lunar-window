@@ -4,6 +4,9 @@ import type { FieldData } from "../data/field";
 import type { GlobeData } from "../data/globe";
 import type { LayerId } from "../gpu/layers";
 import type { FinderResult } from "../gpu/finder";
+import type { FieldMetrics } from "../gpu/engine";
+import { LANDER_PRESETS, type Lander } from "../lib/lander";
+import type { MonteCarloResult } from "../lib/montecarlo";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -22,6 +25,16 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  landerOpen: boolean;
+  lander: Lander;
+  survival: FieldMetrics | null;
+  mc: MonteCarloResult | null;
+  flyRequest: { lat: number; lon: number; altKm: number; n: number } | null;
+  setLanderOpen: (o: boolean) => void;
+  setLander: (l: Lander) => void;
+  setSurvival: (m: FieldMetrics | null) => void;
+  setMc: (r: MonteCarloResult | null) => void;
+  flyTo: (lat: number, lon: number, altKm: number) => void;
   globe: GlobeData | null;
   setGlobe: (g: GlobeData) => void;
   orbitRequest: number;
@@ -63,6 +76,16 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  landerOpen: false,
+  lander: LANDER_PRESETS[0],
+  survival: null,
+  mc: null,
+  flyRequest: null,
+  setLanderOpen: (landerOpen) => set((s) => ({ landerOpen, finderOpen: landerOpen ? false : s.finderOpen })),
+  setLander: (lander) => set({ lander }),
+  setSurvival: (survival) => set((s) => ({ survival, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
+  setMc: (mc) => set({ mc }),
+  flyTo: (lat, lon, altKm) => set((s) => ({ flyRequest: { lat, lon, altKm, n: (s.flyRequest?.n ?? 0) + 1 }, view: "3d" })),
   globe: null,
   setGlobe: (globe) => set({ globe }),
   orbitRequest: 0,
@@ -77,7 +100,7 @@ export const useApp = create<AppState>((set, get) => ({
     }),
   setCompareOpen: (compareOpen) => set({ compareOpen }),
   finder: null,
-  setFinderOpen: (finderOpen) => set({ finderOpen }),
+  setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen })),
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),

@@ -1,7 +1,7 @@
 import type { FieldData } from "../data/field";
 import type { FieldMetrics } from "./engine";
 
-export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "score";
+export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "score" | "survive";
 
 type Stop = [number, number, number, number];
 
@@ -20,6 +20,7 @@ const EARTH: Stop[] = [[0, 6, 10, 25], [0.5, 30, 90, 190], [1, 170, 220, 255]];
 const LINK: Stop[] = [[0, 6, 14, 14], [0.5, 25, 140, 100], [1, 180, 255, 210]];
 const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 108], [1, 90, 20, 40]];
 export const SCORE: Stop[] = [[0, 20, 10, 40], [0.4, 110, 40, 150], [0.7, 240, 110, 90], [0.88, 255, 200, 80], [1, 255, 255, 230]];
+export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [0.999, 255, 230, 120], [1, 61, 220, 151]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
 
 export const LAYERS: LayerDef[] = [
@@ -30,6 +31,7 @@ export const LAYERS: LayerDef[] = [
   { id: "link", label: "Power + comms %", short: "Sun+DSN", ranged: true, stops: LINK, legend: ["0%", "100%"], describe: "Sun up, Earth up and a DSN dish seeing the Moon, all at once" },
   { id: "night", label: "Longest night", short: "Night", ranged: true, stops: NIGHT, legend: ["0 d", "≥ 30 d"], describe: "Longest continuous stretch without sunlight" },
   { id: "score", label: "Landing score", short: "★ Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
+  { id: "survive", label: "Lander survival", short: "♥ Survival", ranged: false, stops: SURVIVE, legend: ["dies day 1", "survives"], describe: "Share of the mission the chosen lander stays powered, simulated hour by hour at every point (green = survives the whole mission)" },
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
 
@@ -97,6 +99,17 @@ export function paintScores(scores: Float32Array, img: ImageData) {
     px[o + 1] = g;
     px[o + 2] = b;
     px[o + 3] = 225;
+  }
+}
+
+export function paintSurvival(m: FieldMetrics, img: ImageData) {
+  const px = img.data;
+  for (let i = 0; i < m.size * m.size; i++) {
+    const [r, g, b] = sample(SURVIVE, m.data[i * 4]);
+    px[i * 4] = r;
+    px[i * 4 + 1] = g;
+    px[i * 4 + 2] = b;
+    px[i * 4 + 3] = 215;
   }
 }
 
