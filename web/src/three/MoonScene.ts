@@ -14,7 +14,8 @@ import { toMap, R_MOON_M } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
-import { buildGlobe, buildSkirt, globeMaterial, latLonFromWorld, MOON_CENTER, polarTexture, setPolarUniforms, worldFromLatLon } from "./globe";
+import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
+import { LodTerrain } from "./lod";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
 import type { ArtemisRegion } from "../data/artemis";
@@ -47,7 +48,7 @@ export class MoonScene {
   private selected: string | null = null;
   private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number; dur: number; orbit: boolean } | null = null;
   private globeMats: THREE.ShaderMaterial[] = [];
-  private globeMeshes: THREE.Mesh[] = [];
+  private lod: LodTerrain | null = null;
   private terrainMesh!: THREE.Mesh;
   private stars!: THREE.Points;
   private sunDir = new THREE.Vector3(1, 0, 0);
@@ -120,7 +121,7 @@ export class MoonScene {
         uOffset: { value: h.decode.offsetDeg },
         uOverlay: { value: new THREE.Texture() },
         uOverlayMix: { value: 0 },
-        uSunPower: { value: 14.0 },
+        uSunPower: { value: 10.5 },
         uEarth: { value: new THREE.Vector3(0, 0, 1) },
         uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
         uEarthshine: { value: 0 },
@@ -417,7 +418,7 @@ export class MoonScene {
       const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       const ray = new THREE.Raycaster();
       ray.setFromCamera(ndc, this.camera);
-      const hit = ray.intersectObjects([this.terrainMesh, ...this.globeMeshes])[0];
+      const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
       if (!hit) return;
       if (hit.object === this.terrainMesh) this.onPick?.(hit.point.x * 1000, -hit.point.z * 1000);
       else this.onPickLatLon?.(...latLonFromWorld(hit.point));
@@ -464,6 +465,7 @@ export class MoonScene {
       this.controls.update();
     }
     this.updateDepthAndSky();
+    this.lod?.update(this.camera);
     this.adaptResolution(dt, now);
     this.terrainMat.uniforms.uTime.value = now / 1000;
     this.lens.uniforms.uTime.value = (now / 1000) % 100;
@@ -477,17 +479,10 @@ export class MoonScene {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
-    const globeMat = globeMaterial(tex, 199000);
-    const skirtMat = globeMaterial(tex, 0);
-    const globe = new THREE.Mesh(buildGlobe(g), globeMat);
-    const skirt = new THREE.Mesh(buildSkirt(g, 200000, 500), skirtMat);
-    const ptex = polarTexture(g);
-    setPolarUniforms(globeMat, g, ptex, false);
-    setPolarUniforms(skirtMat, g, ptex, true);
-    this.globeMats = [globeMat, skirtMat];
+    this.lod = new LodTerrain(g, tex);
+    this.globeMats = [this.lod.material];
     this.updateHoles();
-    this.globeMeshes = [skirt, globe];
-    this.scene.add(globe, skirt);
+    this.scene.add(this.lod.group);
     for (const m of this.globeMats) {
       m.uniforms.uSunME.value.copy(this.terrainMat.uniforms.uSun.value);
       m.uniforms.uSunWorld.value.copy(this.sunDir);
@@ -536,11 +531,7 @@ export class MoonScene {
     const cx = this.field.meta.centerX ?? 0;
     const cy = this.field.meta.centerY ?? 0;
     const e = this.field.meta.extentMeters;
-    const [globeMat, skirtMat] = this.globeMats;
-    if (!globeMat) return;
-    globeMat.uniforms.uHoleB.value.set(cx, cy, e);
-    skirtMat.uniforms.uHoleA.value.set(cx, cy, e);
-    skirtMat.uniforms.uHoleB.value.set(0, 0, 0);
+    this.lod?.material.uniforms.uHole.value.set(cx, cy, e);
   }
 
   private beaconLabel(o: CSS2DObject) {

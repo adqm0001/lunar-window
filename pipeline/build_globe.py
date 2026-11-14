@@ -7,10 +7,13 @@ import numpy as np
 from terrain import RAW
 
 OUT = Path(__file__).resolve().parent.parent / "web" / "public" / "data"
-GLOBE_PPD = 8
+GLOBE_PPD = 16
 GLOBE_STEP_M = 5.0
 POLAR_EXTENT_M = 200_000.0
 POLAR_CELL_M = 240.0
+P80_EXTENT_M = 250_000.0
+P80_CELL_M = 80.0
+MISSING = -32768
 
 
 def delta_rows(q):
@@ -22,7 +25,7 @@ def build_globe():
     f = 16 // GLOBE_PPD
     a = z.reshape(2880 // f, f, 5760 // f, f).mean(axis=(1, 3))
     q = np.round(a / GLOBE_STEP_M)
-    (OUT / "globe_8ppd.bin.gz").write_bytes(gzip.compress(delta_rows(q).tobytes(), 9))
+    (OUT / "globe_16ppd.bin.gz").write_bytes(gzip.compress(delta_rows(q).tobytes(), 9))
     return a.shape
 
 
@@ -39,13 +42,32 @@ def build_polar():
     return crop.shape[0], first_center
 
 
+def build_polar80():
+    n = 15200
+    z = np.memmap(RAW / "ldem_80s_40m.img", dtype="<i2", mode="r", shape=(n, n))
+    half = int(P80_EXTENT_M / P80_CELL_M)
+    c0 = n // 2
+    a = z[c0 - 2 * half : c0 + 2 * half, c0 - 2 * half : c0 + 2 * half].astype(np.float32) * 0.5
+    a = a.reshape(2 * half, 2, 2 * half, 2).mean(axis=(1, 3))
+    first = -half * P80_CELL_M + P80_CELL_M / 2
+    coords = first + np.arange(2 * half) * P80_CELL_M
+    xx, yy = np.meshgrid(coords, -coords)
+    q = np.round(a).astype(np.int32)
+    q[np.hypot(xx, yy) > 300_000] = MISSING
+    d = np.diff(q, axis=1, prepend=0)
+    d = ((d + 32768) % 65536 - 32768).astype("<i2")
+    (OUT / "polar_80m.bin.gz").write_bytes(gzip.compress(d.tobytes(), 6))
+    return 2 * half, first
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     gshape = build_globe()
     psize, first = build_polar()
+    p80size, p80first = build_polar80()
     meta = {
         "globe": {
-            "file": "globe_8ppd.bin.gz",
+            "file": "globe_16ppd.bin.gz",
             "width": gshape[1],
             "height": gshape[0],
             "pixelsPerDegree": GLOBE_PPD,
@@ -58,6 +80,14 @@ def main():
             "cellMeters": POLAR_CELL_M,
             "firstCenterMeters": first,
             "layout": "int16 meters [row][col], south polar stereographic like the field (row 0 = +y); deltas along each row; gzip",
+        },
+        "polar80": {
+            "file": "polar_80m.bin.gz",
+            "size": p80size,
+            "cellMeters": P80_CELL_M,
+            "firstCenterMeters": p80first,
+            "missing": MISSING,
+            "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip",
         },
         "color": {"file": "moon_color_4k.jpg", "preview": "moon_color_1k.jpg", "layout": "equirectangular, left edge = lon -180, NASA SVS CGI Moon Kit (LRO LROC)"},
     }

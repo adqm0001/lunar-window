@@ -1,0 +1,505 @@
+import * as THREE from "three";
+import type { GlobeData } from "../data/globe";
+import { globeHeight } from "../data/globe";
+import { R_MOON_KM, toMap } from "../lib/astro";
+import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
+import { MOON_CENTER } from "./globe";
+
+const GRID = 32;
+const MAX_LEVEL = 12;
+const SPLIT = 2.4;
+const BUILD_BUDGET_MS = 7;
+const MAX_CACHED = 2400;
+
+interface Face {
+  n: THREE.Vector3;
+  u: THREE.Vector3;
+  v: THREE.Vector3;
+}
+
+const FACES: Face[] = [
+  { n: new THREE.Vector3(1, 0, 0), u: new THREE.Vector3(0, 0, -1), v: new THREE.Vector3(0, 1, 0) },
+  { n: new THREE.Vector3(-1, 0, 0), u: new THREE.Vector3(0, 0, 1), v: new THREE.Vector3(0, 1, 0) },
+  { n: new THREE.Vector3(0, 1, 0), u: new THREE.Vector3(1, 0, 0), v: new THREE.Vector3(0, 0, -1) },
+  { n: new THREE.Vector3(0, -1, 0), u: new THREE.Vector3(1, 0, 0), v: new THREE.Vector3(0, 0, 1) },
+  { n: new THREE.Vector3(0, 0, 1), u: new THREE.Vector3(1, 0, 0), v: new THREE.Vector3(0, 1, 0) },
+  { n: new THREE.Vector3(0, 0, -1), u: new THREE.Vector3(-1, 0, 0), v: new THREE.Vector3(0, 1, 0) },
+];
+
+function cubeToDir(f: Face, a: number, b: number, out: THREE.Vector3) {
+  const ta = Math.tan((a * Math.PI) / 4);
+  const tb = Math.tan((b * Math.PI) / 4);
+  return out.copy(f.n).addScaledVector(f.u, ta).addScaledVector(f.v, tb).normalize();
+}
+
+function dataResKm(lat: number, lon: number): number {
+  if (lat < -81) {
+    const [x, y] = toMap(lat, lon);
+    if (Math.hypot(x, y) < 248000) return 0.08;
+  }
+  if (lat < -82) return 0.24;
+  return 1.9;
+}
+
+export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpacingKm: number): number {
+  const ux = -dirWorld.z;
+  const uy = dirWorld.x;
+  const uz = -dirWorld.y;
+  const lat = (Math.asin(Math.max(-1, Math.min(1, uz))) * 180) / Math.PI;
+  const lon = (Math.atan2(uy, ux) * 180) / Math.PI;
+  const base = globeHeight(g, lat, lon);
+  const res = dataResKm(lat, lon);
+  const detail = craterDetailKm(ux * R_MOON_KM, uy * R_MOON_KM, uz * R_MOON_KM, vertexSpacingKm * 2.5, res * 2.5);
+  return base + detail * 1000;
+}
+
+class Node {
+  key: string;
+  mesh: THREE.Mesh | null = null;
+  lastUsed = 0;
+  center = new THREE.Vector3();
+  constructor(
+    public face: number,
+    public level: number,
+    public i: number,
+    public j: number,
+  ) {
+    this.key = `${face}/${level}/${i}/${j}`;
+    const n = 1 << level;
+    const a = ((i + 0.5) / n) * 2 - 1;
+    const b = ((j + 0.5) / n) * 2 - 1;
+    cubeToDir(FACES[face], a, b, this.center);
+  }
+  get sizeKm() {
+    return (Math.PI / 2) * R_MOON_KM / (1 << this.level);
+  }
+}
+
+export class LodTerrain {
+  group = new THREE.Group();
+  material: THREE.ShaderMaterial;
+  private nodes = new Map<string, Node>();
+  private queue: Node[] = [];
+  private frame = 0;
+  private tmp = new THREE.Vector3();
+  meshes: THREE.Mesh[] = [];
+
+  constructor(
+    private g: GlobeData,
+    color: THREE.Texture,
+  ) {
+    this.material = new THREE.ShaderMaterial({
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      glslVersion: THREE.GLSL3,
+      side: THREE.DoubleSide,
+      uniforms: {
+        uColor: { value: color },
+        uGlobe: { value: intTexture(g.globe, g.width, g.height) },
+        uGlobeSize: { value: new THREE.Vector2(g.width, g.height) },
+        uPpd: { value: g.ppd },
+        uStep: { value: g.step },
+        uP80: { value: intTexture(g.p80, g.p80Size, g.p80Size) },
+        uP80Size: { value: g.p80Size },
+        uP80Cell: { value: g.p80Cell },
+        uP80First: { value: g.p80First },
+        uSunME: { value: new THREE.Vector3(1, 0, 0) },
+        uSunWorld: { value: new THREE.Vector3(1, 0, 0) },
+        uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
+        uSunPower: { value: 10.5 },
+        uEarthshine: { value: 0 },
+        uHole: { value: new THREE.Vector3(0, 0, 0) },
+        uCamPos: { value: new THREE.Vector3() },
+      },
+    });
+    this.group.name = "lod-terrain";
+  }
+
+  private node(face: number, level: number, i: number, j: number): Node {
+    const key = `${face}/${level}/${i}/${j}`;
+    let n = this.nodes.get(key);
+    if (!n) {
+      n = new Node(face, level, i, j);
+      this.nodes.set(key, n);
+    }
+    return n;
+  }
+
+  update(camera: THREE.Camera) {
+    this.frame++;
+    const cam = camera.position.clone().sub(MOON_CENTER);
+    const camDist = cam.length();
+    const camDir = cam.clone().normalize();
+    const horizon = Math.acos(Math.min(1, R_MOON_KM / Math.max(camDist, R_MOON_KM + 0.01))) + 0.08;
+    this.material.uniforms.uCamPos.value.copy(camera.position);
+    const visible = new Set<Node>();
+    this.queue = [];
+
+    const visit = (n: Node) => {
+      const ang = (n.sizeKm / R_MOON_KM) * 0.75;
+      if (camDir.dot(n.center) < Math.cos(Math.min(Math.PI, horizon + ang))) return;
+      const world = this.tmp.copy(n.center).multiplyScalar(R_MOON_KM).add(MOON_CENTER);
+      const dist = world.distanceTo(camera.position);
+      const wantSplit = n.level < MAX_LEVEL && dist < n.sizeKm * SPLIT;
+      if (wantSplit) {
+        const kids = [0, 1, 2, 3].map((q) => this.node(n.face, n.level + 1, n.i * 2 + (q & 1), n.j * 2 + (q >> 1)));
+        const ready = kids.every((k) => k.mesh);
+        if (ready) {
+          kids.forEach(visit);
+          return;
+        }
+        kids.forEach((k) => {
+          if (!k.mesh) this.queue.push(k);
+        });
+      }
+      if (!n.mesh) {
+        this.queue.push(n);
+        if (n.level > 0) return;
+      }
+      if (n.mesh) visible.add(n);
+    };
+    for (let f = 0; f < 6; f++) visit(this.node(f, 0, 0, 0));
+
+    const seen = new Set<string>();
+    this.queue = this.queue.filter((n) => (seen.has(n.key) ? false : (seen.add(n.key), true)));
+    this.queue.sort((a, b) => a.level - b.level || this.tmp.copy(a.center).distanceTo(camDir) - this.tmp.copy(b.center).distanceTo(camDir));
+    const t0 = performance.now();
+    for (const n of this.queue) {
+      if (performance.now() - t0 > BUILD_BUDGET_MS && n.level > 1) break;
+      this.build(n);
+    }
+
+    this.meshes = [];
+    for (const n of this.nodes.values()) {
+      if (!n.mesh) continue;
+      const on = visible.has(n);
+      n.mesh.visible = on;
+      if (on) {
+        n.lastUsed = this.frame;
+        this.meshes.push(n.mesh);
+      }
+    }
+    if (this.nodes.size > MAX_CACHED) this.evict();
+  }
+
+  private evict() {
+    const built = [...this.nodes.values()].filter((n) => n.mesh && n.level > 1 && n.lastUsed < this.frame - 120);
+    built.sort((a, b) => a.lastUsed - b.lastUsed);
+    for (const n of built.slice(0, built.length / 2)) {
+      this.group.remove(n.mesh!);
+      n.mesh!.geometry.dispose();
+      n.mesh = null;
+      this.nodes.delete(n.key);
+    }
+  }
+
+  private build(n: Node) {
+    const f = FACES[n.face];
+    const cells = 1 << n.level;
+    const a0 = (n.i / cells) * 2 - 1;
+    const b0 = (n.j / cells) * 2 - 1;
+    const span = 2 / cells;
+    const spacingKm = n.sizeKm / GRID;
+    const E = GRID + 3;
+    const world = new Float32Array(E * E * 3);
+    const dir = new THREE.Vector3();
+    for (let r = 0; r < E; r++) {
+      for (let c = 0; c < E; c++) {
+        const a = a0 + ((c - 1) / GRID) * span;
+        const b = b0 + ((r - 1) / GRID) * span;
+        cubeToDir(f, a, b, dir);
+        const h = surfaceHeightM(this.g, dir, spacingKm) / 1000;
+        const k = (r * E + c) * 3;
+        world[k] = dir.x * (R_MOON_KM + h);
+        world[k + 1] = dir.y * (R_MOON_KM + h);
+        world[k + 2] = dir.z * (R_MOON_KM + h);
+      }
+    }
+    const V = GRID + 1;
+    const centerIdx = ((1 + GRID / 2) * E + 1 + GRID / 2) * 3;
+    const ox = world[centerIdx];
+    const oy = world[centerIdx + 1];
+    const oz = world[centerIdx + 2];
+    const skirtDepth = spacingKm * 1.5;
+    const total = V * V + 4 * V;
+    const pos = new Float32Array(total * 3);
+    const nor = new Float32Array(total * 3);
+    const at = (r: number, c: number) => (r * E + c) * 3;
+    for (let r = 0; r < V; r++) {
+      for (let c = 0; c < V; c++) {
+        const k = at(r + 1, c + 1);
+        const o = (r * V + c) * 3;
+        pos[o] = world[k] - ox;
+        pos[o + 1] = world[k + 1] - oy;
+        pos[o + 2] = world[k + 2] - oz;
+        const L = at(r + 1, c);
+        const Rr = at(r + 1, c + 2);
+        const D = at(r, c + 1);
+        const U = at(r + 2, c + 1);
+        const tx = world[Rr] - world[L];
+        const ty = world[Rr + 1] - world[L + 1];
+        const tz = world[Rr + 2] - world[L + 2];
+        const sx = world[U] - world[D];
+        const sy = world[U + 1] - world[D + 1];
+        const sz = world[U + 2] - world[D + 2];
+        let nx = ty * sz - tz * sy;
+        let ny = tz * sx - tx * sz;
+        let nz = tx * sy - ty * sx;
+        const len = Math.hypot(nx, ny, nz) || 1;
+        nx /= len;
+        ny /= len;
+        nz /= len;
+        const outward = nx * world[k] + ny * world[k + 1] + nz * world[k + 2];
+        const s = outward < 0 ? -1 : 1;
+        nor[o] = nx * s;
+        nor[o + 1] = ny * s;
+        nor[o + 2] = nz * s;
+      }
+    }
+    const edges: number[][] = [[], [], [], []];
+    for (let t = 0; t < V; t++) {
+      edges[0].push(t);
+      edges[1].push((V - 1) * V + t);
+      edges[2].push(t * V);
+      edges[3].push(t * V + V - 1);
+    }
+    let sk = V * V;
+    const skirtStart: number[] = [];
+    for (let e = 0; e < 4; e++) {
+      skirtStart.push(sk);
+      for (const vi of edges[e]) {
+        const o = vi * 3;
+        const wx = pos[o] + ox;
+        const wy = pos[o + 1] + oy;
+        const wz = pos[o + 2] + oz;
+        const l = Math.hypot(wx, wy, wz);
+        const q = sk * 3;
+        pos[q] = pos[o] - (wx / l) * skirtDepth;
+        pos[q + 1] = pos[o + 1] - (wy / l) * skirtDepth;
+        pos[q + 2] = pos[o + 2] - (wz / l) * skirtDepth;
+        nor[q] = nor[o];
+        nor[q + 1] = nor[o + 1];
+        nor[q + 2] = nor[o + 2];
+        sk++;
+      }
+    }
+    const idx: number[] = [];
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const p = r * V + c;
+        idx.push(p, p + 1, p + V, p + 1, p + V + 1, p + V);
+      }
+    }
+    for (let e = 0; e < 4; e++) {
+      for (let t = 0; t < GRID; t++) {
+        const a = edges[e][t];
+        const b = edges[e][t + 1];
+        const sa = skirtStart[e] + t;
+        const sb = skirtStart[e] + t + 1;
+        idx.push(a, sa, b, b, sa, sb, a, b, sa, b, sb, sa);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute("aSpacing", new THREE.BufferAttribute(new Float32Array(total).fill(spacingKm), 1));
+    geo.setIndex(idx);
+    geo.computeBoundingSphere();
+    const mesh = new THREE.Mesh(geo, this.material);
+    mesh.position.set(ox + MOON_CENTER.x, oy + MOON_CENTER.y, oz + MOON_CENTER.z);
+    mesh.visible = false;
+    this.group.add(mesh);
+    n.mesh = mesh;
+  }
+
+  dispose() {
+    for (const n of this.nodes.values()) n.mesh?.geometry.dispose();
+    this.nodes.clear();
+  }
+}
+
+function intTexture(data: Int16Array, w: number, h: number) {
+  const tex = new THREE.DataTexture(data, w, h, THREE.RedIntegerFormat, THREE.ShortType);
+  tex.internalFormat = "R16I";
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.unpackAlignment = 1;
+  tex.flipY = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const VERT = /* glsl */ `
+attribute float aSpacing;
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying float vSpacing;
+void main() {
+  vNormal = normalize(mat3(modelMatrix) * normal);
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vWorld = w.xyz;
+  vSpacing = aSpacing;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`;
+
+const FRAG = /* glsl */ `
+precision highp isampler2D;
+uniform sampler2D uColor;
+uniform isampler2D uGlobe;
+uniform vec2 uGlobeSize;
+uniform float uPpd;
+uniform float uStep;
+uniform isampler2D uP80;
+uniform int uP80Size;
+uniform float uP80Cell;
+uniform float uP80First;
+uniform vec3 uSunME;
+uniform vec3 uSunWorld;
+uniform vec3 uEarthWorld;
+uniform float uSunPower;
+uniform float uEarthshine;
+uniform vec3 uHole;
+uniform vec3 uCamPos;
+varying vec3 vNormal;
+varying vec3 vWorld;
+varying float vSpacing;
+out vec4 fragColor;
+
+const float PI = 3.14159265358979;
+const float R_M = 1737400.0;
+const float R_KM = 1737.4;
+const vec3 CENTER = vec3(0.0, -1737.4, 0.0);
+
+${PROCEDURAL_GLSL}
+
+float hashf(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hashf(i), hashf(i + vec2(1, 0)), u.x), mix(hashf(i + vec2(0, 1)), hashf(i + vec2(1, 1)), u.x), u.y);
+}
+
+float p80(vec2 m, out bool ok) {
+  float c = (m.x - uP80First) / uP80Cell;
+  float r = (-uP80First - m.y) / uP80Cell;
+  float n = float(uP80Size);
+  ok = false;
+  if (c < 0.0 || r < 0.0 || c >= n - 1.0 || r >= n - 1.0) return 0.0;
+  ivec2 p = ivec2(floor(vec2(c, r)));
+  vec2 f = vec2(c, r) - floor(vec2(c, r));
+  int a = texelFetch(uP80, p, 0).r;
+  int b = texelFetch(uP80, p + ivec2(1, 0), 0).r;
+  int d = texelFetch(uP80, p + ivec2(0, 1), 0).r;
+  int e = texelFetch(uP80, p + ivec2(1, 1), 0).r;
+  if (a == -32768 || b == -32768 || d == -32768 || e == -32768) return 0.0;
+  ok = true;
+  return mix(mix(float(a), float(b), f.x), mix(float(d), float(e), f.x), f.y);
+}
+
+float globeH(float latDeg, float lonDeg) {
+  float fx = mod(lonDeg + 360.0, 360.0) * uPpd - 0.5;
+  float fy = clamp((90.0 - latDeg) * uPpd - 0.5, 0.0, uGlobeSize.y - 1.001);
+  int w = int(uGlobeSize.x);
+  int x0 = int(floor(fx));
+  int y0 = int(floor(fy));
+  float tx = fx - floor(fx);
+  float ty = fy - floor(fy);
+  int xa = ((x0 % w) + w) % w;
+  int xb = (xa + 1) % w;
+  float a = float(texelFetch(uGlobe, ivec2(xa, y0), 0).r);
+  float b = float(texelFetch(uGlobe, ivec2(xb, y0), 0).r);
+  float d = float(texelFetch(uGlobe, ivec2(xa, y0 + 1), 0).r);
+  float e = float(texelFetch(uGlobe, ivec2(xb, y0 + 1), 0).r);
+  return mix(mix(a, b, tx), mix(d, e, tx), ty) * uStep;
+}
+
+float demH(vec3 u, out float res) {
+  if (u.z < -0.988) {
+    float k = 2.0 * R_M / (1.0 - u.z);
+    bool ok;
+    float h = p80(vec2(k * u.y, k * u.x), ok);
+    if (ok) { res = 0.08; return h; }
+  }
+  res = 1.9;
+  return globeH(degrees(asin(clamp(u.z, -1.0, 1.0))), degrees(atan(u.y, u.x)));
+}
+
+void main() {
+  vec3 dW = normalize(vWorld - CENTER);
+  vec3 u = vec3(-dW.z, dW.x, -dW.y);
+  float latR = asin(clamp(u.z, -1.0, 1.0));
+  float lonR = atan(u.y, u.x);
+  float lat = degrees(latR);
+  float lon = degrees(lonR);
+
+  float kk = 2.0 * R_M * tan(PI / 4.0 + latR / 2.0);
+  vec2 mp = vec2(kk * sin(lonR), kk * cos(lonR));
+  if (uHole.z > 0.0 && lat < -75.0 && abs(mp.x - uHole.x) < uHole.z && abs(mp.y - uHole.y) < uHole.z) discard;
+
+  float camDist = length(uCamPos - vWorld);
+  float res;
+  float h0 = demH(u, res);
+
+  vec3 n = normalize(vNormal);
+  float footprint = max(camDist * 0.0012, 0.004);
+  float maxCell = min(vSpacing * 2.5, res * 2.5);
+  if (maxCell > footprint * 3.0) {
+    vec3 p = u * R_KM;
+    vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+    vec3 north = cross(u, east);
+    float e = max(footprint, 0.006);
+    float minCell = footprint * 4.0;
+    float c0 = craterDetail(p, minCell, maxCell);
+    float cx = craterDetail(p + east * e, minCell, maxCell);
+    float cy = craterDetail(p + north * e, minCell, maxCell);
+    vec3 eastW = vec3(east.y, -east.z, -east.x);
+    vec3 northW = vec3(north.y, -north.z, -north.x);
+    n = normalize(n - eastW * (cx - c0) / e - northW * (cy - c0) / e);
+  }
+
+  vec3 sv = normalize(uSunME - u * R_KM);
+  float sel = asin(dot(sv, u));
+  float lit = 1.0;
+  if (sel < radians(30.0)) {
+    vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+    vec3 north = cross(u, east);
+    vec3 sdir = normalize(sv - u * dot(sv, u));
+    float hs = h0 + 2.0;
+    float best = -1.5;
+    float d = max(res * 1000.0 * 0.6, camDist * 1.5);
+    float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.05), min(vSpacing * 2.5, res * 2.5)) * 1000.0 : 0.0;
+    hs += hsDetail;
+    for (int i = 0; i < 90; i++) {
+      float delta = d / R_M;
+      float sh = sin(0.5 * delta);
+      vec3 q = cos(delta) * u + sin(delta) * sdir;
+      float r2;
+      float dh = demH(q, r2) - hs;
+      if (camDist < 30.0 && i < 28) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, res * 2.5)) * 1000.0;
+      best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
+      if (best > sel + 0.02) break;
+      d *= 1.075;
+      if (d > 220000.0) break;
+    }
+    lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);
+  }
+
+  vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
+  vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
+  float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
+  vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
+  float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
+  vec3 albedo = mix(mapAlbedo, polarAlbedo, polarW);
+  albedo *= 0.92 + 0.16 * vnoise(vec2(lon, lat) * 3.0);
+
+  vec3 L = normalize(uSunWorld);
+  vec3 V = normalize(cameraPosition - vWorld);
+  float mu0 = max(dot(n, L), 0.0);
+  float mu = max(dot(n, V), 0.02);
+  float ph = degrees(acos(clamp(dot(L, V), -1.0, 1.0)));
+  float lunarL = clamp(1.0 - 0.019 * ph + 0.000242 * ph * ph - 0.00000146 * ph * ph * ph, 0.0, 1.0);
+  float photometry = mu0 > 0.0 ? 2.0 * lunarL * mu0 / (mu0 + mu) + (1.0 - lunarL) * mu0 : 0.0;
+  float surge = 1.0 + 0.35 * exp(-ph / 6.0);
+  vec3 col = albedo * (vec3(1.0, 0.975, 0.94) * uSunPower * photometry * surge * lit + vec3(0.55, 0.68, 1.0) * uEarthshine * max(dot(n, normalize(uEarthWorld)), 0.0) + 0.0008);
+  if (any(isnan(col))) col = vec3(0.0);
+  fragColor = vec4(clamp(col, 0.0, 40.0), 1.0);
+}`;

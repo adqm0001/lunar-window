@@ -1,9 +1,9 @@
 {
   "globe": {
-    "file": "globe_8ppd.bin.gz",
-    "width": 2880,
-    "height": 1440,
-    "pixelsPerDegree": 8,
+    "file": "globe_16ppd.bin.gz",
+    "width": 5760,
+    "height": 2880,
+    "pixelsPerDegree": 16,
     "stepMeters": 5.0,
     "layout": "int16 [row][col] row 0 = 90N, col 0 starts at lon 0 east; value = height / stepMeters; stored as deltas along each row; gzip"
   },
@@ -13,6 +13,14 @@
     "cellMeters": 240.0,
     "firstCenterMeters": -199800.0,
     "layout": "int16 meters [row][col], south polar stereographic like the field (row 0 = +y); deltas along each row; gzip"
+  },
+  "polar80": {
+    "file": "polar_80m.bin.gz",
+    "size": 6250,
+    "cellMeters": 80.0,
+    "firstCenterMeters": -249960.0,
+    "missing": -32768,
+    "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip"
   },
   "color": {
     "file": "moon_color_4k.jpg",

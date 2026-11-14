@@ -10,6 +10,10 @@ export interface GlobeData {
   polarSize: number;
   polarCell: number;
   polarFirst: number;
+  p80: Int16Array;
+  p80Size: number;
+  p80Cell: number;
+  p80First: number;
   color: HTMLImageElement;
 }
 
@@ -44,7 +48,7 @@ function loadImage(path: string): Promise<HTMLImageElement> {
 
 export async function loadGlobe(): Promise<GlobeData> {
   const meta = await (await fetch(base + "globe.json")).json();
-  const [g, p, color] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), loadImage(meta.color.file)]);
+  const [g, p, p80, color] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), gunzipFetch(meta.polar80.file), loadImage(meta.color.file)]);
   return {
     globe: undelta(g, meta.globe.width),
     width: meta.globe.width,
@@ -55,11 +59,40 @@ export async function loadGlobe(): Promise<GlobeData> {
     polarSize: meta.polar.size,
     polarCell: meta.polar.cellMeters,
     polarFirst: meta.polar.firstCenterMeters,
+    p80: undelta(p80, meta.polar80.size),
+    p80Size: meta.polar80.size,
+    p80Cell: meta.polar80.cellMeters,
+    p80First: meta.polar80.firstCenterMeters,
     color,
   };
 }
 
+export const P80_MISSING = -32768;
+
+function p80Height(g: GlobeData, x: number, y: number): number | null {
+  const c = (x - g.p80First) / g.p80Cell;
+  const r = (-g.p80First - y) / g.p80Cell;
+  const n = g.p80Size;
+  if (c < 0 || r < 0 || c >= n - 1 || r >= n - 1) return null;
+  const c0 = Math.floor(c);
+  const r0 = Math.floor(r);
+  const z = g.p80;
+  const a = z[r0 * n + c0];
+  const b = z[r0 * n + c0 + 1];
+  const d = z[(r0 + 1) * n + c0];
+  const e = z[(r0 + 1) * n + c0 + 1];
+  if (a === P80_MISSING || b === P80_MISSING || d === P80_MISSING || e === P80_MISSING) return null;
+  const fc = c - c0;
+  const fr = r - r0;
+  return a * (1 - fc) * (1 - fr) + b * fc * (1 - fr) + d * (1 - fc) * fr + e * fc * fr;
+}
+
 export function globeHeight(g: GlobeData, lat: number, lon: number): number {
+  if (lat < -81) {
+    const [x, y] = toMap(lat, lon);
+    const h = p80Height(g, x, y);
+    if (h !== null) return h;
+  }
   if (lat < -82) {
     const [x, y] = toMap(lat, lon);
     const c = (x - g.polarFirst) / g.polarCell;
