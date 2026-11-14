@@ -17,6 +17,7 @@ import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
+import { craterTexture } from "./craterTexture";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
 import type { ArtemisRegion } from "../data/artemis";
@@ -124,6 +125,7 @@ export class MoonScene {
       fragmentShader: TERRAIN_FRAG,
       glslVersion: THREE.GLSL3,
       uniforms: {
+        uCraterTex: { value: craterTexture() },
         uField: { value: tex },
         uSun: { value: new THREE.Vector3(1, 0, 0) },
         uSunWorld: { value: new THREE.Vector3(1, 0, 0) },
@@ -764,6 +766,10 @@ export class MoonScene {
 
   private updateDepthAndSky() {
     this.hideOccludedLabels();
+    for (const b of this.beacons.values()) {
+      const k = Math.min(1, Math.max(0.06, this.camera.position.distanceTo(b.pos) / 12));
+      if (Math.abs(b.group.scale.x - k) > 0.002) b.group.scale.setScalar(k);
+    }
     const alt = Math.max(0.05, this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM);
     const near = Math.min(20, Math.max(0.005, alt * 0.01));
     const far = alt + 2 * R_MOON_KM + 4000;

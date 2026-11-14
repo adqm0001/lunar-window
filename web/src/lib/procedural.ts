@@ -20,7 +20,7 @@ function pcg3(x: number, y: number, z: number): number {
 
 const U32 = 4294967296;
 
-function profile(r: number, fresh: number): number {
+export function profile(r: number, fresh: number): number {
   const rim = 0.2 * fresh * fresh * Math.exp(-(((r - 1) * (3 + 2 * fresh)) ** 2));
   if (r < 1) {
     const s = r * r * (3 - 2 * r);

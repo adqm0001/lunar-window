@@ -1,3 +1,4 @@
+import { CRATER_TEX_GLSL } from "./craterTexture";
 export const TERRAIN_VERT = /* glsl */ `
 attribute vec2 aMap;
 varying vec2 vMap;
@@ -73,39 +74,7 @@ float horizonAt(vec2 m, float az) {
   return mix(mix(h00, h10, w.x), mix(h01, h11, w.x), w.y) * uStep + uOffset;
 }
 
-float craterProfile(float r) {
-  float bowl = (r * r - 1.0) * 0.55;
-  float rim = 0.22 * exp(-pow((r - 1.0) * 4.5, 2.0));
-  float ejecta = r > 1.0 ? 0.12 * exp(-(r - 1.0) * 3.0) : 0.0;
-  return r < 1.0 ? bowl + rim : rim + ejecta;
-}
-
-float craterLayer(vec2 p, float cellSize, float seed, float density) {
-  vec2 g = p / cellSize;
-  vec2 gi = floor(g);
-  float h = 0.0;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
-      vec2 c = gi + vec2(float(i), float(j));
-      float rnd = hashf(c + seed);
-      if (rnd > density) continue;
-      vec2 center = c + vec2(hashf(c + seed + 3.1), hashf(c + seed + 7.7));
-      float radius = mix(0.18, 0.48, hashf(c + seed + 11.3));
-      float r = length(g - center) / radius;
-      if (r < 2.2) h += craterProfile(r) * radius * cellSize * 0.32;
-    }
-  }
-  return h;
-}
-
-float detailHeight(vec2 p, float lod) {
-  float h = 0.0;
-  h += craterLayer(p, 420.0, 1.0, 0.55);
-  if (lod > 0.25) h += craterLayer(p, 130.0, 17.0, 0.6) * lod;
-  if (lod > 0.55) h += craterLayer(p, 42.0, 33.0, 0.65) * lod;
-  h += (vnoise(p / 60.0) - 0.5) * 6.0 + (vnoise(p / 17.0) - 0.5) * 2.0 * lod;
-  return h;
-}
+${CRATER_TEX_GLSL}
 
 void main() {
   if (uCutOn > 0.5) {
@@ -132,16 +101,13 @@ void main() {
   float earthVis = smoothstep(-0.6, 0.6, eel - horizonAt(vMap, eaz));
 
   float camDist = length(cameraPosition - vWorld);
-  float lod = clamp(1.0 - camDist / 22.0, 0.0, 1.0);
   vec3 n = normalize(vNormal);
-  if (camDist < 45.0) {
-    float e = 6.0 + camDist * 1.5;
-    float h0 = detailHeight(vMap, lod);
-    float hx = detailHeight(vMap + vec2(e, 0.0), lod);
-    float hy = detailHeight(vMap + vec2(0.0, e), lod);
-    vec3 dn = vec3(-(hx - h0) / e, 0.0, (hy - h0) / e) * uExaggeration;
-    float fade = clamp(1.0 - camDist / 45.0, 0.0, 1.0);
-    n = normalize(n + dn * fade);
+  float halo = 0.0;
+  if (camDist < 60.0) {
+    vec4 cd = craterDetailTex(vMap);
+    float fade = 1.0 - smoothstep(35.0, 60.0, camDist);
+    n = normalize(n + vec3(-cd.x, 0.0, cd.y) * 0.85 * fade * uExaggeration);
+    halo = cd.w * fade;
   }
 
   vec3 L = normalize(uSunWorld);
@@ -155,10 +121,14 @@ void main() {
 
   float tone = vnoise(vMap / 2600.0) * 0.55 + vnoise(vMap / 700.0) * 0.3 + vnoise(vMap / 150.0) * 0.15;
   vec3 albedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
+  albedo *= 1.0 + 0.32 * halo;
 
   vec3 sunCol = vec3(1.0, 0.975, 0.94) * uSunPower;
   vec3 earthshine = vec3(0.55, 0.68, 1.0) * uEarthshine * earthVis * (0.35 + 0.65 * max(dot(n, normalize(uEarthWorld)), 0.0));
-  vec3 col = albedo * (sunCol * photometry * surge * lit + earthshine + vec3(0.0008, 0.0009, 0.0012));
+  vec3 upW = normalize(vWorld - vec3(0.0, -1737.4, 0.0));
+  vec3 Lh = normalize(L - upW * dot(L, upW) + upW * 0.15);
+  float fill = uSunPower * 0.012 * (0.35 + 0.65 * max(dot(n, Lh), 0.0)) * smoothstep(-0.12, 0.05, dot(upW, L));
+  vec3 col = albedo * (sunCol * photometry * surge * lit + vec3(0.85, 0.85, 0.88) * fill + earthshine + vec3(0.0008, 0.0009, 0.0012));
 
   if (uOverlayMix > 0.0) {
     vec2 uv = vec2((vMap.x - uCenter.x + uExtent) / (2.0 * uExtent), (vMap.y - uCenter.y + uExtent) / (2.0 * uExtent));

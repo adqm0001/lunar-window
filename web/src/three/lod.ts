@@ -634,7 +634,10 @@ void main() {
   float lunarL = clamp(1.0 - 0.019 * ph + 0.000242 * ph * ph - 0.00000146 * ph * ph * ph, 0.0, 1.0);
   float photometry = mu0 > 0.0 ? 2.0 * lunarL * mu0 / (mu0 + mu) + (1.0 - lunarL) * mu0 : 0.0;
   float surge = 1.0 + 0.35 * exp(-ph / 6.0);
-  vec3 col = albedo * (vec3(1.0, 0.975, 0.94) * uSunPower * photometry * surge * lit + vec3(0.55, 0.68, 1.0) * uEarthshine * max(dot(n, normalize(uEarthWorld)), 0.0) + 0.0008);
+  // light bounced off nearby sunlit ground: faint, mostly from the Sun's side
+  vec3 Lh = normalize(L - dW * dot(L, dW) + dW * 0.15);
+  float fill = uSunPower * 0.012 * (0.35 + 0.65 * max(dot(n, Lh), 0.0)) * smoothstep(-0.12, 0.05, dot(dW, L));
+  vec3 col = albedo * (vec3(1.0, 0.975, 0.94) * uSunPower * photometry * surge * lit + vec3(0.85, 0.85, 0.88) * fill + vec3(0.55, 0.68, 1.0) * uEarthshine * max(dot(n, normalize(uEarthWorld)), 0.0) + 0.0008);
   if (any(isnan(col))) col = vec3(0.0);
   fragColor = vec4(clamp(col, 0.0, 40.0), 1.0);
 }`;
