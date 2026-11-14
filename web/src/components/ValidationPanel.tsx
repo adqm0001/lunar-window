@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
-import { percentOn, siteSeries } from "../lib/visibility";
+import { percentOn } from "../lib/visibility";
 import { siteThermal } from "../lib/siteThermal";
+import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
 
 // Results of the offline pipeline run for 2020 (pipeline/validate_illumination.py), same year as
@@ -16,26 +17,28 @@ const OURS_2020: Record<string, number> = {
 
 export default function ValidationPanel({ onClose }: { onClose: () => void }) {
   const data = useApp((s) => s.data)!;
+  const seriesVersion = useSeriesVersion();
 
+  // Live values stay null until the compute worker has the site's series.
   const peaks = useMemo(() => {
     const year = Math.min(24 * 365, data.ephem.count);
     return data.sites
       .filter((s) => s.published)
       .map((s) => {
-        const series = siteSeries(data.ephem, s);
-        const live = percentOn(series.sun, 0, year, (v) => v >= 128);
+        const series = getSeries(data.ephem, s);
+        const live = series && percentOn(series.sun, 0, year, (v) => v >= 128);
         return { site: s, published: s.published!.sunlit_pct, y2020: OURS_2020[s.id], y2026: live };
       });
-  }, [data]);
+  }, [data, seriesVersion]);
 
   const thermal = useMemo(() => {
-    const pick = (id: string) => data.sites.find((s) => s.id === id);
-    const eq = pick("apollo-11");
-    const floor = pick("shackleton-floor");
-    const a = eq ? siteThermal(data.ephem, eq, 0, 24 * 365) : null;
-    const b = floor ? siteThermal(data.ephem, floor, 0, 24 * 365) : null;
-    return { a, b };
-  }, [data]);
+    const at = (id: string) => {
+      const site = data.sites.find((s) => s.id === id);
+      const series = site && getSeries(data.ephem, site);
+      return site && series ? siteThermal(data.ephem, site, 0, 24 * 365, series) : null;
+    };
+    return { a: at("apollo-11"), b: at("shackleton-floor") };
+  }, [data, seriesVersion]);
 
   const meanAbs = peaks.length ? peaks.reduce((s, p) => s + Math.abs(p.y2020 - p.published), 0) / peaks.length : 0;
 
@@ -87,7 +90,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
                   <td>
                     {p.y2020?.toFixed(1)}% <Diff d={p.y2020 - p.published} />
                   </td>
-                  <td>{p.y2026.toFixed(1)}%</td>
+                  <td>{p.y2026 === null ? "…" : `${p.y2026.toFixed(1)}%`}</td>
                 </tr>
               ))}
             </tbody>

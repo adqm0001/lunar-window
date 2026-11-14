@@ -33,14 +33,15 @@ export default function SitePanel() {
   const hourBucket = Math.floor(hour);
   const next = useMemo(
     () => ({
-      sun: hoursUntilChange(series.sun, hourBucket, lit),
-      earth: hoursUntilChange(series.earth, hourBucket, on),
-      link: hoursUntilChange(series.link, hourBucket, on),
+      sun: series && hoursUntilChange(series.sun, hourBucket, lit),
+      earth: series && hoursUntilChange(series.earth, hourBucket, on),
+      link: series && hoursUntilChange(series.link, hourBucket, on),
     }),
     [series, hourBucket],
   );
 
   const yearStats = useMemo(() => {
+    if (!series) return null;
     const from = Math.floor(hourBucket / 24) * 24;
     return {
       sun: percentOn(series.sun, from, from + YEAR, lit),
@@ -51,10 +52,10 @@ export default function SitePanel() {
   }, [series, Math.floor(hourBucket / 24)]);
 
   const thermStart = Math.floor(hourBucket / 720) * 720;
-  const therm = useMemo(() => siteThermal(data.ephem, site, thermStart, 24 * 395), [data, site, thermStart]);
-  const tNow = therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))];
+  const therm = useMemo(() => (series ? siteThermal(data.ephem, site, thermStart, 24 * 395, series) : null), [data, site, thermStart, series]);
+  const tNow = therm ? therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))] : 0;
 
-  const contacts = useMemo(() => contactWindows(data.ephem, series, hourBucket, 24 * 7), [data, series, hourBucket]);
+  const contacts = useMemo(() => (series ? contactWindows(data.ephem, series, hourBucket, 24 * 7) : null), [data, series, hourBucket]);
 
   const sunUp = st.sunFraction >= 0.5;
   const bestStation = st.dsn.reduce((b, v, i) => (v > st.dsn[b] ? i : b), 0);
@@ -121,49 +122,63 @@ export default function SitePanel() {
       </dl>
 
       <div className="section-label" style={{ margin: "16px 0 6px" }}>Next 12 months</div>
-      <dl className="kv">
-        <dt>Sunlit</dt>
-        <dd style={{ color: "var(--sun)" }}>{yearStats.sun.toFixed(1)}%</dd>
-        <dt>Earth in view</dt>
-        <dd style={{ color: "var(--earth)" }}>{yearStats.earth.toFixed(1)}%</dd>
-        <dt>DSN link available</dt>
-        <dd style={{ color: "var(--link)" }}>{yearStats.link.toFixed(1)}%</dd>
-        <dt>Longest night</dt>
-        <dd>{formatDuration(yearStats.night)}</dd>
-      </dl>
+      {yearStats ? (
+        <dl className="kv">
+          <dt>Sunlit</dt>
+          <dd style={{ color: "var(--sun)" }}>{yearStats.sun.toFixed(1)}%</dd>
+          <dt>Earth in view</dt>
+          <dd style={{ color: "var(--earth)" }}>{yearStats.earth.toFixed(1)}%</dd>
+          <dt>DSN link available</dt>
+          <dd style={{ color: "var(--link)" }}>{yearStats.link.toFixed(1)}%</dd>
+          <dt>Longest night</dt>
+          <dd>{formatDuration(yearStats.night)}</dd>
+        </dl>
+      ) : (
+        <div className="f-hint">computing…</div>
+      )}
 
       <div className="section-label" style={{ margin: "16px 0 6px" }}>Contact with Earth, next 7 days</div>
-      <div className="contacts">
-        <div className="contacts-sum">
-          {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} passes
-        </div>
-        {contacts.windows.length === 0 && <div className="f-hint">Earth stays below this site's horizon all week: a relay satellite would be needed.</div>}
-        {contacts.windows.slice(0, 7).map((w) => (
-          <div key={`${w.station}-${w.start}`} className="contact-row">
-            <span className="c-station">{w.station}</span>
-            <span className="c-time">{formatUtc(hourToDate(data, w.start)).slice(5)}</span>
-            <span className="c-dur">{formatDuration(w.end - w.start)}</span>
+      {contacts ? (
+        <div className="contacts">
+          <div className="contacts-sum">
+            {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} passes
           </div>
-        ))}
-        {contacts.windows.length > 7 && <div className="f-hint">+{contacts.windows.length - 7} more</div>}
-      </div>
+          {contacts.windows.length === 0 && <div className="f-hint">Earth stays below this site's horizon all week: a relay satellite would be needed.</div>}
+          {contacts.windows.slice(0, 7).map((w) => (
+            <div key={`${w.station}-${w.start}`} className="contact-row">
+              <span className="c-station">{w.station}</span>
+              <span className="c-time">{formatUtc(hourToDate(data, w.start)).slice(5)}</span>
+              <span className="c-dur">{formatDuration(w.end - w.start)}</span>
+            </div>
+          ))}
+          {contacts.windows.length > 7 && <div className="f-hint">+{contacts.windows.length - 7} more</div>}
+        </div>
+      ) : (
+        <div className="f-hint">computing…</div>
+      )}
 
       <div className="section-label" style={{ margin: "16px 0 6px" }}>Ground temperature</div>
-      <dl className="kv">
-        <dt>Right now</dt>
-        <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
-          {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
-        </dd>
-        <dt>Coldest / hottest (13 months)</dt>
-        <dd>
-          {Math.round(therm.min)} K / {Math.round(therm.max)} K
-        </dd>
-        <dt>Water ice</dt>
-        <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
-          {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
-        </dd>
-      </dl>
-      <TempChart t={therm} nowDay={Math.floor((hourBucket - therm.start) / 24)} />
+      {therm ? (
+        <>
+          <dl className="kv">
+            <dt>Right now</dt>
+            <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
+              {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
+            </dd>
+            <dt>Coldest / hottest (13 months)</dt>
+            <dd>
+              {Math.round(therm.min)} K / {Math.round(therm.max)} K
+            </dd>
+            <dt>Water ice</dt>
+            <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
+              {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
+            </dd>
+          </dl>
+          <TempChart t={therm} nowDay={Math.floor((hourBucket - therm.start) / 24)} />
+        </>
+      ) : (
+        <div className="f-hint">computing…</div>
+      )}
 
       {outside && site.lat < -75 && (
         <button className="btn analyze-btn" onClick={() => analyzeArea(site.name, site.lat, site.lon)}>
