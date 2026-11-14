@@ -35,6 +35,9 @@ export default function LayerControls() {
           </button>
         ))}
         <span className="chip-sep" />
+        <button className="chip moon" onClick={() => useApp.getState().requestOrbit()} title="Zoom out to the whole Moon">
+          ◐ Whole Moon
+        </button>
         <button className={`chip find ${finderOpen ? "sel" : ""}`} onClick={() => useApp.getState().setFinderOpen(!finderOpen)}>
           ★ Find landing spot
         </button>

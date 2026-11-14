@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
+import { loadGlobe } from "./data/globe";
 import { useApp } from "./state/store";
 import { usePlayback } from "./state/usePlayback";
 import TopBar from "./components/TopBar";
@@ -50,6 +51,9 @@ export default function App() {
     loadField(s.setFieldProgress)
       .then(s.setField)
       .catch((e: Error) => s.setFieldError(e.message));
+    loadGlobe()
+      .then(s.setGlobe)
+      .catch((e: Error) => console.warn("Globe data failed to load:", e.message));
   }, [data]);
 
   usePlayback();

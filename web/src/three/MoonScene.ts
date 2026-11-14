@@ -12,6 +12,10 @@ import type { Site } from "../data/load";
 import type { Vec3 } from "../lib/astro";
 import { toMap, R_MOON_M } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
+import type { GlobeData } from "../data/globe";
+import { globeHeight } from "../data/globe";
+import { buildGlobe, buildSkirt, globeMaterial, latLonFromWorld, MOON_CENTER, polarTexture, setPolarUniforms, worldFromLatLon } from "./globe";
+import { R_MOON_KM } from "../lib/astro";
 
 export const EXAGGERATION = 1.0;
 const SKY_R = 6000;
@@ -38,7 +42,17 @@ export class MoonScene {
   private sunRay: THREE.Line;
   private earthRay: THREE.Line;
   private selected: string | null = null;
-  private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number; dur: number } | null = null;
+  private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number; dur: number; orbit: boolean } | null = null;
+  private globeMats: THREE.ShaderMaterial[] = [];
+  private globeMeshes: THREE.Mesh[] = [];
+  private terrainMesh!: THREE.Mesh;
+  private stars!: THREE.Points;
+  private sunDir = new THREE.Vector3(1, 0, 0);
+  private earthDir = new THREE.Vector3(0, 1, 0);
+  private globe: GlobeData | null = null;
+  private pendingIntro: Site | null = null;
+  private lastSites: Site[] = [];
+  onPickLatLon: ((lat: number, lon: number) => void) | null = null;
   private introDone = false;
   private frameTimes: number[] = [];
   private dpr = Math.min(window.devicePixelRatio, 1.75);
@@ -67,17 +81,16 @@ export class MoonScene {
     host.appendChild(this.labels.domElement);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20000);
-    this.camera.position.set(0, 420, 90);
+    this.camera.position.copy(MOON_CENTER).add(new THREE.Vector3(0, 0.62, 1).normalize().multiplyScalar(R_MOON_KM + 3600));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
-    this.controls.maxPolarAngle = Math.PI * 0.495;
-    this.controls.minDistance = 1.2;
-    this.controls.maxDistance = 140;
-    this.controls.target.set(0, 0, 0);
+    this.controls.target.copy(MOON_CENTER);
+    this.configureControls(true);
 
     this.scene.background = new THREE.Color(0x000000);
-    this.scene.add(this.makeStars());
+    this.stars = this.makeStars();
+    this.scene.add(this.stars);
 
     const { geometry } = this.makeTerrain();
     const h = field.meta.horizon;
@@ -113,7 +126,8 @@ export class MoonScene {
         uTime: { value: 0 },
       },
     });
-    this.scene.add(new THREE.Mesh(geometry, this.terrainMat));
+    this.terrainMesh = new THREE.Mesh(geometry, this.terrainMat);
+    this.scene.add(this.terrainMesh);
 
     const glow = glowTexture();
     this.sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: new THREE.Color(6, 5.2, 4), blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -233,9 +247,14 @@ export class MoonScene {
     const me = new THREE.Vector3(-earthMe[0], -earthMe[1], -earthMe[2]).normalize();
     const earthLitFraction = (1 + se.dot(me)) / 2;
     this.terrainMat.uniforms.uEarthshine.value = 0.035 * earthLitFraction;
-    this.sun.position.copy(s).multiplyScalar(SKY_R);
-    this.sunHalo.position.copy(s).multiplyScalar(SKY_R * 0.99);
-    this.earth.position.copy(e).multiplyScalar(SKY_R * 0.95);
+    for (const m of this.globeMats) {
+      m.uniforms.uSunME.value.set(sunMe[0], sunMe[1], sunMe[2]);
+      m.uniforms.uSunWorld.value.copy(s);
+      m.uniforms.uEarthWorld.value.copy(e);
+      m.uniforms.uEarthshine.value = 0.035 * earthLitFraction;
+    }
+    this.sunDir.copy(s);
+    this.earthDir.copy(e);
     this.earthMat.uniforms.uSunDir.value.copy(s);
     this.earthMat.uniforms.uSpin.value = ((hour % 24) / 24) * Math.PI * 2;
   }
@@ -259,12 +278,16 @@ export class MoonScene {
   sitePosition(site: Site): THREE.Vector3 | null {
     const [x, y] = toMap(site.lat, site.lon);
     const E = this.field.meta.extentMeters;
-    if (Math.abs(x) > E || Math.abs(y) > E) return null;
+    if (Math.abs(x) > E || Math.abs(y) > E) {
+      if (!this.globe) return null;
+      return worldFromLatLon(site.lat, site.lon, globeHeight(this.globe, site.lat, site.lon));
+    }
     const h = fieldHeight(this.field, x, y) ?? site.height_m;
     return new THREE.Vector3(x / 1000, this.worldY(x, y, h), -y / 1000);
   }
 
   setSites(sites: Site[]) {
+    this.lastSites = sites;
     for (const b of this.beacons.values()) this.scene.remove(b.group);
     this.beacons.clear();
     for (const s of sites) {
@@ -301,18 +324,58 @@ export class MoonScene {
     this.highlight(site.id);
     const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
     if (!p || !fly) return;
+    if (!this.introDone && !this.globe) {
+      this.pendingIntro = site;
+      return;
+    }
+    const up = p.clone().sub(MOON_CENTER).normalize();
     let offset = this.camera.position.clone().sub(this.controls.target);
-    let dur = 1.6;
+    let dur = 1.8;
     if (!this.introDone) {
       this.introDone = true;
-      const s = this.sun.position.clone().setY(0).normalize();
-      offset = s.multiplyScalar(-9).add(new THREE.Vector3(0, 3.2, 0)).applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.5);
-      dur = 5.5;
+      const s = this.sunDir.clone().projectOnPlane(up).normalize();
+      offset = s.multiplyScalar(-9).add(up.clone().multiplyScalar(3.2)).applyAxisAngle(up, 0.5);
+      dur = 7.5;
+    } else {
+      const tangent = offset.clone().projectOnPlane(up);
+      if (tangent.lengthSq() < 1e-6) tangent.set(1, 0, 0).projectOnPlane(up);
+      const dist = Math.min(Math.max(offset.length(), 6), 14);
+      offset = tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38));
     }
-    const dist = Math.min(Math.max(offset.length(), 6), 14);
-    offset.setLength(dist);
-    if (offset.y < dist * 0.22) offset.y = dist * 0.22;
-    this.flight = { from: this.controls.target.clone(), to: p.clone(), camFrom: this.camera.position.clone(), camTo: p.clone().add(offset), t: 0, dur };
+    this.startFlight(p, offset, dur, up);
+  }
+
+  flyToOrbit() {
+    const dir = this.camera.position.clone().sub(MOON_CENTER).normalize();
+    if (dir.y > 0.97) dir.set(0, 0.62, 1).normalize();
+    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), 3.5, null);
+  }
+
+  private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null) {
+    const from = this.controls.target.clone();
+    const camFrom = this.camera.position.clone();
+    this.camera.up.copy(up ?? new THREE.Vector3(0, 1, 0));
+    this.controls.enabled = false;
+    this.flight = { from, to: to.clone(), camFrom, camTo: to.clone().add(offTo), t: 0, dur, orbit: up === null };
+  }
+
+  private configureControls(orbit: boolean) {
+    const target = this.controls ? this.controls.target.clone() : MOON_CENTER.clone();
+    this.controls?.dispose();
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.07;
+    this.controls.target.copy(target);
+    if (orbit) {
+      this.controls.minDistance = R_MOON_KM + 40;
+      this.controls.maxDistance = R_MOON_KM + 14000;
+      this.controls.rotateSpeed = 0.5;
+      this.controls.zoomSpeed = 0.8;
+    } else {
+      this.controls.maxPolarAngle = Math.PI * 0.495;
+      this.controls.minDistance = 0.6;
+      this.controls.maxDistance = 420;
+    }
   }
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
@@ -349,8 +412,10 @@ export class MoonScene {
       const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       const ray = new THREE.Raycaster();
       ray.setFromCamera(ndc, this.camera);
-      const hit = ray.intersectObjects(this.scene.children.filter((o) => o instanceof THREE.Mesh && o.material === this.terrainMat))[0];
-      if (hit) this.onPick?.(hit.point.x * 1000, -hit.point.z * 1000);
+      const hit = ray.intersectObjects([this.terrainMesh, ...this.globeMeshes])[0];
+      if (!hit) return;
+      if (hit.object === this.terrainMesh) this.onPick?.(hit.point.x * 1000, -hit.point.z * 1000);
+      else this.onPickLatLon?.(...latLonFromWorld(hit.point));
     });
   }
 
@@ -375,16 +440,83 @@ export class MoonScene {
       f.t = Math.min(1, f.t + dt / f.dur);
       const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
       this.controls.target.lerpVectors(f.from, f.to, k);
-      this.camera.position.lerpVectors(f.camFrom, f.camTo, k);
-      if (f.t >= 1) this.flight = null;
+      const a = f.camFrom.clone().sub(MOON_CENTER);
+      const b = f.camTo.clone().sub(MOON_CENTER);
+      const altA = Math.max(0.05, a.length() - R_MOON_KM);
+      const altB = Math.max(0.05, b.length() - R_MOON_KM);
+      const arc = a.angleTo(b);
+      const hop = arc * R_MOON_KM * 0.7 * Math.sin(Math.PI * k);
+      const alt = Math.exp(Math.log(altA) + (Math.log(altB) - Math.log(altA)) * k) + hop;
+      const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
+      if (dir.lengthSq() < 1e-8) dir.copy(b);
+      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
+      this.camera.lookAt(this.controls.target);
+      if (f.t >= 1) {
+        this.flight = null;
+        this.configureControls(f.orbit);
+      }
+    } else {
+      this.controls.update();
     }
-    this.controls.update();
+    this.updateDepthAndSky();
     this.adaptResolution(dt, now);
     this.terrainMat.uniforms.uTime.value = now / 1000;
     this.lens.uniforms.uTime.value = (now / 1000) % 100;
     this.composer.render();
     this.labels.render(this.scene, this.camera);
   };
+
+  setGlobe(g: GlobeData) {
+    this.globe = g;
+    const tex = new THREE.Texture(g.color);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    tex.needsUpdate = true;
+    const globeMat = globeMaterial(tex, 199000);
+    const skirtMat = globeMaterial(tex, this.field.meta.extentMeters);
+    const globe = new THREE.Mesh(buildGlobe(g), globeMat);
+    const skirt = new THREE.Mesh(buildSkirt(g, 200000, 500), skirtMat);
+    const ptex = polarTexture(g);
+    setPolarUniforms(globeMat, g, ptex, false);
+    setPolarUniforms(skirtMat, g, ptex, true);
+    this.globeMats = [globeMat, skirtMat];
+    this.globeMeshes = [skirt, globe];
+    this.scene.add(globe, skirt);
+    for (const m of this.globeMats) {
+      m.uniforms.uSunME.value.copy(this.terrainMat.uniforms.uSun.value);
+      m.uniforms.uSunWorld.value.copy(this.sunDir);
+      m.uniforms.uEarthWorld.value.copy(this.earthDir);
+      m.uniforms.uEarthshine.value = this.terrainMat.uniforms.uEarthshine.value;
+    }
+    this.setSites(this.lastSites);
+    if (this.pendingIntro) {
+      const s = this.pendingIntro;
+      this.pendingIntro = null;
+      this.select(s, true);
+    }
+  }
+
+  private updateDepthAndSky() {
+    const alt = Math.max(0.05, this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM);
+    const near = Math.min(20, Math.max(0.005, alt * 0.01));
+    const far = alt + 2 * R_MOON_KM + 4000;
+    if (Math.abs(this.camera.near - near) / near > 0.05 || Math.abs(this.camera.far - far) / far > 0.05) {
+      this.camera.near = near;
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+    }
+    const sky = far * 0.6;
+    const k = sky / SKY_R;
+    const c = this.camera.position;
+    this.sun.position.copy(c).addScaledVector(this.sunDir, sky);
+    this.sunHalo.position.copy(c).addScaledVector(this.sunDir, sky * 0.99);
+    this.sun.scale.setScalar(260 * k);
+    this.sunHalo.scale.setScalar(1500 * k);
+    this.earth.position.copy(c).addScaledVector(this.earthDir, sky * 0.95);
+    this.earth.scale.setScalar(k);
+    this.stars.position.copy(c);
+    this.stars.scale.setScalar(k);
+  }
 
   private adaptResolution(dt: number, now: number) {
     this.frameTimes.push(dt);

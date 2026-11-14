@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AppData, Site } from "../data/load";
 import type { FieldData } from "../data/field";
+import type { GlobeData } from "../data/globe";
 import type { LayerId } from "../gpu/layers";
 import type { FinderResult } from "../gpu/finder";
 
@@ -21,6 +22,10 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  globe: GlobeData | null;
+  setGlobe: (g: GlobeData) => void;
+  orbitRequest: number;
+  requestOrbit: () => void;
   pinned: Site[];
   compareOpen: boolean;
   togglePin: (s: Site) => void;
@@ -58,6 +63,10 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  globe: null,
+  setGlobe: (globe) => set({ globe }),
+  orbitRequest: 0,
+  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d" })),
   pinned: [],
   compareOpen: false,
   togglePin: (site) =>

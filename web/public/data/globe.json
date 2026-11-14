@@ -1,0 +1,22 @@
+{
+  "globe": {
+    "file": "globe_8ppd.bin.gz",
+    "width": 2880,
+    "height": 1440,
+    "pixelsPerDegree": 8,
+    "stepMeters": 5.0,
+    "layout": "int16 [row][col] row 0 = 90N, col 0 starts at lon 0 east; value = height / stepMeters; stored as deltas along each row; gzip"
+  },
+  "polar": {
+    "file": "polar_240m.bin.gz",
+    "size": 1666,
+    "cellMeters": 240.0,
+    "firstCenterMeters": -199800.0,
+    "layout": "int16 meters [row][col], south polar stereographic like the field (row 0 = +y); deltas along each row; gzip"
+  },
+  "color": {
+    "file": "moon_color_4k.jpg",
+    "preview": "moon_color_1k.jpg",
+    "layout": "equirectangular, left edge = lon -180, NASA SVS CGI Moon Kit (LRO LROC)"
+  }
+}

@@ -109,6 +109,10 @@ export default function SitePanel() {
         <dd>{formatDuration(yearStats.night)}</dd>
       </dl>
 
+      {site.computedMs !== undefined && (
+        <div className="note">Horizon computed live on your GPU from NASA LOLA global elevation: 720 directions in {site.computedMs.toFixed(1)} ms.</div>
+      )}
+
       {site.published && (
         <div className="note">
           Validated: {site.published.source} reports {site.published.sunlit_pct}% sunlight for this peak. Coordinates moved{" "}

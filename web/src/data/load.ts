@@ -10,6 +10,7 @@ export interface Site {
   height_m: number;
   horizon: number[];
   published?: { lat: number; lon: number; sunlit_pct: number; source: string };
+  computedMs?: number;
 }
 
 export interface Station {
