@@ -89,7 +89,7 @@ def main():
             "missing": MISSING,
             "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip",
         },
-        "color": {"file": "moon_color_4k.jpg", "preview": "moon_color_1k.jpg", "layout": "equirectangular, left edge = lon -180, NASA SVS CGI Moon Kit (LRO LROC)"},
+        "color": {"file": "moon_color_8k.jpg", "preview": "moon_color_1k.jpg", "layout": "equirectangular, left edge = lon -180, NASA SVS CGI Moon Kit (LRO LROC)"},
     }
     (OUT / "globe.json").write_text(json.dumps(meta, indent=2))
     sizes = {p.name: p.stat().st_size for p in OUT.glob("*") if p.name.startswith(("globe_", "polar_", "moon_color"))}
