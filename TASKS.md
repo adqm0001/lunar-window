@@ -169,9 +169,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** same pattern as 26.
   - **Verify:** same as 26.
 
-- [ ] **28. Separate three.js chunk** (S)
+- [x] **28. Separate three.js chunk** (S)
   - **Files:** `web/vite.config.ts`.
-  - **Spec:** `build.rollupOptions.output.manualChunks: { three: ["three"] }` (and the three/examples imports resolve into it).
+  - **Spec:** `build.rollupOptions.output.manualChunks` as a function that returns `"three"` for any id under `/node_modules/three/`. The object form `{ three: ["three"] }` only takes the core package and leaves the three/examples imports (OrbitControls, EffectComposer and passes, CSS2DRenderer) in the main chunk.
   - **Verify:** `npm run build` shows a `three-*.js` chunk; the main chunk is below 500 kB minified; the app works from `npm run preview`.
 
 - [ ] **29. Remove dead rendering code** (S)
