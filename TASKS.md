@@ -149,7 +149,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
     4. Goal unreachable (column 2 dark always, full column): returns a `RoverFailure` (has `reason`).
   - **Verify:** `npm test` green.
 
-- [ ] **24. Tests: thermal model against Diviner** (M) — Depends on 20
+- [x] **24. Tests: thermal model against Diviner** (M) — Depends on 20
   - **Files:** new `src/lib/siteThermal.test.ts`, maybe `src/lib/testData.ts` (helper).
   - **Spec:** helper reads `web/public/data/ephem.json`, `ephem.bin` (float32), `dsn.bin` (int8) and `sites.json` with `node:fs`, and builds an `Ephemeris` (`{ startMs, stepHours, count, data, dsn, stations }`, see `src/data/load.ts`). Then `siteThermal(ephem, apollo11, 0, 24 * 365)`: `max ∈ [370, 400]`, `min ∈ [80, 100]`. `siteThermal(ephem, shackletonFloor, 0, 8760)`: `max < 110`, `iceDepth === 0`.
   - **Verify:** `npm test` green in < 10 s.
