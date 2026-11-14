@@ -174,7 +174,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `build.rollupOptions.output.manualChunks` as a function that returns `"three"` for any id under `/node_modules/three/`. The object form `{ three: ["three"] }` only takes the core package and leaves the three/examples imports (OrbitControls, EffectComposer and passes, CSS2DRenderer) in the main chunk.
   - **Verify:** `npm run build` shows a `three-*.js` chunk; the main chunk is below 500 kB minified; the app works from `npm run preview`.
 
-- [ ] **29. Remove dead rendering code** (S)
+- [x] **29. Remove dead rendering code** (S)
   - **Files:** `src/three/globe.ts`.
   - **Spec:** `buildGlobe`, `buildSkirt`, `globeMaterial`, `polarTexture`, `setPolarUniforms` and the `VERT`/`FRAG` shader strings they use are not referenced anywhere (`grep -rn` to confirm). Delete them. Keep `MOON_CENTER`, `dirFromLatLon`, `worldFromLatLon`, `latLonFromWorld`.
   - **Verify:** `npx tsc --noEmit -p .` and `npm run build` pass; app looks unchanged.
