@@ -3,6 +3,7 @@ import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
+import { craterTexture, CRATER_TEX_GLSL } from "./craterTexture";
 import { MOON_CENTER } from "./globe";
 import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
 import { GpuTileCache, TILE_CACHE_GLSL } from "./tileCache";
@@ -141,6 +142,7 @@ export class LodTerrain {
         uCamPos: { value: new THREE.Vector3() },
         uT64: { value: null },
         uQuality: { value: 1 },
+        uCraterTex: { value: craterTexture() },
         uCutOn: { value: 0 },
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
@@ -458,6 +460,19 @@ const vec3 CENTER = vec3(0.0, -1737.4, 0.0);
 
 ${PROCEDURAL_GLSL}
 ${TILE_CACHE_GLSL}
+${CRATER_TEX_GLSL}
+
+// The crater tile projected onto the sphere from three directions, blended by which way the
+// ground faces, so it covers the whole Moon without seams. Returns the 3D slope and halo.
+vec4 craterTri(vec3 pm, vec3 up) {
+  vec3 w = pow(abs(up), vec3(6.0));
+  w /= (w.x + w.y + w.z);
+  vec4 a = w.x > 0.02 ? craterDetailTex(pm.yz) : vec4(0.0);
+  vec4 b = w.y > 0.02 ? craterDetailTex(pm.zx) : vec4(0.0);
+  vec4 c = w.z > 0.02 ? craterDetailTex(pm.xy) : vec4(0.0);
+  vec3 G = w.x * vec3(0.0, a.x, a.y) + w.y * vec3(b.y, 0.0, b.x) + w.z * vec3(c.x, c.y, 0.0);
+  return vec4(G, w.x * a.w + w.y * b.w + w.z * c.w);
+}
 
 float hashf(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float h3(ivec3 c) { return float(pcg3(c.x, c.y, c.z) & 0xffffu) / 65535.0; }
@@ -568,20 +583,12 @@ void main() {
   float halo = 0.0;
   float footprint = max(camDist * 0.0012, 0.004);
   float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
-  if (uQuality > 0 && maxCell > footprint * 3.0 && camDist < 80.0) {
-    vec3 p = u * R_KM;
-    vec3 east = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
-    vec3 north = cross(u, east);
-    float e = max(footprint, 0.006);
-    float minCell = footprint * 4.0;
-    gHalo = 0.0;
-    float c0 = craterDetail(p, minCell, maxCell);
-    halo = gHalo;
-    float cx = craterDetail(p + east * e, minCell, maxCell);
-    float cy = craterDetail(p + north * e, minCell, maxCell);
-    vec3 eastW = vec3(east.y, -east.z, -east.x);
-    vec3 northW = vec3(north.y, -north.z, -north.x);
-    n = normalize(n - eastW * (cx - c0) / e - northW * (cy - c0) / e);
+  if (camDist < 140.0) {
+    vec4 cd = craterTri((vWorld - CENTER) * 1000.0, dW);
+    float fade = 1.0 - smoothstep(80.0, 140.0, camDist);
+    vec3 G = cd.xyz - dW * dot(cd.xyz, dW);
+    n = normalize(n - G * 0.85 * fade);
+    halo = cd.w * fade;
   }
 
   vec3 sv = normalize(uSunME - u * R_KM);
@@ -596,10 +603,10 @@ void main() {
     float hs = h0 + 2.0;
     float best = -1.5;
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
-    float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.05), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
+    float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.45), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
-    int steps = uQuality == 0 ? 36 : uQuality == 1 ? 60 : 90;
-    float grow = uQuality == 0 ? 1.16 : uQuality == 1 ? 1.1 : 1.075;
+    int steps = uQuality == 0 ? 28 : uQuality == 1 ? 42 : 70;
+    float grow = uQuality == 0 ? 1.2 : uQuality == 1 ? 1.14 : 1.095;
     for (int i = 0; i < 90; i++) {
       if (i >= steps) break;
       float delta = d / R_M;
@@ -607,13 +614,33 @@ void main() {
       vec3 q = cos(delta) * u + sin(delta) * sdir;
       float r2;
       float dh = demH(q, r2) - hs;
-      if (uQuality > 0 && camDist < 25.0 && i < 16) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.05)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
+      if (uQuality > 0 && camDist < 25.0 && i < 10) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.45)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
       best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
       if (best > sel + 0.02) break;
       d *= grow;
       if (d > 220000.0) break;
     }
     lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);
+  }
+
+  if (camDist < 140.0 && lit > 0.0) {
+    vec3 Ls = normalize(uSunWorld);
+    float sinE = dot(Ls, dW);
+    if (sinE > 0.05 && sinE < 0.65) {
+      vec3 aw = abs(dW);
+      vec3 pm = (vWorld - CENTER) * 1000.0;
+      vec2 m;
+      vec2 sd;
+      float wmax;
+      if (aw.x >= aw.y && aw.x >= aw.z) { m = pm.yz; sd = vec2(Ls.y, Ls.z); wmax = aw.x; }
+      else if (aw.y >= aw.z) { m = pm.zx; sd = vec2(Ls.z, Ls.x); wmax = aw.y; }
+      else { m = pm.xy; sd = vec2(Ls.x, Ls.y); wmax = aw.z; }
+      vec3 a6 = pow(aw, vec3(6.0));
+      float wn = pow(wmax, 6.0) / (a6.x + a6.y + a6.z);
+      float tanE = sinE / sqrt(max(1.0 - sinE * sinE, 1e-4));
+      float cs = craterShadow(m, normalize(sd + vec2(1e-6, 0.0)), tanE, footprint * 1000.0);
+      lit *= mix(1.0, cs, smoothstep(0.55, 0.85, wn) * (1.0 - smoothstep(80.0, 140.0, camDist)) * smoothstep(0.05, 0.1, sinE));
+    }
   }
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);

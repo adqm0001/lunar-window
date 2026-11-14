@@ -108,6 +108,12 @@ void main() {
     float fade = 1.0 - smoothstep(35.0, 60.0, camDist);
     n = normalize(n + vec3(-cd.x, 0.0, cd.y) * 0.85 * fade * uExaggeration);
     halo = cd.w * fade;
+    if (lit > 0.0 && sel > 3.0 && sel < 40.0) {
+      vec3 Ls = normalize(uSunWorld);
+      vec2 sd = normalize(vec2(Ls.x, -Ls.z) + vec2(1e-6, 0.0));
+      float cs = craterShadow(vMap, sd, tan(radians(sel)), camDist * 1000.0 * 0.0009);
+      lit *= mix(1.0, cs, fade * smoothstep(3.0, 6.0, sel));
+    }
   }
 
   vec3 L = normalize(uSunWorld);

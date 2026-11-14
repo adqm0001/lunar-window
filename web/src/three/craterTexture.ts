@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import { profile } from "../lib/procedural";
 
 // A seamless tile of small craters, built once at startup. Each texel holds the surface slope
 // (x, y), the height and a bright-ejecta "halo" value. Sampling it at a few scales gives crater
@@ -19,6 +18,21 @@ function rng(seed: number) {
   };
 }
 
+// Simple crater shape from lunar morphometry: parabolic bowl about 1/5 as deep as it is wide,
+// a raised rim, and ejecta thinning out as r^-3. Old craters (low "fresh") are eroded into
+// shallow, rimless cosine dips. Radius is 1 at the rim.
+function shape(r: number, fresh: number): number {
+  const d = 0.4 * fresh;
+  const rim = 0.08 * fresh;
+  let sharp: number;
+  if (r < 1) sharp = rim + d * (r * r - 1);
+  else sharp = (rim * (Math.pow(r, -3) - 0.064)) / 0.936;
+  const soft = -0.12 * 0.5 * (1 + Math.cos(Math.PI * Math.min(r / 1.35, 1)));
+  const k = Math.min(1, fresh * 1.6);
+  const v = soft * (1 - k) + sharp * k;
+  return r < 2.5 ? v : 0;
+}
+
 function build() {
   const rand = rng(20261114);
   const h = new Float32Array(N * N);
@@ -29,10 +43,10 @@ function build() {
       const cx = rand() * N;
       const cy = rand() * N;
       const radius = r * (0.85 + 0.3 * rand());
-      const fresh = Math.min(1, 0.3 + 0.7 * Math.pow(rand(), 0.8 + radius / 120));
+      const fresh = Math.pow(rand(), 2.2 + radius / 90);
       const ph = rand() * 6.283;
       const ext = Math.ceil(radius * 2.6);
-      const depth = radius * 0.62;
+      const depth = radius;
       for (let dy = -ext; dy <= ext; dy++) {
         const py = Math.floor(cy) + dy;
         const row = (((py % N) + N) % N) * N;
@@ -46,9 +60,9 @@ function build() {
           const rr = d / (radius * wob);
           if (rr >= 2.6) continue;
           const i = row + (((px % N) + N) % N);
-          if (rr < 2.2) h[i] += profile(rr, fresh) * depth;
-          if (fresh > 0.75) {
-            const v = (fresh - 0.75) * 4 * Math.exp(-((Math.max(rr - 0.85, 0) * 2.2) ** 2));
+          h[i] += shape(rr, fresh) * depth;
+          if (fresh > 0.8) {
+            const v = (fresh - 0.8) * 5 * Math.exp(-((Math.max(rr - 0.9, 0) * 1.8) ** 2));
             if (v > halo[i]) halo[i] = v;
           }
         }
@@ -117,6 +131,35 @@ vec4 craterTap(vec2 m, float size, float ang, vec2 off) {
   t.xy = transpose(R) * t.xy;
   return t;
 }
+// Cast shadows inside the crater tile: march from the pixel toward the Sun through the height
+// channel; if the terrain rises above the ray the pixel is shadowed. k is that scale's weight.
+float craterShadow1(vec2 m, float size, float ang, vec2 off, vec2 sd, float tanE, float fpm) {
+  float fpx = fpm / size * 1024.0;
+  if (fpx > 24.0) return 1.0;
+  float c = cos(ang);
+  float s = sin(ang);
+  mat2 R = mat2(c, s, -s, c);
+  vec2 uv = (R * m) / size + off;
+  vec2 d = R * sd / 1024.0;
+  float lod0 = log2(max(fpx, 1.0));
+  float h0 = textureLod(uCraterTex, uv, lod0).z;
+  float lit = 1.0;
+  float t = max(1.5, fpx);
+  for (int i = 0; i < 11; i++) {
+    float h = textureLod(uCraterTex, uv + d * t, max(lod0, log2(t * 0.2))).z;
+    lit = min(lit, clamp((h0 + t * tanE - h) / (t * 0.03) + 0.5, 0.0, 1.0));
+    t *= 1.6;
+    if (t > 340.0 || lit <= 0.0) break;
+  }
+  return lit;
+}
+float craterShadow(vec2 m, vec2 sd, float tanE, float fpm) {
+  float a = craterShadow1(m, 5200.0, 0.0, vec2(0.0), sd, tanE / 0.85, fpm);
+  float b = a > 0.0 ? craterShadow1(m, 1300.0, 2.1, vec2(0.37, 0.71), sd, tanE / (0.85 * 0.55), fpm) : 1.0;
+  float c = a * b > 0.0 ? craterShadow1(m, 330.0, 4.2, vec2(0.13, 0.52), sd, tanE / (0.85 * 0.3), fpm) : 1.0;
+  return a * b * c;
+}
+
 vec4 craterDetailTex(vec2 m) {
   vec4 a = craterTap(m, 5200.0, 0.0, vec2(0.0));
   vec4 b = craterTap(m, 1300.0, 2.1, vec2(0.37, 0.71));

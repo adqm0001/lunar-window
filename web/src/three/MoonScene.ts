@@ -446,6 +446,14 @@ export class MoonScene {
         target.add(v);
         this.camera.position.add(v);
       }
+      const lift = (this.keys.has("r") ? 1 : 0) - (this.keys.has("f") ? 1 : 0);
+      if (lift) {
+        const camUp = this.camera.position.clone().sub(MOON_CENTER).normalize();
+        const alt = Math.max(0.15, this.camera.position.distanceTo(MOON_CENTER) - this.groundRadius(camUp, 0.1));
+        const fast = this.keys.has("shift") ? 3 : 1;
+        this.camera.position.addScaledVector(camUp, lift * alt * 1.1 * fast * dt);
+        if (lift > 0 && this.camera.position.distanceTo(target) > this.controls.maxDistance * 0.97) this.flyToOrbit(1.8);
+      }
       const turn = (this.keys.has("e") ? 1 : 0) - (this.keys.has("q") ? 1 : 0);
       if (turn) {
         const off = this.camera.position.clone().sub(target).applyAxisAngle(up, -turn * 1.4 * dt);
@@ -477,8 +485,8 @@ export class MoonScene {
     const camRel = this.camera.position.clone().sub(MOON_CENTER);
     const alt = camRel.length() - R_MOON_KM;
     const focus = this.orbitMode ? camRel.normalize() : this.controls.target.clone().sub(MOON_CENTER).normalize();
-    const local = Math.max(focus.dot(sun), 0.16);
-    const surfaceGain = Math.pow(0.16 / local, 0.8);
+    const local = Math.max(focus.dot(sun), 0.2);
+    const surfaceGain = Math.pow(0.2 / local, 0.95);
     const ang = Math.acos(Math.max(-1, Math.min(1, camRel.normalize().dot(sun))));
     const brightestVisible = ang < Math.PI / 2 ? 1 : Math.cos(ang - Math.PI / 2);
     const diskGain = Math.pow(0.16 / Math.max(brightestVisible, 0.16), 0.55);
@@ -529,7 +537,7 @@ export class MoonScene {
     window.addEventListener("keydown", (e) => {
       if (typing(e) || e.ctrlKey || e.metaKey) return;
       const k = e.key.toLowerCase();
-      if (k.length === 1 && "wasdqe".includes(k)) this.keys.add(k);
+      if (k.length === 1 && "wasdqerf".includes(k)) this.keys.add(k);
       if (k === "shift") this.keys.add("shift");
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
@@ -544,6 +552,19 @@ export class MoonScene {
   }
 
   private spinOrbit(dt: number) {
+    const lift = (this.keys.has("r") ? 1 : 0) - (this.keys.has("f") ? 1 : 0);
+    if (lift) {
+      const off = this.camera.position.clone().sub(MOON_CENTER);
+      const alt = off.length() - R_MOON_KM;
+      const next = Math.min(this.controls.maxDistance - R_MOON_KM, Math.max(this.controls.minDistance - R_MOON_KM, alt * (1 + lift * 1.2 * dt)));
+      this.camera.position.copy(MOON_CENTER).addScaledVector(off.normalize(), R_MOON_KM + next);
+      if (lift < 0 && next <= this.controls.minDistance - R_MOON_KM + 1) {
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
+        if (hit) this.diveTo(hit.point);
+      }
+    }
     const moving = ["w", "a", "s", "d"].some((k) => this.keys.has(k));
     if (!moving) return;
     const off = this.camera.position.clone().sub(MOON_CENTER);

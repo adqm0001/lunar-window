@@ -94,7 +94,7 @@ export default function App() {
       <SitePanel />
       {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}
       <Timeline />
-      <div className="kbd-hint">WASD move · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
+      <div className="kbd-hint">WASD move · R F up/down · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
     </div>
   );
 }
