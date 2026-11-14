@@ -73,19 +73,38 @@ export function tileFor(lat: number, lon: number): number {
   return tileKey(tx, ty);
 }
 
+let lastMissing = -1;
+
+export function lastMissingGlobal64() {
+  return lastMissing;
+}
+
+function pix(gx: number, gy: number): number | null {
+  const W = COLS * TILE;
+  const x = ((gx % W) + W) % W;
+  const y = Math.max(0, Math.min(ROWS * TILE - 1, gy));
+  const tx = Math.floor(x / TILE);
+  const ty = Math.floor(y / TILE);
+  const key = tileKey(tx, ty);
+  const t = tiles.get(key);
+  if (!(t instanceof Int16Array)) {
+    lastMissing = key;
+    return null;
+  }
+  return t[(y - ty * TILE) * TILE + (x - tx * TILE)];
+}
+
 export function sampleGlobal64(lat: number, lon: number): number | null {
   const [x, y] = px(lat, lon);
-  const tx = Math.min(COLS - 1, Math.max(0, Math.floor(Math.max(0, x) / TILE)));
-  const ty = Math.min(ROWS - 1, Math.max(0, Math.floor(Math.max(0, y) / TILE)));
-  const t = tiles.get(tileKey(tx, ty));
-  if (!(t instanceof Int16Array)) return null;
-  const lx = Math.min(TILE - 1.001, Math.max(0, x - tx * TILE));
-  const ly = Math.min(TILE - 1.001, Math.max(0, y - ty * TILE));
-  const c0 = Math.floor(lx);
-  const r0 = Math.floor(ly);
-  const fc = lx - c0;
-  const fr = ly - r0;
-  const c1 = Math.min(TILE - 1, c0 + 1);
-  const r1 = Math.min(TILE - 1, r0 + 1);
-  return t[r0 * TILE + c0] * (1 - fc) * (1 - fr) + t[r0 * TILE + c1] * fc * (1 - fr) + t[r1 * TILE + c0] * (1 - fc) * fr + t[r1 * TILE + c1] * fc * fr;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  lastMissing = -1;
+  const a = pix(x0, y0);
+  const b = pix(x0 + 1, y0);
+  const c = pix(x0, y0 + 1);
+  const d = pix(x0 + 1, y0 + 1);
+  if (a === null || b === null || c === null || d === null) return null;
+  return a * (1 - fx) * (1 - fy) + b * fx * (1 - fy) + c * (1 - fx) * fy + d * fx * fy;
 }

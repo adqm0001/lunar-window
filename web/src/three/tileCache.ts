@@ -60,23 +60,26 @@ precision highp isampler2DArray;
 uniform isampler2DArray uT64;
 uniform isampler2D uT64Index;
 
+bool pix64(ivec2 g, out float v) {
+  int W = 48 * 480;
+  int x = ((g.x % W) + W) % W;
+  int y = clamp(g.y, 0, 24 * 480 - 1);
+  int tx = x / 480;
+  int ty = y / 480;
+  int layer = texelFetch(uT64Index, ivec2(tx, ty), 0).r;
+  if (layer < 0) { v = 0.0; return false; }
+  v = float(texelFetch(uT64, ivec3(x - tx * 480, y - ty * 480, layer), 0).r);
+  return true;
+}
+
 float h64(float latDeg, float lonDeg, out bool ok) {
-  ok = false;
   float px = mod(lonDeg + 360.0, 360.0) * 64.0 - 0.5;
   float py = (90.0 - latDeg) * 64.0 - 0.5;
-  int tx = clamp(int(floor(max(px, 0.0) / 480.0)), 0, 47);
-  int ty = clamp(int(floor(max(py, 0.0) / 480.0)), 0, 23);
-  int layer = texelFetch(uT64Index, ivec2(tx, ty), 0).r;
-  if (layer < 0) return 0.0;
-  float lx = clamp(px - float(tx) * 480.0, 0.0, 478.999);
-  float ly = clamp(py - float(ty) * 480.0, 0.0, 478.999);
-  ivec2 p = ivec2(floor(vec2(lx, ly)));
-  vec2 f = vec2(lx, ly) - floor(vec2(lx, ly));
-  float a = float(texelFetch(uT64, ivec3(p, layer), 0).r);
-  float b = float(texelFetch(uT64, ivec3(p + ivec2(1, 0), layer), 0).r);
-  float d = float(texelFetch(uT64, ivec3(p + ivec2(0, 1), layer), 0).r);
-  float e = float(texelFetch(uT64, ivec3(p + ivec2(1, 1), layer), 0).r);
-  ok = true;
+  ivec2 p = ivec2(floor(vec2(px, py)));
+  vec2 f = vec2(px, py) - floor(vec2(px, py));
+  float a; float b; float d; float e;
+  ok = pix64(p, a) && pix64(p + ivec2(1, 0), b) && pix64(p + ivec2(0, 1), d) && pix64(p + ivec2(1, 1), e);
+  if (!ok) return 0.0;
   return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);
 }
 `;

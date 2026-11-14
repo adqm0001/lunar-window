@@ -4,7 +4,7 @@ import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
 import { MOON_CENTER } from "./globe";
-import { onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
+import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
 import { GpuTileCache, TILE_CACHE_GLSL } from "./tileCache";
 
 const GRID = 32;
@@ -68,7 +68,8 @@ export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpac
       base = h64;
       res = 0.474;
     } else {
-      surf.want = tileFor(lat, lon);
+      const miss = lastMissingGlobal64();
+      surf.want = miss >= 0 ? miss : tileFor(lat, lon);
       base = globeHeight(g, lat, lon);
     }
   } else base = globeHeight(g, lat, lon);
@@ -222,7 +223,7 @@ export class LodTerrain {
       this.build(n);
       this.changedFlag = true;
     }
-    this.hasWork = this.queue.some((n) => !n.mesh || n.dirty);
+    this.hasWork = this.changedFlag || this.queue.some((n) => !n.mesh || n.dirty);
 
     this.meshes = [];
     for (const n of this.nodes.values()) {
