@@ -524,6 +524,7 @@ void main() {
   float h0 = demH(u, res);
 
   vec3 n = normalize(vNormal);
+  float halo = 0.0;
   float footprint = max(camDist * 0.0012, 0.004);
   float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
   if (uQuality > 0 && maxCell > footprint * 3.0 && camDist < 80.0) {
@@ -532,7 +533,9 @@ void main() {
     vec3 north = cross(u, east);
     float e = max(footprint, 0.006);
     float minCell = footprint * 4.0;
+    gHalo = 0.0;
     float c0 = craterDetail(p, minCell, maxCell);
+    halo = gHalo;
     float cx = craterDetail(p + east * e, minCell, maxCell);
     float cy = craterDetail(p + north * e, minCell, maxCell);
     vec3 eastW = vec3(east.y, -east.z, -east.x);
@@ -579,6 +582,7 @@ void main() {
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
   vec3 albedo = mix(mapAlbedo, polarAlbedo, polarW);
   albedo *= 0.92 + 0.16 * vnoise(vec2(lon, lat) * 3.0);
+  albedo *= 1.0 + 0.55 * halo;
 
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);

@@ -55,7 +55,22 @@ function layer(px: number, py: number, pz: number, cell: number, seed: number, d
     const sizeU = (h2 >>> 16) / 65536;
     const radius = cell * (0.07 + 0.36 * sizeU * sizeU);
     const fresh = 0.12 + 0.88 * Math.pow(((h2 >>> 8) & 0xff) / 255, 3.2);
-    const r = Math.hypot(sx, sy, sz) / radius;
+    const nx = fx / fl;
+    const ny = fy / fl;
+    const nz = fz / fl;
+    let t1x = -ny;
+    let t1y = nx;
+    let t1z = 0;
+    const tl = Math.hypot(t1x, t1y) || 1;
+    t1x /= tl;
+    t1y /= tl;
+    const t2x = ny * t1z - nz * t1y;
+    const t2y = nz * t1x - nx * t1z;
+    const t2z = nx * t1y - ny * t1x;
+    const ang = Math.atan2(sx * t2x + sy * t2y + sz * t2z, sx * t1x + sy * t1y + sz * t1z);
+    const ph = (hh >>> 24) / 40.7;
+    const wobble = 1 + 0.1 * Math.sin(2 * ang + ph) + 0.06 * Math.sin(3 * ang + 2.1 * ph) + 0.035 * Math.sin(5 * ang + 3.3 * ph);
+    const r = Math.hypot(sx, sy, sz) / (radius * wobble);
     if (r < 2.2) h += profile(r, fresh) * radius * 0.3;
   }
   return h;
@@ -92,6 +107,8 @@ float craterProfile(float r, float fresh) {
   return 0.0;
 }
 
+float gHalo = 0.0;
+
 float craterLayer(vec3 p, float cell, int seed, float density) {
   vec3 g = p / cell - 0.5;
   ivec3 b = ivec3(floor(g));
@@ -106,8 +123,17 @@ float craterLayer(vec3 p, float cell, int seed, float density) {
     float sizeU = float(h2 >> 16u) / 65536.0;
     float radius = cell * (0.07 + 0.36 * sizeU * sizeU);
     float fresh = 0.12 + 0.88 * pow(float((h2 >> 8u) & 0xffu) / 255.0, 3.2);
-    float r = length(s) / radius;
-    if (r < 2.2) h += craterProfile(r, fresh) * radius * 0.3;
+    vec3 nn = normalize(f);
+    vec3 t1 = normalize(vec3(-nn.y, nn.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+    vec3 t2 = cross(nn, t1);
+    float ang = atan(dot(s, t2), dot(s, t1));
+    float ph = float(hh >> 24u) / 40.7;
+    float wobble = 1.0 + 0.1 * sin(2.0 * ang + ph) + 0.06 * sin(3.0 * ang + 2.1 * ph) + 0.035 * sin(5.0 * ang + 3.3 * ph);
+    float r = length(s) / (radius * wobble);
+    if (r < 2.2) {
+      h += craterProfile(r, fresh) * radius * 0.3;
+      if (fresh > 0.7 && r < 2.6) gHalo = max(gHalo, (fresh - 0.7) * 2.6 * exp(-pow(max(r - 0.85, 0.0) * 2.2, 2.0)));
+    }
   }
   return h;
 }
