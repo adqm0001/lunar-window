@@ -10,7 +10,7 @@ import type { FieldData } from "../data/field";
 import { fieldHeight, inField } from "../data/field";
 import type { Site } from "../data/load";
 import type { Vec3 } from "../lib/astro";
-import { toMap, R_MOON_M } from "../lib/astro";
+import { toLatLon, toMap } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
@@ -233,10 +233,10 @@ export class MoonScene {
         const i = r * n + c;
         const x = (c + 0.5) * cell - E + cx;
         const y = E - (r + 0.5) * cell + cy;
-        const h = f.heights[i];
-        pos[i * 3] = x / 1000;
-        pos[i * 3 + 1] = this.worldY(x, y, h);
-        pos[i * 3 + 2] = -y / 1000;
+        const w = this.mapToWorld(x, y, f.heights[i]);
+        pos[i * 3] = w.x;
+        pos[i * 3 + 1] = w.y;
+        pos[i * 3 + 2] = w.z;
         map[i * 2] = x;
         map[i * 2 + 1] = y;
       }
@@ -265,8 +265,11 @@ export class MoonScene {
     return { geometry };
   }
 
-  worldY(x: number, y: number, h: number) {
-    return (h * EXAGGERATION - (x * x + y * y) / (2 * R_MOON_M)) / 1000;
+  // Exact placement of a polar map point (metres) at height h (metres) on the sphere.
+  // (A flat-map shortcut was fine near the pole but kilometres off for areas far from it.)
+  mapToWorld(x: number, y: number, h: number): THREE.Vector3 {
+    const [lat, lon] = toLatLon(x, y);
+    return worldFromLatLon(lat, lon, h * EXAGGERATION);
   }
 
   private makeStars() {
@@ -339,8 +342,12 @@ export class MoonScene {
     u.uGOverlayMix.value = 0.9;
   }
 
+  private overlayOn = false;
+
   setOverlay(canvas: HTMLCanvasElement | null) {
     this.dirty = true;
+    this.overlayOn = !!canvas;
+    this.updateHoles();
     const u = this.terrainMat.uniforms;
     if (!canvas) {
       u.uOverlayMix.value = 0;
@@ -363,7 +370,7 @@ export class MoonScene {
       return worldFromLatLon(site.lat, site.lon, globeHeight(this.globe, site.lat, site.lon));
     }
     const h = fieldHeight(this.field, x, y) ?? site.height_m;
-    return new THREE.Vector3(x / 1000, this.worldY(x, y, h), -y / 1000);
+    return this.mapToWorld(x, y, h);
   }
 
   setSites(sites: Site[]) {
@@ -376,6 +383,7 @@ export class MoonScene {
       if (!p) continue;
       const group = new THREE.Group();
       group.position.copy(p);
+      group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.clone().sub(MOON_CENTER).normalize());
       const stem = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.6, 0)]),
         new THREE.LineBasicMaterial({ color: 0xaab6ff, transparent: true, opacity: 0.55 }),
@@ -889,7 +897,11 @@ export class MoonScene {
       ray.setFromCamera(ndc, this.camera);
       const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
       if (!hit) return;
-      if (hit.object === this.terrainMesh) this.onPick?.(hit.point.x * 1000, -hit.point.z * 1000);
+      if (hit.object === this.terrainMesh) {
+        const [plat, plon] = latLonFromWorld(hit.point);
+        const [mx, my] = toMap(plat, plon);
+        this.onPick?.(mx, my);
+      }
       else this.onPickLatLon?.(...latLonFromWorld(hit.point));
     });
   }
@@ -1025,11 +1037,15 @@ export class MoonScene {
     this.setSites(this.lastSites);
   }
 
+  // Detailed areas away from the pole are built from coarser terrain than the globe around them,
+  // so they only replace it while a data layer is shown on them. The polar patch always shows.
   private updateHoles() {
     const cx = this.field.meta.centerX ?? 0;
     const cy = this.field.meta.centerY ?? 0;
     const e = this.field.meta.extentMeters;
-    this.lod?.material.uniforms.uHole.value.set(cx, cy, e);
+    const show = !this.field.meta.label || this.overlayOn;
+    if (this.terrainMesh) this.terrainMesh.visible = show;
+    this.lod?.material.uniforms.uHole.value.set(cx, cy, show ? e : 0);
   }
 
   // Removing a parent group does not delete child label elements from the page, so do it by hand.
@@ -1102,7 +1118,8 @@ export class MoonScene {
     const x = (col + 0.5) * cell - E + (f.meta.centerX ?? 0);
     const y = E - (row + 0.5) * cell + (f.meta.centerY ?? 0);
     const h = fieldHeight(f, x, y) ?? 0;
-    return new THREE.Vector3(x / 1000, this.worldY(x, y, h) + lift, -y / 1000);
+    const p = this.mapToWorld(x, y, h);
+    return p.addScaledVector(p.clone().sub(MOON_CENTER).normalize(), lift);
   }
 
   setRoute(route: RoverRoute | null) {
@@ -1170,7 +1187,9 @@ export class MoonScene {
     const col = new Float32Array(points.length * 3);
     points.forEach((pt, i) => {
       const h = fieldHeight(this.field, pt.x, pt.y) ?? 0;
-      pos.set([pt.x / 1000, this.worldY(pt.x, pt.y, h) + 0.012, -pt.y / 1000], i * 3);
+      const p = this.mapToWorld(pt.x, pt.y, h);
+      p.addScaledVector(p.clone().sub(MOON_CENTER).normalize(), 0.012);
+      pos.set([p.x, p.y, p.z], i * 3);
       col.set(pt.ok ? [0.22, 0.85, 0.55] : [0.95, 0.3, 0.36], i * 3);
     });
     const g = new THREE.BufferGeometry();

@@ -160,9 +160,19 @@ float craterShadow(vec2 m, vec2 sd, float tanE, float fpm) {
   return a * b * c;
 }
 
+// slow random variation, used to blend two copies of the tile so the pattern never repeats visibly
+float ctHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float ctNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(ctHash(i), ctHash(i + vec2(1.0, 0.0)), f.x), mix(ctHash(i + vec2(0.0, 1.0)), ctHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 vec4 craterDetailTex(vec2 m) {
-  vec4 a = craterTap(m, 5200.0, 0.0, vec2(0.0));
-  vec4 b = craterTap(m, 1300.0, 2.1, vec2(0.37, 0.71));
+  float w = smoothstep(0.3, 0.7, ctNoise(m / 7300.0));
+  vec4 a = mix(craterTap(m, 5200.0, 0.0, vec2(0.0)), craterTap(m, 4300.0, 1.3, vec2(0.61, 0.27)), w);
+  float w2 = smoothstep(0.3, 0.7, ctNoise(m / 1900.0 + 17.0));
+  vec4 b = mix(craterTap(m, 1300.0, 2.1, vec2(0.37, 0.71)), craterTap(m, 1070.0, 5.0, vec2(0.83, 0.44)), w2);
   vec4 c = craterTap(m, 330.0, 4.2, vec2(0.13, 0.52));
   return vec4(a.xy + b.xy * 0.55 + c.xy * 0.3, 0.0, max(a.w, max(b.w * 0.7, c.w * 0.4)));
 }

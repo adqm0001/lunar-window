@@ -600,7 +600,7 @@ void main() {
 
   float kk = 2.0 * R_M * tan(PI / 4.0 + latR / 2.0);
   vec2 mp = vec2(kk * sin(lonR), kk * cos(lonR));
-  if (uHole.z > 0.0 && lat < -75.0 && abs(mp.x - uHole.x) < uHole.z && abs(mp.y - uHole.y) < uHole.z) discard;
+  if (uHole.z > 0.0 && lat < -72.0 && abs(mp.x - uHole.x) < uHole.z && abs(mp.y - uHole.y) < uHole.z) discard;
 
   float camDist = length(uCamPos - vWorld);
   float res;

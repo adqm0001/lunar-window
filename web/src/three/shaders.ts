@@ -104,28 +104,32 @@ void main() {
 
   float camDist = length(cameraPosition - vWorld);
   vec3 n = normalize(vNormal);
+  // world directions of the map's x and y axes here, and the Sun's direction in map terms
+  vec3 eastW = vec3(east.y, -east.z, -east.x);
+  vec3 northW = vec3(north.y, -north.z, -north.x);
+  vec3 mxW = sin(lon) * northW + cos(lon) * eastW;
+  vec3 myW = cos(lon) * northW - sin(lon) * eastW;
+  float sE = dot(sv, east);
+  float sN = dot(sv, north);
+  vec2 sunMap = normalize(sE * vec2(cos(lon), -sin(lon)) + sN * vec2(sin(lon), cos(lon)) + vec2(1e-6, 0.0));
   float halo = 0.0;
   if (camDist < 60.0) {
     vec4 cd = craterDetailTex(vMap);
     float fade = 1.0 - smoothstep(35.0, 60.0, camDist);
-    n = normalize(n + vec3(-cd.x, 0.0, cd.y) * 0.85 * fade * uExaggeration);
+    n = normalize(n - (cd.x * mxW + cd.y * myW) * 0.85 * fade * uExaggeration);
     halo = cd.w * fade;
     if (lit > 0.0 && sel > 3.0 && sel < 40.0) {
-      vec3 Ls = normalize(uSunWorld);
-      vec2 sd = normalize(vec2(Ls.x, -Ls.z) + vec2(1e-6, 0.0));
-      float cs = craterShadow(vMap, sd, tan(radians(sel)), camDist * 1000.0 * 0.0009);
+      float cs = craterShadow(vMap, sunMap, tan(radians(sel)), camDist * 1000.0 * 0.0009);
       lit *= mix(1.0, cs, fade * smoothstep(3.0, 6.0, sel));
     }
   }
   float rockAlb = 1.0;
   if (camDist < 0.3) {
     float fd = 1.0 - smoothstep(0.12, 0.3, camDist);
-    vec3 Lr = normalize(uSunWorld);
-    vec2 sdr = normalize(vec2(Lr.x, -Lr.z) + vec2(1e-6, 0.0));
     float rmask;
     vec2 g = groundDetail(vMap, rmask);
-    n = normalize(n + vec3(-g.x, 0.0, g.y) * fd);
-    if (lit > 0.0 && sel > 0.0) lit *= mix(1.0, rockShadow(vMap, sdr, tan(radians(sel))), fd);
+    n = normalize(n - (g.x * mxW + g.y * myW) * fd);
+    if (lit > 0.0 && sel > 0.0) lit *= mix(1.0, rockShadow(vMap, sunMap, tan(radians(sel))), fd);
     rockAlb = mix(1.0, 1.2, rmask * fd);
   }
 
