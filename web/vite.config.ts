@@ -28,4 +28,12 @@ export default defineConfig({
   base: "./",
   plugins: [react(), devShots()],
   server: { port: 5173, watch: { usePolling: true, interval: 300 } },
+  build: {
+    rollupOptions: {
+      output: {
+        // Matches by path so the three/examples imports (controls, post-processing, CSS2D) share the chunk.
+        manualChunks: (id) => (id.includes("/node_modules/three/") ? "three" : undefined),
+      },
+    },
+  },
 });
