@@ -13,6 +13,7 @@ export default function LayerControls() {
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
   const poleField = useApp((s) => s.poleField);
+  const cutaway = useApp((s) => s.cutaway);
   const regionStatus = useApp((s) => s.regionStatus);
   const hasFinder = useApp((s) => !!s.finder);
   const hasSurvival = useApp((s) => !!s.survival);
@@ -42,6 +43,9 @@ export default function LayerControls() {
         <span className="chip-sep" />
         <button className="chip moon" onClick={() => useApp.getState().requestOrbit()} title="Zoom out to the whole Moon">
           ◐ Whole Moon
+        </button>
+        <button className={`chip moon ${cutaway ? "sel" : ""}`} onClick={() => useApp.getState().toggleCutaway()} title="Slice the Moon open to see its layers">
+          ◔ Inside the Moon
         </button>
         <button className={`chip find ${porkchopOpen ? "sel" : ""}`} onClick={() => useApp.getState().setPorkchopOpen(!porkchopOpen)}>
           ▦ Landing dates

@@ -16,6 +16,7 @@ import type { GlobeData } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, type Quality } from "./lod";
+import { Cutaway } from "./cutaway";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
 import type { ArtemisRegion } from "../data/artemis";
@@ -61,6 +62,9 @@ export class MoonScene {
   private lastRender = 0;
   private quality: Quality = "balanced";
   private bloom!: UnrealBloomPass;
+  private cutaway = new Cutaway();
+  private cutOn = false;
+  private cutPending = false;
   private scatter: THREE.Points | null = null;
   private regionGroup = new THREE.Group();
   private labelObjs: CSS2DObject[] = [];
@@ -104,6 +108,7 @@ export class MoonScene {
     this.scene.background = new THREE.Color(0x000000);
     this.stars = this.makeStars();
     this.scene.add(this.stars);
+    this.scene.add(this.cutaway.group);
 
     const { geometry } = this.makeTerrain();
     const h = field.meta.horizon;
@@ -130,6 +135,9 @@ export class MoonScene {
         uEarthWorld: { value: new THREE.Vector3(0, 1, 0) },
         uEarthshine: { value: 0 },
         uExaggeration: { value: EXAGGERATION },
+        uCutOn: { value: 0 },
+        uCutA: { value: new THREE.Vector3(1, 0, 0) },
+        uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uTime: { value: 0 },
       },
     });
@@ -471,6 +479,7 @@ export class MoonScene {
       if (f.t >= 1) {
         this.flight = null;
         this.configureControls(f.orbit);
+        if (this.cutPending) this.applyCut();
       }
       this.dirty = true;
     } else if (this.controls.update()) {
@@ -495,8 +504,13 @@ export class MoonScene {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
+    if (this.lod) {
+      this.scene.remove(this.lod.group);
+      this.lod.dispose();
+    }
     this.lod = new LodTerrain(g, tex);
     this.lod.setQuality(this.quality);
+    this.setCutUniforms(this.cutOn && !this.cutPending);
     this.globeMats = [this.lod.material];
     this.updateHoles();
     this.scene.add(this.lod.group);
@@ -563,7 +577,8 @@ export class MoonScene {
       o.getWorldPosition(p);
       const v = p.sub(MOON_CENTER);
       const toCam = cam.clone().sub(v);
-      o.visible = v.dot(toCam) / (v.length() * toCam.length()) > -0.08;
+      const inCut = this.cutOn && !this.cutPending && v.dot(this.cutaway.a) > 0 && v.dot(this.cutaway.b) > 0;
+      o.visible = !inCut && v.dot(toCam) / (v.length() * toCam.length()) > -0.08;
     }
   }
 
@@ -687,6 +702,39 @@ export class MoonScene {
     this.lod?.setQuality(q);
     this.resize();
     this.dirty = true;
+  }
+
+  setCutaway(on: boolean) {
+    this.cutOn = on;
+    if (!on) {
+      this.cutPending = false;
+      this.cutaway.setVisible(false);
+      this.setCutUniforms(false);
+      this.dirty = true;
+      return;
+    }
+    const alt = this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM;
+    if (alt < 1500) {
+      this.cutPending = true;
+      this.flyToOrbit();
+    } else this.applyCut();
+  }
+
+  private applyCut() {
+    this.cutPending = false;
+    if (!this.cutOn) return;
+    this.cutaway.orient(this.camera);
+    this.cutaway.setVisible(true);
+    this.setCutUniforms(true);
+    this.dirty = true;
+  }
+
+  private setCutUniforms(on: boolean) {
+    for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) {
+      m.uniforms.uCutOn.value = on ? 1 : 0;
+      m.uniforms.uCutA.value.copy(this.cutaway.a);
+      m.uniforms.uCutB.value.copy(this.cutaway.b);
+    }
   }
 
   invalidate() {

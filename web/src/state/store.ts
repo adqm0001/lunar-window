@@ -26,6 +26,8 @@ interface AppState {
   view: "3d" | "2d";
   cinema: boolean;
   finderOpen: boolean;
+  cutaway: boolean;
+  toggleCutaway: () => void;
   quality: Quality;
   setQuality: (q: Quality) => void;
   porkchopOpen: boolean;
@@ -98,6 +100,8 @@ export const useApp = create<AppState>((set, get) => ({
   view: "3d",
   cinema: false,
   finderOpen: false,
+  cutaway: false,
+  toggleCutaway: () => set((s) => ({ cutaway: !s.cutaway, view: "3d" })),
   quality: loadQuality(),
   setQuality: (quality) => {
     try {

@@ -141,6 +141,9 @@ export class LodTerrain {
         uCamPos: { value: new THREE.Vector3() },
         uT64: { value: null },
         uQuality: { value: 1 },
+        uCutOn: { value: 0 },
+        uCutA: { value: new THREE.Vector3(1, 0, 0) },
+        uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uT64Index: { value: null },
       },
     });
@@ -389,6 +392,7 @@ export class LodTerrain {
   dispose() {
     for (const n of this.nodes.values()) n.mesh?.geometry.dispose();
     this.nodes.clear();
+    this.material.dispose();
   }
 }
 
@@ -438,6 +442,9 @@ uniform float uEarthshine;
 uniform vec3 uHole;
 uniform vec3 uCamPos;
 uniform int uQuality;
+uniform float uCutOn;
+uniform vec3 uCutA;
+uniform vec3 uCutB;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSpacing;
@@ -509,6 +516,10 @@ float demH(vec3 u, out float res) {
 }
 
 void main() {
+  if (uCutOn > 0.5) {
+    vec3 pc = vWorld - vec3(0.0, -1737.4, 0.0);
+    if (dot(pc, uCutA) > 0.0 && dot(pc, uCutB) > 0.0) discard;
+  }
   vec3 dW = normalize(vWorld - CENTER);
   vec3 u = vec3(-dW.z, dW.x, -dW.y);
   float latR = asin(clamp(u.z, -1.0, 1.0));

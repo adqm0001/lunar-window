@@ -16,6 +16,9 @@ import ComparePanel from "./components/ComparePanel";
 import LanderPanel from "./components/LanderPanel";
 import PorkchopPanel from "./components/PorkchopPanel";
 
+let startedField = false;
+let startedData = false;
+
 export default function App() {
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
@@ -44,13 +47,16 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (startedData) return;
+    startedData = true;
     loadAppData((fraction, label) => setProgress({ fraction, label }))
       .then(setData)
       .catch((e: Error) => setError(e.message));
   }, [setData]);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || startedField) return;
+    startedField = true;
     const s = useApp.getState();
     loadField(s.setFieldProgress)
       .then(s.setField)

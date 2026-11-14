@@ -31,6 +31,9 @@ uniform vec3 uEarth;
 uniform vec3 uEarthWorld;
 uniform float uEarthshine;
 uniform float uExaggeration;
+uniform float uCutOn;
+uniform vec3 uCutA;
+uniform vec3 uCutB;
 varying vec2 vMap;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -105,6 +108,10 @@ float detailHeight(vec2 p, float lod) {
 }
 
 void main() {
+  if (uCutOn > 0.5) {
+    vec3 pc = vWorld - vec3(0.0, -1737.4, 0.0);
+    if (dot(pc, uCutA) > 0.0 && dot(pc, uCutB) > 0.0) discard;
+  }
   float rho = length(vMap);
   float lat = -(PI / 2.0 - 2.0 * atan(rho / (2.0 * R_M)));
   float lon = atan(vMap.x, vMap.y);
