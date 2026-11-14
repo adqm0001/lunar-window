@@ -39,6 +39,10 @@ interface AppState {
   setActiveField: (f: FieldData) => void;
   landerOpen: boolean;
   roverOpen: boolean;
+  tourStep: number | null;
+  setTourStep: (n: number | null) => void;
+  validationOpen: boolean;
+  setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
   setRoverOpen: (o: boolean) => void;
   setRover: (r: RoverRoute | RoverFailure | null) => void;
@@ -132,6 +136,10 @@ export const useApp = create<AppState>((set, get) => ({
     })),
   landerOpen: false,
   roverOpen: false,
+  tourStep: null,
+  setTourStep: (tourStep) => set({ tourStep }),
+  validationOpen: false,
+  setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,
   setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
   setRover: (rover) => set({ rover }),

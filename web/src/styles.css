@@ -244,3 +244,9 @@ button { font: inherit; color: inherit; }
 .diff.good { color: #3ddc97; }
 .btn.rec { color: #ff8a8a; }
 .btn.rec.on { background: rgba(255,70,70,0.18); border-color: rgba(255,90,90,0.6); color: #fff; }
+.tour-card { position: absolute; left: 50%; transform: translateX(-50%); bottom: 182px; width: min(520px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 12px; z-index: 60; border: 1px solid rgba(139,156,255,0.45); }
+.tour-count { font: 10px var(--mono); color: var(--muted); letter-spacing: 0.08em; }
+.tour-title { font-size: 15px; font-weight: 600; margin: 3px 0 6px; }
+.tour-text { font-size: 12.5px; line-height: 1.55; color: var(--text); }
+.tour-nav { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.chip.tour-btn { color: #c7cfff; border-color: rgba(139,156,255,0.4); }

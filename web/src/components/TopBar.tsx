@@ -13,7 +13,9 @@ export default function TopBar() {
   const quality = useApp((s) => s.quality);
   const setQuality = useApp((s) => s.setQuality);
   const [copied, setCopied] = useState<null | boolean>(null);
-  const [validation, setValidation] = useState(false);
+  const validation = useApp((s) => s.validationOpen);
+  const setValidation = useApp((s) => s.setValidationOpen);
+  const touring = useApp((s) => s.tourStep !== null);
   const share = async () => {
     setCopied(await copyShareLink());
     setTimeout(() => setCopied(null), 2200);
@@ -36,6 +38,11 @@ export default function TopBar() {
           </button>
         ))}
       </div>
+      {!touring && (
+        <button className="chip tour-btn" onClick={() => useApp.getState().setTourStep(0)} title="A one-minute guided tour of what Lunar Window does">
+          ▶ Tour
+        </button>
+      )}
       <button className="chip" onClick={() => setValidation(true)} title="How every number is checked against NASA tools and published measurements">
         ✓ Validation
       </button>

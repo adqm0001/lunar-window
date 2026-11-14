@@ -16,6 +16,7 @@ import FinderPanel from "./components/FinderPanel";
 import ComparePanel from "./components/ComparePanel";
 import LanderPanel from "./components/LanderPanel";
 import RoverPanel from "./components/RoverPanel";
+import Tour from "./components/Tour";
 import PorkchopPanel from "./components/PorkchopPanel";
 
 let startedField = false;
@@ -104,6 +105,7 @@ export default function App() {
       <SitePanel />
       {porkchopOpen ? <PorkchopPanel /> : compareOpen && <ComparePanel />}
       <Timeline />
+      <Tour />
       <div className="kbd-hint">WASD move · R F up/down · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
     </div>
   );
