@@ -212,7 +212,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 4: Phones and accessibility
 
-- [ ] **36. Pinch zoom in 2D map mode** (S)
+- [x] **36. Pinch zoom in 2D map mode** (S)
   - **Files:** `src/three/MoonScene.ts` (`bindMapInput`).
   - **Spec:** track active pointers by `pointerId`. With two pointers, scale `this.mapDist` by the ratio of previous to current finger distance (clamp 0.6–3500 km), and suppress panning while two are down.
   - **Verify:** Chrome DevTools device mode with touch emulation, or a real phone: pinch zooms the 2D map.
