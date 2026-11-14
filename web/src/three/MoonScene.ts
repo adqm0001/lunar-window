@@ -17,6 +17,8 @@ import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
+import { LanderModel } from "./landerModel";
+import { altaz, localFrame } from "../lib/astro";
 import type { GlobalOverlay } from "../gpu/globalOverlay";
 import { craterTexture } from "./craterTexture";
 import { R_MOON_KM } from "../lib/astro";
@@ -74,6 +76,12 @@ export class MoonScene {
   private dragging = false;
   private upDirty = false;
   private sunGain = 1;
+  private lander = new LanderModel();
+  private landerSite: Site | null = null;
+  private landerMode = "vertical";
+  private landerAz = -1;
+  private landerFixedAz = 0;
+  private lastSunMe: Vec3 = [1, 0, 0];
   private mapMode = false;
   private mapTarget = new THREE.Vector3();
   private mapDist = 120;
@@ -132,6 +140,7 @@ export class MoonScene {
     this.stars = this.makeStars();
     this.scene.add(this.stars);
     this.scene.add(this.cutaway.group);
+    this.scene.add(this.lander.group, this.lander.lights);
 
     const { geometry } = this.makeTerrain();
     const h = field.meta.horizon;
@@ -281,6 +290,8 @@ export class MoonScene {
 
   setBodies(sunMe: Vec3, earthMe: Vec3, hour: number) {
     this.dirty = true;
+    this.lastSunMe = sunMe;
+    this.updateLander();
     const s = meToWorld(sunMe);
     const e = meToWorld(earthMe);
     this.terrainMat.uniforms.uSun.value.set(sunMe[0], sunMe[1], sunMe[2]);
@@ -421,6 +432,48 @@ export class MoonScene {
     return this.renderer.domElement;
   }
 
+  // 3D lander standing at a site, its solar panel facing a fixed azimuth or tracking the Sun
+  setLander(site: Site | null, mode: string, panelAz: number) {
+    this.landerSite = site;
+    this.landerMode = mode;
+    this.landerAz = panelAz;
+    if (site && panelAz < 0) {
+      // "face the Sun at landing": freeze the panel toward where the Sun is now
+      const f = localFrame(site.lat, site.lon);
+      this.landerFixedAz = altaz(this.lastSunMe, f, R_MOON_KM + site.height_m / 1000).az;
+    }
+    this.updateLander();
+  }
+
+  private updateLander() {
+    const site = this.landerSite;
+    const p = site ? this.sitePosition(site) : null;
+    this.lander.setVisible(!!p);
+    if (!site || !p) return;
+    const f = localFrame(site.lat, site.lon);
+    const up = p.clone().sub(MOON_CENTER).normalize();
+    const north = new THREE.Vector3(f.north[1], -f.north[2], -f.north[0]);
+    this.lander.place(p, up, north);
+    const sun = altaz(this.lastSunMe, f, R_MOON_KM + site.height_m / 1000);
+    const az = this.landerMode === "track" ? sun.az : this.landerAz >= 0 ? this.landerAz : this.landerFixedAz;
+    this.lander.setPanel(this.landerMode, az);
+    this.lander.setSun(this.sunDir);
+    this.dirty = true;
+  }
+
+  viewLander() {
+    const site = this.landerSite;
+    const p = site ? this.sitePosition(site) : null;
+    if (!p) return;
+
+    const up = p.clone().sub(MOON_CENTER).normalize();
+    const away = this.sunDir.clone().projectOnPlane(up);
+    if (away.lengthSq() < 1e-6) away.set(1, 0, 0).projectOnPlane(up);
+    const side = away.clone().normalize().cross(up).multiplyScalar(0.012);
+    const offset = away.normalize().multiplyScalar(-0.022).add(side).add(up.clone().multiplyScalar(0.007));
+    this.startFlight(p.clone().add(up.clone().multiplyScalar(0.002)), offset, 2.4, up);
+  }
+
   getView(): ViewState {
     const t = latLonFromWorld(this.controls.target);
     const c = latLonFromWorld(this.camera.position);
@@ -485,7 +538,7 @@ export class MoonScene {
       this.controls.enablePan = false;
     } else {
       this.controls.maxPolarAngle = Math.PI * 0.495;
-      this.controls.minDistance = 0.4;
+      this.controls.minDistance = 0.012;
       this.controls.maxDistance = 600;
       this.controls.enablePan = true;
       this.controls.screenSpacePanning = false;
@@ -717,7 +770,8 @@ export class MoonScene {
     const d = rel.length();
     if (d - R_MOON_KM > 40) return false;
     const dir = rel.divideScalar(d);
-    const minR = this.groundRadius(dir, 0.05) + 0.12;
+    const clearance = Math.min(0.12, Math.max(0.003, this.camera.position.distanceTo(this.controls.target) * 0.25));
+    const minR = this.groundRadius(dir, 0.05) + clearance;
     if (d >= minR) return false;
     this.camera.position.copy(MOON_CENTER).addScaledVector(dir, minR);
     return true;
@@ -1005,12 +1059,19 @@ export class MoonScene {
     this.hideOccludedLabels();
     if (this.rover) this.rover.scale.setScalar(Math.min(1, Math.max(0.05, this.camera.position.distanceTo(this.rover.position) / 12)));
     for (const b of this.beacons.values()) {
-      const k = Math.min(1, Math.max(0.06, this.camera.position.distanceTo(b.pos) / 12));
+      const dist = this.camera.position.distanceTo(b.pos);
+      b.group.visible = dist > 0.15;
+      const k = Math.min(1, Math.max(0.06, dist / 12));
       if (Math.abs(b.group.scale.x - k) > 0.002) b.group.scale.setScalar(k);
     }
-    const alt = Math.max(0.05, this.camera.position.distanceTo(MOON_CENTER) - R_MOON_KM);
-    const near = Math.min(20, Math.max(0.005, alt * 0.01));
-    const far = alt + 2 * R_MOON_KM + 4000;
+    const rel = this.camera.position.clone().sub(MOON_CENTER);
+    const camR = rel.length();
+    const alt = Math.max(0.05, camR - R_MOON_KM);
+    // height above the actual ground (ridges stand kilometres above the reference sphere)
+    const ground = camR - R_MOON_KM < 60 ? this.groundRadius(rel.divideScalar(camR), 0.1) : R_MOON_KM;
+    const agl = Math.max(0.002, camR - ground);
+    const near = Math.min(20, Math.max(0.0004, Math.min(alt, agl) * 0.01));
+    const far = Math.min(alt + 2 * R_MOON_KM + 4000, Math.max(600, alt * 60 + 600));
     if (Math.abs(this.camera.near - near) / near > 0.05 || Math.abs(this.camera.far - far) / far > 0.05) {
       this.camera.near = near;
       this.camera.far = far;

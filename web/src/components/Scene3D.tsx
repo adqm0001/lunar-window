@@ -35,6 +35,8 @@ export default function Scene3D() {
   const finder = useApp((s) => s.finder);
   const survival = useApp((s) => s.survival);
   const rover = useApp((s) => s.rover);
+  const landerOpen = useApp((s) => s.landerOpen);
+  const lander = useApp((s) => s.lander);
   const rangeDays = useApp((s) => s.rangeDays);
   const playing = useApp((s) => s.playing);
   const day = Math.floor(hour / 24);
@@ -105,6 +107,10 @@ export default function Scene3D() {
   useEffect(() => {
     scene?.setMapMode(view === "2d");
   }, [scene, view]);
+
+  useEffect(() => {
+    scene?.setLander(landerOpen ? site : null, lander.panel, lander.panelAz);
+  }, [scene, landerOpen, site, lander, field, globe]);
 
   useEffect(() => {
     scene?.setCutaway(cutaway);

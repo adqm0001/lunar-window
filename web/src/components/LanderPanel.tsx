@@ -4,6 +4,7 @@ import { LANDER_PRESETS, PANEL_LABEL, simulate, type Lander, type PanelMode, typ
 import { monteCarlo } from "../lib/montecarlo";
 import { inField } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
+import { currentScene } from "../state/share";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 import { useSelectedSite } from "../state/selectors";
 
@@ -134,6 +135,16 @@ export default function LanderPanel() {
         </span>
       </div>
       <SocChart sim={sim} minSoc={lander.minSocPct} />
+
+      <button
+        className="btn view-lander"
+        onClick={() => {
+          useApp.getState().setView("3d");
+          setTimeout(() => currentScene()?.viewLander(), 60);
+        }}
+      >
+        👁 See the lander on the ground
+      </button>
 
       <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy}>
         {busy ? "Simulating…" : `Simulate ${field ? (field.meta.horizon.size ** 2).toLocaleString() : ""} landing spots`}
