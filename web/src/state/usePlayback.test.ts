@@ -25,4 +25,8 @@ describe("startHour", () => {
   it("keeps the current hour otherwise", () => {
     expect(startHour(42.5, 100)).toBe(42.5);
   });
+  it("restarts IM-2 at touchdown instead of the beginning of its ephemeris", () => {
+    expect(startHour(1079, 1080, 473.5)).toBe(473.5);
+    expect(startHour(600, 1080, 473.5)).toBe(600);
+  });
 });
