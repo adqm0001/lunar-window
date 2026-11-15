@@ -79,6 +79,7 @@ Rules:
 | `field_pole.json` + `field_pole.bin.gz` | **Horizon field**: uint8 `[azimuthBin][row][col]`, 180 bins × 320 × 320, 250 m cells, ±40 km around the pole. Decode `deg = v·0.1 − 8`. Stored as byte deltas between consecutive azimuth layers (mod 256), gzip. |
 | `heights_pole.bin.gz` | int16 metres `[row][col]`, 1280², 62.5 m cells, same extent. |
 | `slope_pole.bin.gz` | uint8 `[2][320][320]`: layer 0 = mean slope °×4, layer 1 = % of cell under 10°. |
+| `field_ridge_b.json` + `field_ridge_b.bin.gz`, `heights_ridge_b.bin.gz`, `slope_ridge_b.bin.gz` | Same field formats around Connecting ridge B: 250² horizon/slope cells at 20 m, 180 azimuths; 1000² mesh heights at 5 m. Half-extent 2500 m, `centerX = −11505`, `centerY = −12495`, row 0 = +y. The centre is snapped 4.6 m from the site to share exact centres with the pole grid. Bilinear samples of the measured 40 m DEM, not additional measured terrain detail; horizons retain the pole encoding's −8° to 17.5° clamp. Built with `python pipeline/build_site_field.py`; selecting this field in Monte Carlo is task 52. |
 | `globe.json` + `globe_16ppd.bin.gz` | int16 `[2880][5760]` global, 16 px/°, value × 5 m = height, row 0 = 90°N, col 0 = lon 0°E, deltas along rows, gzip. |
 | `polar_240m.bin.gz` | int16 metres, 1666², 240 m, polar map (row 0 = +y), deltas along rows. |
 | `polar_80m.bin.gz` | int16 metres, 6250², 80 m, ±250 km, `−32768` = missing, deltas along rows (wrapping). **Loaded in the background** after the globe (`loadPolar80`). |
