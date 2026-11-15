@@ -66,12 +66,13 @@ Everything already built, so you know what exists before adding to it. Feature �
 
 ## Workflow
 
-1. Pick an open task. Claim it by appending `— taken: <name>` to its heading in a small commit or PR, so nobody doubles up.
-2. Branch: `task-<number>-<short-name>` (for example `task-23-vitest`).
+1. **Claim it on GitHub first.** Every open task has an issue titled `Task <number>: <title>` ([open issues](https://github.com/adqm0001/lunar-window/issues)). Before writing any code, check the issue has no assignee and no "taking this" comment, then assign yourself (collaborators) or comment `taking this` (everyone else). If someone already has it, pick another task. If you stop working on it, unassign yourself or comment `dropping this`.
+2. Branch: `task-<number>-<short-name>` (for example `task-23-vitest`). Open the PR with `Closes #<issue number>` in its description so the issue closes when it's merged.
 3. Implement exactly the spec. If the spec turns out to be wrong, fix the spec in this file in the same PR and say why.
 4. Before the PR: `cd web && npx tsc --noEmit -p . && npm run build` pass, the app loads with no console errors, and the task's **Verify** steps hold. Visual changes: before/after screenshots in the PR description.
 5. **Mark it done only after checking it.** Change the task's `- [ ]` to `- [x]` in this file, in the same PR, and only once every item in its **Verify** line has actually been run and passes, plus `npx tsc --noEmit -p .` and `npm run build`. If something can't be verified (no device, no data), leave it unchecked and say what's missing in the PR.
 6. Commit messages: one plain sentence saying what changed.
+7. Every PR is checked automatically (type check, tests, build) by `.github/workflows/pr-checks.yml`, and `main` only accepts PRs whose checks pass and that are up to date with `main`. If your PR falls behind, update it from `main` (rebase or merge) and resolve any conflicts, usually just neighbouring ticks in this file.
 
 Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h, M ≈ half a day, L ≈ a day or more.
 
@@ -154,7 +155,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** helper reads `web/public/data/ephem.json`, `ephem.bin` (float32), `dsn.bin` (int8) and `sites.json` with `node:fs`, and builds an `Ephemeris` (`{ startMs, stepHours, count, data, dsn, stations }`, see `src/data/load.ts`). Then `siteThermal(ephem, apollo11, 0, 24 * 365)`: `max ∈ [370, 400]`, `min ∈ [80, 100]`. `siteThermal(ephem, shackletonFloor, 0, 8760)`: `max < 110`, `iceDepth === 0`.
   - **Verify:** `npm test` green in < 10 s.
 
-- [ ] **25. Run tests in CI** (S) — Depends on 20
+- [x] **25. Run tests in CI** (S) — Depends on 20
   - **Files:** `.github/workflows/pages.yml`.
   - **Spec:** in the `build` job, add `- name: Test` / `working-directory: web` / `run: npm test` between Install and Build. A failing test must stop the deploy.
   - **Verify:** `npm test` passes locally and the step order in the YAML is Install → Test → Build. After merge, the Actions run on `main` shows the Test step passing. (The workflow only runs on `main`; to see a failure block the deploy, temporarily break a test on `main` in a test fork.)
@@ -199,7 +200,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `visibilityBits` stays on the main thread (WebGL). Transfer copies of `bits.sun`, `bits.link` and `field.slope` (the field keeps using its slope, and the originals allow a main-thread fallback if the worker can't load) and the needed `meta` fields to the worker; run `planRoute` there.
   - **Verify:** Plan route keeps the UI responsive; route identical to before for Connecting ridge B → Shackleton ridge A.
 
-- [ ] **34. Tile the 80 m polar file** (M)
+- [x] **34. Tile the 80 m polar file** (M)
   - **Files:** `pipeline/build_globe.py` (writes `polar_80m.bin.gz`), new output folder `web/public/data/polar80/`, `web/public/data/globe.json`.
   - **Spec:** split the 6250² grid into 8×8 tiles (782² each; last row/col may be smaller), each `int16` metres with row deltas, gzip, named `ty_tx.bin.gz`. Record `tile`, `tiles`, `size`, `cellMeters`, `firstCenterMeters` in `globe.json` under `polar80`. Keep `−32768` for missing.
   - **Verify:** reassembling the tiles in Python equals the old array exactly.
@@ -227,7 +228,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** currently `pointerdown` records only `button === 0` and `pointerup` checks movement < 4 px. Make it work for touch (`pointerType === "touch"`): use a 10 px threshold and ignore if a second pointer went down in between (pinch).
   - **Verify:** on a phone viewport, a tap adds a point; a drag or pinch doesn't.
 
-- [ ] **39. Focus outlines** (S)
+- [x] **39. Focus outlines** (S)
   - **Files:** `src/styles.css`.
   - **Spec:** `:focus-visible` outline (2 px, `rgba(139,156,255,0.9)`, offset 2 px) for `.btn`, `.chip`, `.icon-btn`, `.m-tab`, `.result`, list rows; don't remove outlines anywhere.
   - **Verify:** Tab through the page; every control shows the outline.
@@ -245,7 +246,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 5: Science upgrades
 
-- [ ] **42. Terrain view factor per cell** (M)
+- [x] **42. Terrain view factor per cell** (M) — taken: malqedra
   - **Files:** `src/gpu/thermal.ts`.
   - **Spec:** in `THERMAL_MAIN`, before the time loop, compute the fraction of the (cosine-weighted) sky covered by terrain from the horizon field: `F = (1/N) Σ_az sin²(max(h(az), 0))` over the `uAzBins` directions, using the existing `horizonAt(col, row, az)` (degrees). This is the radiative view factor from the cell to surrounding terrain.
   - **Verify:** temporarily output `F` in a channel: flat plains ≈ 0, crater floors (Shackleton floor) ≈ 0.05–0.15. Revert the debug output.
