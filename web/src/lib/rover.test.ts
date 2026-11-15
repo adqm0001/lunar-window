@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FieldData } from "../data/field";
 import type { VisibilityBits } from "../gpu/engine";
-import { isRoute, planRoute, type RoverParams, type RoverRoute } from "./rover";
+import { Heap, isRoute, planRoute, type RoverParams, type RoverRoute } from "./rover";
 
 const N = 5;
 const HOURS = 48;
@@ -76,5 +76,64 @@ describe("planRoute", () => {
     expect(isRoute(r)).toBe(false);
     expect(r).toHaveProperty("reason");
     expect((r as { reason: string }).reason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Heap", () => {
+  it("pops keys in priority order, including after a key is re-pushed with a lower priority", () => {
+    let seed = 12345;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+    for (let t = 0; t < 500; t++) {
+      const n = 3 + Math.floor(rnd() * 30);
+      const heap = new Heap();
+      const best = new Map<number, number>();
+      const ops = 5 + Math.floor(rnd() * 60);
+      for (let i = 0; i < ops; i++) {
+        const key = Math.floor(rnd() * n);
+        const pri = Math.floor(rnd() * 1000);
+        const cur = best.get(key);
+        if (cur === undefined || pri < cur) {
+          best.set(key, pri); // decrease-key by re-push, as planRoute does
+          heap.push(key, pri);
+        }
+      }
+      const seen = new Set<number>();
+      const pris: number[] = [];
+      while (heap.size) {
+        const k = heap.pop();
+        if (seen.has(k)) continue; // stale duplicate of a key already popped
+        seen.add(k);
+        pris.push(best.get(k)!);
+      }
+      expect(seen.size).toBe(best.size);
+      expect(pris).toEqual([...pris].sort((a, b) => a - b));
+    }
+  });
+});
+
+describe("planRoute shadow during a long move", () => {
+  // 2 x 2 km hop at 0.1 km/h: the 250 m step takes 2.5 h, so it spans hours 0, 1 and 2.
+  const slow: RoverParams = { ...params, speedKmh: 0.1, start: { col: 0, row: 2 }, goal: { col: 1, row: 2 } };
+
+  it("does not drive through a cell that goes dark in an hour the move spans", () => {
+    // goal is lit at hours 0 and 2 (departure and arrival) but dark at hour 1, then lit again from hour 4
+    const bits = makeBits((col, _row, h) => col !== 1 || h === 0 || h === 2 || h >= 4);
+    const r = planRoute(makeField(), bits, slow);
+    expect(isRoute(r)).toBe(true);
+    if (!isRoute(r)) return;
+    const move = r.stops[1];
+    const dep = r.stops[0].depart;
+    for (let h = Math.floor(dep); h <= Math.floor(move.arrive); h++) {
+      expect(h === 1 || h === 3).toBe(false);
+    }
+  });
+
+  it("does not leave a cell that goes dark while the rover is still driving away from it", () => {
+    const bits = makeBits((col, _row, h) => col !== 0 || h < 1 || h >= 4);
+    const r = planRoute(makeField(), bits, slow);
+    expect(isRoute(r)).toBe(true);
+    if (!isRoute(r)) return;
+    const dep = r.stops[0].depart;
+    expect(dep).toBeGreaterThanOrEqual(4);
   });
 });

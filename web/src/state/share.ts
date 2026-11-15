@@ -28,6 +28,15 @@ export function currentScene() {
 const fix = (n: number, d: number) => Number(n.toFixed(d));
 const MAX_SHARED_POINTS = 20;
 
+// A link cut off in the middle of an escape ("%C3") cannot be decoded; keep the raw text instead of throwing at import.
+const decodeName = (s: string) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
+
 function parse(hash: string): Shared | null {
   const q = new URLSearchParams(hash.replace(/^#/, ""));
   if ([...q.keys()].length === 0) return null;
@@ -48,7 +57,7 @@ function parse(hash: string): Shared | null {
       .map((e) => e.split(","))
       .filter((a) => a.length >= 2 && Number.isFinite(Number(a[0])) && Number.isFinite(Number(a[1])))
       .slice(0, MAX_SHARED_POINTS)
-      .map((a) => ({ lat: Number(a[0]), lon: Number(a[1]), name: decodeURIComponent(a.slice(2).join(",") || "") }));
+      .map((a) => ({ lat: Number(a[0]), lon: Number(a[1]), name: decodeName(a.slice(2).join(",") || "") }));
   const c = q.get("c")?.split(",").map(Number);
   if (c && c.length === 6 && c.every(Number.isFinite)) out.c = { orbit: c[0] === 1, t: [c[1], c[2]], c: [c[3], c[4], c[5]] };
   return out;
@@ -103,8 +112,9 @@ export function applyLate() {
   applied = true;
   const ids: string[] = [];
   for (const p of pending.p ?? []) {
-    const s = addPointAt(p.lat, p.lon, p.name || undefined);
-    if (s) ids.push(s.id);
+    // A shared point landing on one of this browser's own points keeps that point's name.
+    const s = addPointAt(p.lat, p.lon, p.name || undefined, true);
+    ids.push(s?.id ?? ""); // keep indexes lined up with the link even if a point fails to load
   }
   const st = useApp.getState();
   const m = pending.s?.match(/^p(\d+)$/);
