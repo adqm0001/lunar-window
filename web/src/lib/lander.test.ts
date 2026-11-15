@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { survivedFraction, type Lander, type SunTrack } from "./lander";
+import { changedSurvivalInputs, survivalInputs, survivedFraction, type Lander, type SunTrack } from "./lander";
 
 const lander: Lander = { name: "Boundary reference", panelW: 0, panel: "horizontal", panelAz: 0, batteryWh: 100, dayLoadW: 1, nightLoadW: 1, minSocPct: 0 };
 const track = (n: number): SunTrack => ({ frac: new Float32Array(n).fill(1), az: new Float32Array(n), el: new Float32Array(n).fill(90) });
@@ -33,5 +33,23 @@ describe("mission data coverage", () => {
 
   it("keeps a real battery failure distinct from unavailable data", () => {
     expect(survivedFraction(track(6), { ...lander, batteryWh: 4, dayLoadW: 2 }, 2, 4)).toBe(0.5);
+  });
+});
+
+describe("survival map inputs", () => {
+  const base = { name: "A", panelW: 600, panel: "vertical" as const, panelAz: -1, batteryWh: 2500, dayLoadW: 220, nightLoadW: 90, minSocPct: 10 };
+  const was = survivalInputs(base, 100, 336);
+
+  it("reports nothing when the settings are the same", () => {
+    expect(changedSurvivalInputs(was, survivalInputs({ ...base, name: "Custom" }, 100, 336))).toEqual([]);
+  });
+
+  it("ignores settings the map does not use", () => {
+    expect(changedSurvivalInputs(was, survivalInputs({ ...base, panel: "track", panelAz: 120 }, 100, 336))).toEqual([]);
+  });
+
+  it("names every changed setting in form order", () => {
+    const now = survivalInputs({ ...base, panel: "horizontal", panelW: 0, minSocPct: 20 }, 101, 720);
+    expect(changedSurvivalInputs(was, now)).toEqual(["start time", "mission length", "panel mounting", "panel power", "dead-below level"]);
   });
 });

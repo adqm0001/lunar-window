@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toMap } from "../lib/astro";
-import { LANDER_PRESETS, PANEL_LABEL, simulate, type Lander, type PanelMode, type SimResult } from "../lib/lander";
+import { changedSurvivalInputs, LANDER_PRESETS, PANEL_LABEL, simulate, survivalInputs, type Lander, type PanelMode, type SimResult } from "../lib/lander";
 import { monteCarlo } from "../lib/montecarlo";
 import { inField } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
@@ -22,10 +22,15 @@ export default function LanderPanel() {
   const hour = useApp((s) => s.hour);
   const lander = useApp((s) => s.lander);
   const survival = useApp((s) => s.survival);
+  const survivalFor = useApp((s) => s.survivalFor);
   const mc = useApp((s) => s.mc);
   const { setLander, setLanderOpen, setSurvival, setMc } = useApp.getState();
   const site = useSelectedSite();
-  const [missionDays, setMissionDays] = useState(14);
+  // Reopening the panel picks up the mission length the current map was simulated with.
+  const [missionDays, setMissionDays] = useState(() => {
+    const d = (useApp.getState().survivalFor?.hours ?? 0) / 24;
+    return MISSIONS.includes(d) ? d : 14;
+  });
   const [miss, setMiss] = useState(400);
   const [busy, setBusy] = useState(false);
   const start = Math.floor(hour);
@@ -37,6 +42,10 @@ export default function LanderPanel() {
     const [x, y] = toMap(site.lat, site.lon);
     return inField(field, x, y);
   }, [field, site]);
+
+  const inputs = useMemo(() => survivalInputs(lander, start, missionDays * 24), [lander, start, missionDays]);
+  // The map and the landing odds belong to the settings they were simulated with; say which ones have changed since.
+  const stale = survival && survivalFor ? changedSurvivalInputs(survivalFor, inputs) : [];
 
   const set = (patch: Partial<Lander>) => setLander({ ...lander, ...patch, name: "Custom" });
 
@@ -55,7 +64,7 @@ export default function LanderPanel() {
           minSocPct: lander.minSocPct,
           horizontal: lander.panel === "horizontal",
         });
-        setSurvival(m);
+        setSurvival(m, inputs);
         if (siteInField) {
           const [x, y] = toMap(site.lat, site.lon);
           setMc(monteCarlo(field, m, x, y, miss));
@@ -154,6 +163,12 @@ export default function LanderPanel() {
           Every spot simulated hour by hour on the GPU in {survival.millis.toFixed(0)} ms (vertical panels modeled as Sun-tracking on the map)
         </div>
       )}
+      {stale.length > 0 && (
+        <div className="f-hint warn" role="status">
+          Out of date: the {joinNames(stale)} changed since the map was simulated, so the map and the landing odds below are for the earlier
+          settings. Simulate again to update them.
+        </div>
+      )}
 
       <label className="f-label">Landing miss (how far off target you might touch down)</label>
       <div className="chips">
@@ -166,7 +181,7 @@ export default function LanderPanel() {
       {!survival && <div className="f-hint">Run the map simulation first, then 4,000 random touchdowns are scored around this site.</div>}
       {survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Use “⚡ Analyze this area in detail” in the right panel.</div>}
       {mc && siteInField && (
-        <div className="mc">
+        <div className={stale.length ? "mc stale" : "mc"}>
           <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "#ffd27a" : "var(--danger)" }}>
             {mc.okPct.toFixed(1)}%
           </div>
@@ -178,6 +193,10 @@ export default function LanderPanel() {
       )}
     </aside>
   );
+}
+
+function joinNames(names: string[]) {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
 function Num({ label, unit, value, onChange }: { label: string; unit: string; value: number; onChange: (v: number) => void }) {
