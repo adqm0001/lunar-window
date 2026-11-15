@@ -6,17 +6,27 @@ R_MOON = 1737400.0
 RAW = Path(__file__).resolve().parent.parent / "data" / "raw"
 
 
-def to_map(lat_deg, lon_deg):
+def hemisphere_sign(hemisphere):
+    if hemisphere not in ("north", "south"):
+        raise ValueError("hemisphere must be 'north' or 'south'")
+    return 1 if hemisphere == "north" else -1
+
+
+def to_map(lat_deg, lon_deg, hemisphere="south"):
+    pole = hemisphere_sign(hemisphere)
     lat = np.radians(lat_deg)
     lon = np.radians(lon_deg)
-    k = 2 * R_MOON * np.tan(np.pi / 4 + lat / 2)
-    return k * np.sin(lon), k * np.cos(lon)
+    # LOLA polar stereographic convention: north has -y toward lon 0.
+    # https://pds-geosciences.wustl.edu/lro/lro-l-lola-3-rdr-v1/lrolol_1xxx/data/lola_gdr/polar/img/ldem_85n_40m.lbl
+    k = 2 * R_MOON * np.tan(np.pi / 4 - pole * lat / 2)
+    return k * np.sin(lon), -pole * k * np.cos(lon)
 
 
-def to_latlon(x, y):
+def to_latlon(x, y, hemisphere="south"):
+    pole = hemisphere_sign(hemisphere)
     rho = np.hypot(x, y)
-    lat = -(np.pi / 2 - 2 * np.arctan(rho / (2 * R_MOON)))
-    lon = np.arctan2(x, y)
+    lat = pole * (np.pi / 2 - 2 * np.arctan(rho / (2 * R_MOON)))
+    lon = np.arctan2(x, -pole * np.asarray(y))
     return np.degrees(lat), np.degrees(lon)
 
 
@@ -64,12 +74,14 @@ class PolarDem:
 
 
 class Terrain:
-    def __init__(self):
-        self.fine = PolarDem("ldem_85s_40m.img", 7584, 40.0)
-        self.coarse = PolarDem("ldem_75s_240m.img", 3812, 240.0)
+    def __init__(self, hemisphere="south"):
+        hemisphere_sign(hemisphere)
+        self.hemisphere = hemisphere
+        self.fine = PolarDem(f"ldem_85{hemisphere[0]}_40m.img", 7584, 40.0)
+        self.coarse = PolarDem(f"ldem_75{hemisphere[0]}_240m.img", 3812, 240.0)
 
     def covers(self, lat_deg, lon_deg):
-        x, y = to_map(lat_deg, lon_deg)
+        x, y = to_map(lat_deg, lon_deg, self.hemisphere)
         return bool(np.hypot(x, y) < self.coarse.valid_radius)
 
     def height_xy(self, x, y):
@@ -82,5 +94,5 @@ class Terrain:
         return h
 
     def height(self, lat_deg, lon_deg):
-        x, y = to_map(lat_deg, lon_deg)
+        x, y = to_map(lat_deg, lon_deg, self.hemisphere)
         return self.height_xy(x, y)

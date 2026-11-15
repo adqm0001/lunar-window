@@ -59,6 +59,7 @@ struct Terrain {
     PolarDem fine;
     PolarDem coarse;
     double max_height = 0.0;
+    int pole = -1;
 
     bool height(double x, double y, double& out) const {
         return fine.height(x, y, out) || coarse.height(x, y, out);
@@ -84,9 +85,9 @@ void horizon_for_point(const Terrain& t, const Point& p, int n_az, double obs_h,
     const double east[3] = {-std::sin(lon), std::cos(lon), 0.0};
     const double north[3] = {up[1] * east[2] - up[2] * east[1], up[2] * east[0] - up[0] * east[2], up[0] * east[1] - up[1] * east[0]};
 
-    const double k0 = 2 * kR / (1 - up[2]);
+    const double k0 = 2 * kR / (1 + t.pole * up[2]);
     double h0 = 0.0;
-    t.height(k0 * up[1], k0 * up[0], h0);
+    t.height(k0 * up[1], -t.pole * k0 * up[0], h0);
     const double r0 = kR + h0 + obs_h;
     const double peak_r = kR + t.max_height;
 
@@ -103,9 +104,9 @@ void horizon_for_point(const Terrain& t, const Point& p, int n_az, double obs_h,
             const double X = c * up[0] + s * dir[0];
             const double Y = c * up[1] + s * dir[1];
             const double Z = c * up[2] + s * dir[2];
-            const double k = 2 * kR / (1 - Z);
+            const double k = 2 * kR / (1 + t.pole * Z);
             double h;
-            if (!t.height(k * Y, k * X, h)) break;
+            if (!t.height(k * Y, -t.pole * k * X, h)) break;
             const double r = kR + h;
             const double num = r * c - r0;
             const double den = std::sqrt(r * r + r0 * r0 - 2 * r * r0 * c);
@@ -132,7 +133,7 @@ std::vector<Point> read_points(const std::string& path) {
 
 int main(int argc, char** argv) {
     if (argc < 6) {
-        std::fprintf(stderr, "usage: horizon <raw_dir> <points.f64> <out.f32> <n_az> <observer_m> [max_dist_m]\n");
+        std::fprintf(stderr, "usage: horizon <raw_dir> <points.f64> <out.f32> <n_az> <observer_m> [max_dist_m] [south|north]\n");
         return 2;
     }
     try {
@@ -141,10 +142,15 @@ int main(int argc, char** argv) {
         const int n_az = std::atoi(argv[4]);
         const double obs_h = std::atof(argv[5]);
         const double max_d = argc > 6 ? std::atof(argv[6]) : 250000.0;
+        const std::string hemisphere = argc > 7 ? argv[7] : "south";
+        if (hemisphere != "south" && hemisphere != "north")
+            throw std::runtime_error("hemisphere must be south or north");
 
         Terrain t;
-        t.fine.load(raw + "/ldem_85s_40m.img", 7584, 40.0);
-        t.coarse.load(raw + "/ldem_75s_240m.img", 3812, 240.0);
+        t.pole = hemisphere == "north" ? 1 : -1;
+        const std::string code = hemisphere == "north" ? "n" : "s";
+        t.fine.load(raw + "/ldem_85" + code + "_40m.img", 7584, 40.0);
+        t.coarse.load(raw + "/ldem_75" + code + "_240m.img", 3812, 240.0);
         t.max_height = std::max(t.fine.max_height, t.coarse.max_height);
 
         const auto dist = ray_distances(max_d, 20.0, 0.02);

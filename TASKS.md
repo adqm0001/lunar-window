@@ -289,10 +289,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/components/SitePanel.tsx` ("Contact with Earth, next 7 days").
   - **Spec:** each pass row shows ≈ rate (Mbps); the summary line adds total GB for the week. A `title` tooltip lists the assumptions.
 
-- [ ] **51. 20 m horizons around one site** (L)
+- [x] **51. 20 m horizons around one site** (L) — taken: malqedra
   - **Files:** `pipeline/build_field.py` (pattern), new `pipeline/build_site_field.py`, `engine/horizon.cpp` (unchanged; CLI: `horizon <raw_dir> <points.f64> <out.f32> <n_az> <observer_m> <max_dist_m>`, points are `[lat, lon]` float64 pairs, output float32 `[n_points][n_az]` degrees; see `pipeline/engine.py`).
-  - **Spec:** 250×250 points at 20 m spacing (5 × 5 km) centred on Connecting ridge B, 180 directions. Write `field_ridge_b.json` + `.bin.gz` in the same format as `field_pole` (see ARCHITECTURE §3), with `centerX/centerY` and `label`.
-  - **Verify:** loading it with `loadField`-style code gives horizons matching the pole field at shared points within ~0.3°.
+  - **Spec:** 250×250 points at 20 m spacing (5 × 5 km) around Connecting ridge B, 180 directions. Snap each centre coordinate to the nearest `5 + 10k` metres (at most 5 m per axis; 4.6 m total here) so the 20 m and 250 m grids have exactly shared cell centres every 500 m. Write `field_ridge_b.json` + `.bin.gz` in the same format as `field_pole` (see ARCHITECTURE §3), with `centerX/centerY` and `label`, plus the heights and slope files required by the loader. This is 20 m sampling of the measured 40 m DEM, retaining the pole format's −8° to 17.5° encoded range.
+  - **Verify:** loading it with `loadField` gives horizons matching the pole field at all 100 shared points and 180 directions within ~0.3°. Run `npm test` and `python -m unittest discover -s pipeline -p 'test_*.py'` for loader, coordinates, delta wrapping and analytic slope checks.
 
 - [ ] **52. Use the 20 m field in the Monte Carlo** (M) — Depends on 51
   - **Files:** `src/lib/montecarlo.ts`, `src/components/LanderPanel.tsx`.
@@ -304,10 +304,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add the north-pole counterparts of the south polar LOLA products used (same PDS directory, `…_n_…` names) to `FILES`, with sizes.
   - **Verify:** `python fetch_data.py` downloads them.
 
-- [ ] **54. North polar projection in the pipeline** (M) — Depends on 53
-  - **Files:** `pipeline/terrain.py`, `pipeline/geo.py`, `pipeline/build_field.py`.
-  - **Spec:** parameterise the polar projection by hemisphere (north: `k = 2R·tan(π/4 − lat/2)`, `x = k·sin(lon)`, `y = −k·cos(lon)`), build `field_north.*` like `field_pole`.
-  - **Verify:** a sunlit-fraction map of the north pole shows Peary crater's rim as one of the brightest areas.
+- [x] **54. North polar projection in the pipeline** (M) — Depends on 53 — taken: malqedra
+  - **Files:** `pipeline/terrain.py`, `pipeline/build_field.py`, `pipeline/engine.py`, `pipeline/horizon.py`, `engine/horizon.cpp`, generated `field_north.json`, `field_north.bin.gz`, `heights_north.bin.gz`, `slope_north.bin.gz`, projection/loader tests. `pipeline/geo.py` already works in geographic lat/lon for both hemispheres and is covered by tests.
+  - **Spec:** parameterise the polar projection by hemisphere (north: `k = 2R·tan(π/4 − lat/2)`, `x = k·sin(lon)`, `y = −k·cos(lon)`), build `field_north.*` like `field_pole` with `python pipeline/build_field.py --hemisphere north`. The Python terrain/horizon APIs and the C++ CLI accept a hemisphere; existing calls default to south. North metadata carries `hemisphere: "north"`; 320² horizon/slope cells at 250 m, 180 azimuths, 2 m observer, 1280² mesh heights at 62.5 m. The app switch is task 55.
+  - **Verify:** an hourly sunlit-fraction map of the north pole shows Peary crater's rim as one of the brightest areas. Run `python -m unittest discover -s pipeline -p 'test_*.py'` and `npm test`; compare north horizons to independent rays and old/new south builders and native horizon output for regressions.
 
 - [ ] **55. North pole in the app** (L) — Depends on 54
   - **Files:** `src/lib/astro.ts` (`toMap`/`toLatLon` take a hemisphere), `src/data/field.ts`, `src/three/MoonScene.ts` (`mapToWorld`), `src/three/shaders.ts` (patch shader lat/lon from `vMap`), `src/gpu/engine.ts` (cell lat/lon).
@@ -317,7 +317,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 6: New features
 
-- [ ] **56. Lander shadow** (M)
+- [x] **56. Lander shadow** (M)
   - **Files:** `src/three/lod.ts`, `src/three/shaders.ts`, `src/three/MoonScene.ts` (`updateLander`), `src/three/landerModel.ts`.
   - **Spec:** uniforms `uLanderPos` (world km), `uLanderUp`, `uLanderR = 0.0025` km, `uLanderH = 0.0045` km, `uLanderOn`. In both terrain fragment shaders, within 0.2 km of the lander, project the pixel into the lander's local tangent plane and test it against the shadow of a vertical cylinder of radius R, height H, cast away from the Sun (length `H / tan(sunElevation)`). Same idea as `rockShadow` in `src/three/craterTexture.ts`.
   - **Verify:** "See the lander on the ground" shows a long shadow pointing away from the Sun that rotates as time plays.
@@ -336,7 +336,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 through 2025-03-31 inclusive (same format), with a matching `dsn_2025.bin` named in the replay metadata. Don't change the main ephemeris.
   - **Verify:** 1,080 hourly vector and DSN records, ending 2025-03-31 23:00 UTC; binary lengths match the metadata; original main ephemeris and DSN files remain byte-for-byte identical.
 
-- [ ] **60. IM-2 replay: UI** (M) — Depends on 59
+- [x] **60. IM-2 replay: UI** (M) — Depends on 59
   - **Files:** `pipeline/sites.py` (site `im2-athena` already exists at −84.78°, 29.13°), `src/data/load.ts`, new replay entry in `src/components/SiteList.tsx`.
   - **Spec:** "Replay IM-2" loads the 2025 ephemeris, jumps to the landing time (from Intuitive Machines / NASA public reports; cite it in a comment), selects the site, shows the 3D lander, starts playback.
   - **Verify:** lighting at the site around the landing date matches public reports of the conditions.
