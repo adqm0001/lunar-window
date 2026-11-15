@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { recordRenderedFrame } from "../lib/playbackPerformance";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -1194,6 +1195,7 @@ export class MoonScene {
       this.composer.render();
     }
     this.labels.render(this.scene, this.camera);
+    recordRenderedFrame(now);
   };
 
   // Moves the current view's camera one frame: flight, 2D map keys, or orbit/surface controls.
