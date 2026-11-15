@@ -115,8 +115,8 @@ export default function LayerControls() {
         )}
         {(layer === "temp" || layer === "ice") && (
           <div className="legend-desc">
-            Soil physics from Hayne et al. 2017 (Diviner). Leaves out light and heat bounced off nearby slopes, so the darkest crater floors come out colder than
-            measured (~25 K vs 30–50 K).
+            Soil physics from Hayne et al. 2017 (Diviner). Light and heat bounced off surrounding slopes follow Ingersoll et al. 1992, which keeps shadowed
+            crater floors at roughly 40–100 K instead of the 25 K you'd get from direct sunlight alone.
           </div>
         )}
         {globalStatus && <div className="legend-gpu">{globalStatus}</div>}
