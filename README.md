@@ -30,7 +30,7 @@ Mission planners have to answer two questions at once: **where** is there light,
 | **Temperature and water ice** | A heat-flow model of the lunar soil runs for every point and shows where water ice stays stable at or below the surface. |
 | **Landing spot finder** | Choose a landing date, mission length, longest night your battery can survive and the flat ground you need. It scores 102,400 spots and returns the top 10. |
 | **Lander simulator** | Solar panels, battery and power loads simulated hour by hour at a site, or across the whole area as a survival map. |
-| **Landing-miss Monte Carlo** | 10,000 simulated touchdowns around a target to estimate the odds of ending up on safe, sunlit ground. |
+| **Landing-miss Monte Carlo** | 4,000 simulated touchdowns around a target to estimate the odds of ending up on safe, sunlit ground. |
 | **Rover route planner** | Finds a route that keeps a solar rover in sunlight on drivable slopes as the shadows move, waiting out darkness when it has to, then animates the drive. |
 | **Artemis III report card** | Ranks NASA's nine candidate landing regions for your dates by sunlight, Earth contact, longest night and nearby ice. |
 | **Site details** | Countdown to the next sunset and Earth-set, the next week of DSN contact windows, ground temperature through the year, and a skyline view showing the paths of the Sun and Earth over the terrain. |

@@ -48,7 +48,7 @@ Everything already built, so you know what exists before adding to it. Feature â
 - [x] Sites: peaks of light, Shackleton floor, missions, Artemis III regions; unlimited custom points (rename, remove)
 - [x] Site panel: Sun/Earth/DSN status with countdowns, 12-month stats, ground temperature now and through the year, ice depth, 7-day DSN contact windows, skyline with Sun and Earth paths
 - [x] Landing spot finder: scores 102,400 spots for a date, mission length, night limit, flat ground, priority; top 10 (`gpu/finder.ts`)
-- [x] Lander simulator: panels, battery, loads, hour by hour; GPU survival map; landing-miss Monte Carlo (10,000 touchdowns); true-scale 3D lander (`lib/lander.ts`, `lib/montecarlo.ts`, `three/landerModel.ts`)
+- [x] Lander simulator: panels, battery, loads, hour by hour; GPU survival map; landing-miss Monte Carlo (4,000 touchdowns); true-scale 3D lander (`lib/lander.ts`, `lib/montecarlo.ts`, `three/landerModel.ts`)
 - [x] Landing dates (porkchop): survival for every site and landing date (`PorkchopPanel.tsx`)
 - [x] Compare: pin sites, side-by-side table, synced timeline rows
 - [x] Rover route planner: hour-by-hour light and link bitmasks on the GPU, time-dependent A*, animated rover (`lib/rover.ts`)
