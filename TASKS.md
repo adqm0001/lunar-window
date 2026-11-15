@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Enforce rover Earth/DSN contact throughout each drive** ([#200](https://github.com/adqm0001/lunar-window/issues/200)) — taken: malqedra
+  - **Files:** `web/src/lib/rover.ts` and regression tests.
+  - **Spec:** when the Earth-link rule is enabled, require contact at both endpoint cells for every sampled hour spanned by a move, using the existing conservative sunlight convention. Waiting can remain without contact; routes with the rule disabled remain unrestricted by contact.
+  - **Verify:** the reported 3×3 / 250 m / 48 h reproduction; mid-drive contact loss; destination contact absent; a later valid window, including across bit 31/32; an exact-hour arrival; rule-off and no-window controls; TypeScript, tests, build, and the production rover tool without console errors.
+
 - [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
   - **Files:** `web/src/state/share.ts` and regression tests.
   - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
