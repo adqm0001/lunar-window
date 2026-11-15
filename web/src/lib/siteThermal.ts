@@ -37,9 +37,12 @@ export function terrainViewFactor(horizonDeg: ArrayLike<number>): number {
   return horizonDeg.length ? f / horizonDeg.length : 0;
 }
 
+/** How much the site panel asks siteThermal for: 13 months, so a full year is covered from any 30-day block. */
+export const PANEL_THERMAL_HOURS = 24 * 395;
+
 /** The span a site's temperatures cover, for labels: "13 months" for the panel's full window, else hours or days. */
 export function thermalSpanLabel(hours: number): string {
-  if (hours >= 24 * 395) return "13 months";
+  if (hours >= PANEL_THERMAL_HOURS) return "13 months";
   return hours < 48 ? `${hours} h` : `${Math.round(hours / 24)} d`;
 }
 

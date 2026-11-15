@@ -22,6 +22,8 @@ export const ICE_K = 110;
 export const ICE_HOURS = 365 * 24;
 /** A shorter run hasn't seen the year's warmest days, so it can't say whether ice survives. */
 export const iceVerdictPossible = (hours: number) => hours >= ICE_HOURS;
+/** Whether the data from `startHour` to its end (`count` hours in all) covers the year an ice verdict needs. */
+export const iceCovered = (count: number, startHour: number) => iceVerdictPossible(count - startHour);
 
 // Normal-incidence albedo of the surrounding terrain and emissivity, as in the direct-sunlight terms.
 export const WALL_ALBEDO = 0.12;

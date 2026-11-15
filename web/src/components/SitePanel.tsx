@@ -3,7 +3,7 @@ import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
-import { thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
+import { PANEL_THERMAL_HOURS, thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
 import { iceVerdictPossible } from "../gpu/thermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
 import { contactWindows, estimateRateBps, type ContactWindow } from "../lib/contacts";
@@ -93,7 +93,7 @@ export default function SitePanel() {
 
   const thermStart = Math.floor(hourBucket / 720) * 720;
   const seriesVersion = useSeriesVersion();
-  const therm = useMemo(() => getThermal(data.ephem, site, thermStart, 24 * 395), [data, site, thermStart, seriesVersion]);
+  const therm = useMemo(() => getThermal(data.ephem, site, thermStart, PANEL_THERMAL_HOURS), [data, site, thermStart, seriesVersion]);
   const tNow = therm ? therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))] : 0;
 
   const contacts = useMemo(() => (series ? contactWindows(data.ephem, series, hourBucket, 24 * 7) : null), [data, series, hourBucket]);
