@@ -6,7 +6,7 @@ import type { LayerId, Palette } from "../gpu/layers";
 import type { Quality } from "../three/lod";
 import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
-import { LANDER_PRESETS, type Lander } from "../lib/lander";
+import { LANDER_PRESETS, type Lander, type SurvivalInputs } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
 import type { RoverFailure, RoverRoute } from "../lib/rover";
 
@@ -58,11 +58,13 @@ interface AppState {
   setRover: (r: RoverRoute | RoverFailure | null) => void;
   lander: Lander;
   survival: FieldMetrics | null;
+  /** The settings `survival` was simulated with. */
+  survivalFor: SurvivalInputs | null;
   mc: MonteCarloResult | null;
   flyRequest: { lat: number; lon: number; altKm: number; n: number } | null;
   setLanderOpen: (o: boolean) => void;
   setLander: (l: Lander) => void;
-  setSurvival: (m: FieldMetrics | null) => void;
+  setSurvival: (m: FieldMetrics | null, inputs?: SurvivalInputs | null) => void;
   setMc: (r: MonteCarloResult | null) => void;
   flyTo: (lat: number, lon: number, altKm: number) => void;
   globe: GlobeData | null;
@@ -160,6 +162,7 @@ export const useApp = create<AppState>((set, get) => ({
       field,
       finder: null,
       survival: null,
+      survivalFor: null,
       mc: null,
       rover: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
@@ -183,11 +186,12 @@ export const useApp = create<AppState>((set, get) => ({
   setRover: (rover) => set({ rover }),
   lander: LANDER_PRESETS[0],
   survival: null,
+  survivalFor: null,
   mc: null,
   flyRequest: null,
   setLanderOpen: (landerOpen) => set((s) => ({ landerOpen, finderOpen: landerOpen ? false : s.finderOpen, roverOpen: landerOpen ? false : s.roverOpen })),
   setLander: (lander) => set({ lander }),
-  setSurvival: (survival) => set((s) => ({ survival, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
+  setSurvival: (survival, inputs = null) => set((s) => ({ survival, survivalFor: survival ? inputs : null, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
   setMc: (mc) => set({ mc }),
   flyTo: (lat, lon, altKm) => set((s) => ({ flyRequest: { lat, lon, altKm, n: (s.flyRequest?.n ?? 0) + 1 }, view: "3d" })),
   globe: null,
