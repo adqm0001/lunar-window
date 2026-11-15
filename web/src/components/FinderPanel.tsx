@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_WEIGHTS, findBestSpots, type FinderParams } from "../gpu/finder";
+import { DEFAULT_WEIGHTS, findBestSpots, fitsFinderMission, type FinderParams } from "../gpu/finder";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 
 const MISSIONS = [3, 7, 14, 30, 90];
@@ -35,9 +35,7 @@ export default function FinderPanel() {
   const areaLabel = field?.meta.label ? `the ${km} × ${km} km ${field.meta.label} area` : `the ${km} × ${km} km polar area`;
 
   const start = Math.floor(hour);
-  // A mission must fit inside the ephemeris, as in Landing dates: past the last hour there is nothing to score.
-  const hoursLeft = data.ephem.count - start;
-  const fits = missionDays * 24 <= hoursLeft;
+  const fits = fitsFinderMission(start, missionDays, data.ephem.count);
   const run = () => {
     if (!field || !fits) return;
     setBusy(true);
@@ -123,9 +121,7 @@ export default function FinderPanel() {
       {result && (
         <>
           <div className="f-stats">
-            {result.evaluated.toLocaleString()} spots ×{" "}
-            {Math.max(0, Math.min(result.params.missionDays * 24, data.ephem.count - result.params.startHour))} h scored on the GPU in{" "}
-            {result.millis.toFixed(0)} ms ·{" "}
+            {result.evaluated.toLocaleString()} spots × {result.params.missionDays * 24} h scored on the GPU in {result.millis.toFixed(0)} ms ·{" "}
             {result.rejected.toLocaleString()} ruled out
           </div>
           {result.candidates.length === 0 && <div className="f-hint">No spot meets all constraints. Loosen the night or flat-ground limits.</div>}
