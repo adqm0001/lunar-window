@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useMemo } from "react";
 import Modal from "./Modal";
 import { percentOn } from "../lib/visibility";
@@ -49,7 +50,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sun and Earth positions
+            <span className="ok"><Icon name="check" /></span> Sun and Earth positions
           </h3>
           <p>
             Our positions (JPL DE421 ephemeris, Moon body-fixed frame) were compared with NASA JPL's Horizons service for 3 sites, every day of a year, for both
@@ -59,7 +60,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sunlight at the famous "peaks of light"
+            <span className="ok"><Icon name="check" /></span> Sunlight at the famous "peaks of light"
           </h3>
           <p>
             Share of the year with at least half the Sun's disc above the real terrain horizon, compared with Bussey et al. 2010 (Icarus), which used Japan's
@@ -95,9 +96,9 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Ground temperature
+            <span className="ok"><Icon name="check" /></span> Ground temperature
           </h3>
-          <p>Our soil heat-flow model against NASA's Diviner thermal instrument on the Lunar Reconnaissance Orbiter:</p>
+          <p>Site temperatures from the CPU soil heat-flow model, compared with NASA's Diviner instrument on the Lunar Reconnaissance Orbiter:</p>
           <table className="vtable">
             <thead>
               <tr>
@@ -137,11 +138,16 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
               ? `Both are hourly heat flow over the ${thermalSpanLabel(thermal.b.hours)} of data available, run in your browser.`
               : "Both are a full year of hourly heat flow, run in your browser."}
           </p>
+            <p className="muted">
+              The temperature and ice maps warm the soil model for up to four lunar days before the displayed period and include every sampled step in
+              that period. Where earlier data is missing, the maps use conditions from twelve lunar days later if available. The site estimates above
+              use a different warm-up, so short-period site and map temperatures can differ.
+            </p>
         </section>
 
         <section>
           <h3>
-            <span className="ok">✓</span> Engines agree with each other
+            <span className="ok"><Icon name="check" /></span> Engines agree with each other
           </h3>
           <p>
             The C++ horizon engine (6 billion terrain lookups on 8 cores) builds the horizon data. The browser's GPU engine reproduces the reference sunlight

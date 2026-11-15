@@ -24,8 +24,8 @@ const SUN: Stop[] = [[0, 8, 8, 20], [0.25, 90, 30, 70], [0.55, 220, 90, 40], [0.
 const EARTH: Stop[] = [[0, 6, 10, 25], [0.5, 30, 90, 190], [1, 170, 220, 255]];
 const LINK: Stop[] = [[0, 6, 14, 14], [0.5, 25, 140, 100], [1, 180, 255, 210]];
 const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 108], [1, 90, 20, 40]];
-export const SCORE: Stop[] = [[0, 20, 10, 40], [0.4, 110, 40, 150], [0.7, 240, 110, 90], [0.88, 255, 200, 80], [1, 255, 255, 230]];
-// Green only at exactly 1: a battery that never dies (one dying in the last step still scores below 1).
+export const SCORE: Stop[] = [[0, 10, 16, 26], [0.4, 40, 66, 104], [0.7, 74, 118, 156], [0.88, 145, 191, 214], [1, 236, 246, 252]];
+// Green is reserved for a battery that never dies, even in the last step.
 export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [1 - 1e-6, 255, 230, 120], [1, 61, 220, 151]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
 const TEMP: Stop[] = [[0, 30, 20, 90], [0.14, 40, 90, 220], [0.28, 60, 200, 230], [0.48, 240, 220, 90], [0.72, 250, 110, 50], [0.9, 220, 40, 60], [1, 255, 200, 220]];
@@ -47,10 +47,10 @@ export const LAYERS: LayerDef[] = [
   { id: "earth", label: "Earth in view %", short: "Earth %", ranged: true, stops: EARTH, legend: ["0%", "100%"], describe: "Share of time Earth is above the terrain" },
   { id: "link", label: "Power + comms %", short: "Sun+DSN", ranged: true, stops: LINK, legend: ["0%", "100%"], describe: "Sun up, Earth up and a DSN dish seeing the Moon, all at once" },
   { id: "night", label: "Longest night", short: "Night", ranged: true, stops: NIGHT, legend: ["0 d", "≥ 30 d"], describe: "Longest continuous stretch without sunlight" },
-  { id: "score", label: "Landing score", short: "★ Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
-  { id: "survive", label: "Lander survival", short: "♥ Survival", ranged: false, stops: SURVIVE, legend: ["dies day 1", "survives"], describe: "Share of the mission the chosen lander stays powered, simulated hour by hour at every point (green = survives the whole mission)" },
+  { id: "score", label: "Landing score", short: "Score", ranged: false, stops: SCORE, legend: ["worse", "best"], describe: "Combined score from the landing finder; dark = rejected (night too long or too steep)" },
+  { id: "survive", label: "Lander survival", short: "Survival", ranged: false, stops: SURVIVE, legend: ["dies day 1", "survives"], describe: "Share of the mission the chosen lander stays powered, simulated hour by hour at every point (green = survives the whole mission)" },
   { id: "temp", label: "Max surface temperature", short: "Temp", ranged: true, stops: TEMP, legend: ["20 K", "400 K"], describe: "Hottest the ground gets in the period, from a heat-flow model of the soil run for every point on your GPU (sunlight on the real slope and horizon, heat soaking into the ground, glowing back to space)" },
-  { id: "ice", label: "Water ice stability", short: "❄ Ice", ranged: false, stops: ICE, legend: ["≤ 80 cm down", "at surface"], describe: "Where water ice can survive: it stays put wherever the warmest temperature all year is below 110 K. Bright = stable right at the surface, darker blue = stable once you dig down. Uses a full year of sunlight." },
+  { id: "ice", label: "Water ice stability", short: "Ice", ranged: false, stops: ICE, legend: ["≤ 80 cm down", "at surface"], describe: "Where water ice can survive: it stays put wherever the warmest temperature all year is below 110 K. Bright = stable right at the surface, darker blue = stable once you dig down. Uses a full year of sunlight." },
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
 

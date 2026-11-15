@@ -156,7 +156,7 @@ export default function Scene3D() {
     }
 
     const panelSelector = ":scope > aside.left, :scope > aside.right";
-    const toolbarSelector = ":scope > .layer-bar";
+    const toolbarSelector = ":scope > .layer-bar, :scope > .map-actions";
     let lastInsets: ReturnType<typeof panelInsets> | undefined;
     const fit = () => {
       const insets = panelInsets(viewport, app.querySelectorAll(panelSelector));
@@ -164,8 +164,9 @@ export default function Scene3D() {
         scene.setSplit(true, insets);
         lastInsets = insets;
       }
-      const bar = app.querySelector(toolbarSelector);
-      if (bar) setTagTop(Math.round(bar.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top) + 8);
+      let controlsBottom = app.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0;
+      for (const bar of app.querySelectorAll(toolbarSelector)) controlsBottom = Math.max(controlsBottom, bar.getBoundingClientRect().bottom);
+      setTagTop(Math.round(controlsBottom - viewport.getBoundingClientRect().top) + 8);
     };
     fit();
     const { pinned, selectedId, select } = useApp.getState();

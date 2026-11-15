@@ -1,7 +1,7 @@
 import type { Ephemeris } from "../data/load";
 import type { FieldData } from "../data/field";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
-import { THERMAL_MAIN } from "./thermal";
+import { THERMAL_MAIN, thermalWarmup } from "./thermal";
 
 const ROW = 4096;
 
@@ -352,7 +352,7 @@ export class GpuEngine {
     if (!this.thermProg) {
       this.thermProg = link(gl, VERT, FRAG.split("void main() {")[0] + THERMAL_MAIN);
       gl.useProgram(this.thermProg);
-      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uSpin"]) {
+      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uReplay", "uHistory"]) {
         this.thermUni[n] = gl.getUniformLocation(this.thermProg, n);
       }
       const f = this.field;
@@ -390,7 +390,10 @@ export class GpuEngine {
     gl.uniform1i(u.uStart, start);
     gl.uniform1i(u.uSteps, steps);
     gl.uniform1i(u.uStride, stride);
-    gl.uniform1i(u.uSpin, Math.min(Math.floor(steps / 4), Math.round(709 / stride)));
+    // warm up on the lunar days before the window, then record all of it (see thermalWarmup)
+    const warm = thermalWarmup(start, stride, this.count);
+    gl.uniform1i(u.uReplay, warm.replay);
+    gl.uniform1i(u.uHistory, warm.history);
     // draw in bands so no single GPU job runs long enough to trip the driver watchdog
     gl.enable(gl.SCISSOR_TEST);
     const band = 32;
