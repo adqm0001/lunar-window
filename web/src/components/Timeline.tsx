@@ -64,8 +64,12 @@ export default function Timeline() {
     const c = canvasRef.current;
     if (!c || !size.w) return;
     const dpr = window.devicePixelRatio || 1;
-    c.width = size.w * dpr;
-    c.height = size.h * dpr;
+    // Assigning width/height reallocates and clears the bitmap even when unchanged: only do it when the size differs
+    // (playback redraws this every hour).
+    const cw = Math.round(size.w * dpr);
+    const ch = Math.round(size.h * dpr);
+    if (c.width !== cw) c.width = cw;
+    if (c.height !== ch) c.height = ch;
     const g = c.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, size.w, size.h);
