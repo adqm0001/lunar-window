@@ -50,7 +50,8 @@ describe.each(SCENARIOS)("battery edge case: $name", ({ name, lit, lander, diedA
   const survives = diedAtHour === null;
 
   it("simulate reports the hour it dies, with no NaN charge", () => {
-    const r = simulate(e, s, lander, 0, n);
+    // the whole mission is in the data, so this is never null once simulate can return null for a short ephemeris
+    const r = simulate(e, s, lander, 0, n)!;
     expect(r.diedAtHour).toBe(diedAtHour);
     expect(Number.isFinite(r.minSocPct)).toBe(true);
     expect(Array.from(r.soc).every(Number.isFinite)).toBe(true);
