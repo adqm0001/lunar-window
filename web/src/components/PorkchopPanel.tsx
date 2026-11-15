@@ -19,6 +19,16 @@ export default function PorkchopPanel() {
   const [missionDays, setMissionDays] = useState(14);
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Redraw when the canvas changes width, including when it first becomes visible (on phones it is hidden while a
+  // sheet is open, and a hidden canvas measures 0 px).
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ro = new ResizeObserver(() => setBoxW(c.clientWidth));
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, []);
 
   const sites = useMemo(() => {
     const base = pinned.length >= 2 ? pinned : allSites.filter((s) => s.terrain && s.lat < -80);
@@ -49,6 +59,7 @@ export default function PorkchopPanel() {
     if (!c) return;
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth;
+    if (w === 0) return;
     const h = sites.length * ROW_H + 22;
     c.style.height = `${h}px`;
     c.width = w * dpr;
@@ -79,7 +90,7 @@ export default function PorkchopPanel() {
       g.lineWidth = 1.5;
       g.strokeRect(LABEL_W + hover.col * cw, hover.row * ROW_H + 1, Math.max(2, cw), ROW_H - 2);
     }
-  }, [grid, sites, cols, data, start, hover]);
+  }, [grid, sites, cols, data, start, hover, boxW]);
 
   const cellAt = (e: React.MouseEvent) => {
     if (!cols) return null;

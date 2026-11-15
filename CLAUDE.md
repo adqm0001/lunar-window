@@ -6,6 +6,12 @@ Start here every session:
 2. Pick or continue a task from [TASKS.md](TASKS.md). Each task has Files / Spec / Verify. Implement exactly that task, nothing extra.
    Before starting, check its GitHub issue (`gh issue list --search "Task <number>:" --state all`): if it is closed, assigned to someone else, or has a "taking this" comment from someone else, do not work on it. Otherwise claim it (`gh issue edit <n> --add-assignee @me`, or `gh issue comment <n> --body "taking this"` if you can't be assigned).
 3. Work on a branch `task-<number>-<short-name>`, never directly on `main` (every push to `main` deploys the live site). The PR description must contain `Closes #<issue number>`. PRs must pass the automatic checks (type check, tests, build) before they can be merged.
+4. **Merging your own PR** (see [REVIEWING.md](REVIEWING.md)): wait for the reviewer. PRs opened from the owner's account can't get a GitHub approval from that same account, so the reviewer approves by posting a comment that starts with `okay to merge`. Merge only when all of these hold:
+   - there is a GitHub approval, or a comment starting with `okay to merge`, posted after your last commit other than merges from `main` (`gh pr view <n> --comments`);
+   - the branch is up to date (`gh pr update-branch <n>` if not) and `checks` is green (`gh pr checks <n> --watch`);
+   - no unresolved "request changes" review.
+
+   Then `gh pr merge <n> --squash --delete-branch` and confirm the issue closed and the deploy on `main` succeeded (`gh run list --workflow pages.yml --limit 1`). If you merge several PRs, do them one at a time: each merge puts the others behind `main`.
 
 ## Commands (from `web/`)
 
