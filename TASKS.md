@@ -110,7 +110,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [ ] **13. Mac Safari** (S).
 
-- [ ] **14. Firefox** (S).
+- [x] **14. Firefox** (S).
 
 - [ ] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels.
 
