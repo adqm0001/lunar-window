@@ -22,7 +22,8 @@ export default function ComparePanel() {
   const pinned = useApp((s) => s.pinned);
   const hour = useApp((s) => s.hour);
   const selectedId = useApp((s) => s.selectedId);
-  const { select, togglePin, setCompareOpen } = useApp.getState();
+  const split = useApp((s) => s.split);
+  const { select, togglePin, setCompareOpen, setSplit } = useApp.getState();
   const h = Math.floor(hour);
   const day = Math.floor(hour / 24) * 24;
   const seriesVersion = useSeriesVersion();
@@ -57,15 +58,26 @@ export default function ComparePanel() {
   if (pinned.length === 0) return null;
 
   return (
-    <div className="glass compare">
+    <div className={`glass compare${split ? " compact" : ""}`}>
       <div className="compare-head">
         <span className="finder-title">Compare</span>
         <span className="f-hint">Pin sites with “+ Compare” · times follow the timeline</span>
         <span className="spacer" />
+        {pinned.length >= 2 && (
+          <button
+            className={`chip${split ? " sel" : ""}`}
+            onClick={() => setSplit(!split)}
+            aria-pressed={split}
+            title={`3D views of ${pinned[0].name} and ${pinned[1].name} side by side`}
+          >
+            Side by side
+          </button>
+        )}
         <button className="icon-btn" onClick={() => setCompareOpen(false)} aria-label="Close">
           ✕
         </button>
       </div>
+      {!split && (
       <div className="compare-scroll">
         <table className="compare-table">
           <thead>
@@ -103,6 +115,7 @@ export default function ComparePanel() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
