@@ -118,7 +118,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [ ] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
 
-- [ ] **18. Tour** (S). ▶ Tour, all 9 steps.
+- [x] **18. Tour** (S). ▶ Tour, all 9 steps.
 
 - [x] **19. Every button** (S). Each layer chip and tool button in the layer bar; note console errors.
 
