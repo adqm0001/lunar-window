@@ -303,10 +303,10 @@ export default function Scene3D() {
       )}
       {!field && !fieldError && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
       {!field && fieldError && (
-        <div className="stage-msg error" role="alert">
-          <div>
-            Couldn't load the terrain: {fieldError}
-            <div><button onClick={() => void fieldLoader.retry()}>Retry</button></div>
+        <div className="stage-msg" role="alert">
+          <div className="glass stage-error">
+            <span>Couldn't load the terrain: {fieldError}</span>
+            <button className="btn primary" onClick={() => void fieldLoader.retry()}>Retry</button>
           </div>
         </div>
       )}
