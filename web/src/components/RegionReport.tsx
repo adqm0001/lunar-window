@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import Modal from "./Modal";
 import { ARTEMIS_SOURCE } from "../data/artemis";
 import { getGlobalMetrics } from "../gpu/globalOverlay";
 import { addPointAt } from "../lib/points";
@@ -43,20 +43,10 @@ export default function RegionReport({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  return createPortal(
-    <div className="modal-back" onClick={onClose}>
-      <div className="glass modal report" onClick={(e) => e.stopPropagation()}>
-        <div className="finder-head">
-          <div>
-            <div className="finder-title">Artemis III candidate regions: report card</div>
-            <div className="finder-sub">
-              {formatUtc(hourToDate(data, start)).slice(0, 10)} + {rangeDays} days (change with the timeline and the range buttons) · ice uses a full year
-            </div>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
+  return (
+    <Modal className="report" title="Artemis III candidate regions: report card"
+      subtitle={<>{formatUtc(hourToDate(data, start)).slice(0, 10)} + {rangeDays} days (change with the timeline and the range buttons) · ice uses a full year</>}
+      onClose={onClose}>
         {!rows && <div className="legend-gpu">{status}</div>}
         {rows && (
           <table className="vtable report-table">
@@ -98,8 +88,6 @@ export default function RegionReport({ onClose }: { onClose: () => void }) {
           Ranked by sunlight and Earth contact at each region's best spot, the length of its longest night, and how much ice-stable ground is nearby. Computed
           from the whole-Moon models (about 1.4 km cells); open a region in detail with "Analyze this area" for 250 m cells. {ARTEMIS_SOURCE}
         </p>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

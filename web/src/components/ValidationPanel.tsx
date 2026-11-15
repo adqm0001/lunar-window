@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { createPortal } from "react-dom";
+import Modal from "./Modal";
 import { percentOn } from "../lib/visibility";
 import { getSeries, getThermal, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
@@ -40,18 +40,9 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
   const meanAbs = peaks.length ? peaks.reduce((s, p) => s + Math.abs(p.y2020 - p.published), 0) / peaks.length : 0;
 
-  return createPortal(
-    <div className="modal-back" onClick={onClose}>
-      <div className="glass modal validation" onClick={(e) => e.stopPropagation()}>
-        <div className="finder-head">
-          <div>
-            <div className="finder-title">How do we know it's right?</div>
-            <div className="finder-sub">Every number in Lunar Window is checked against NASA tools or published measurements</div>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
+  return (
+    <Modal className="validation" title="How do we know it's right?"
+      subtitle="Every number in Lunar Window is checked against NASA tools or published measurements" onClose={onClose}>
 
         <section>
           <h3>
@@ -161,9 +152,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
             <li>Sun and Earth positions cover 2026–2028.</li>
           </ul>
         </section>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }
 
