@@ -115,8 +115,8 @@ export default function LayerControls() {
         )}
         {(layer === "temp" || layer === "ice") && (
           <div className="legend-desc">
-            Soil physics from Hayne et al. 2017 (Diviner). Light and heat bounced off surrounding slopes follow Ingersoll et al. 1992, which keeps shadowed
-            crater floors at roughly 40–100 K instead of the 25 K you'd get from direct sunlight alone.
+            Soil physics from Hayne et al. 2017 (Diviner). Light and heat bounced off surrounding slopes follow Ingersoll et al. 1992, which keeps Shackleton's
+            shadowed floor at roughly 40–100 K instead of the ~25 K you'd get from direct sunlight alone. Other craters differ with their depth and Sun angle.
           </div>
         )}
         {globalStatus && <div className="legend-gpu">{globalStatus}</div>}
