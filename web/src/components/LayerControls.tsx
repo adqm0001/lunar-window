@@ -47,6 +47,8 @@ export default function LayerControls() {
   const setReport = useApp((s) => s.setReportOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
+  // Near the end of the ephemeris the GPU only has the hours that are left; say so instead of showing the full range.
+  const covered = Math.max(0, Math.min(hours, data.ephem.count - start));
   const def = layerDef(layer, palette);
   const hasPalette = PALETTE_LAYERS.includes(layer);
 
@@ -123,7 +125,8 @@ export default function LayerControls() {
         </div>
         {(def.ranged || layer === "ice") && (
           <div className="legend-desc mono">
-            {formatUtc(hourToDate(data, start)).slice(0, 10)} → {formatUtc(hourToDate(data, start + hours)).slice(0, 10)}
+            {formatUtc(hourToDate(data, start)).slice(0, 10)} → {formatUtc(hourToDate(data, start + covered)).slice(0, 10)}
+            {covered < hours && ` · data ends: ${covered < 48 ? `${covered} h` : `${Math.round(covered / 24)} d`} of ${Math.round(hours / 24)} d`}
           </div>
         )}
         {metrics && (def.ranged || layer === "ice") && (

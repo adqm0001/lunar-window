@@ -35,8 +35,11 @@ export default function FinderPanel() {
   const areaLabel = field?.meta.label ? `the ${km} × ${km} km ${field.meta.label} area` : `the ${km} × ${km} km polar area`;
 
   const start = Math.floor(hour);
+  // A mission must fit inside the ephemeris, as in Landing dates: past the last hour there is nothing to score.
+  const hoursLeft = data.ephem.count - start;
+  const fits = missionDays * 24 <= hoursLeft;
   const run = () => {
-    if (!field) return;
+    if (!field || !fits) return;
     setBusy(true);
     setTimeout(() => {
       try {
@@ -107,14 +110,22 @@ export default function FinderPanel() {
         ))}
       </div>
 
-      <button className="btn primary search-btn" onClick={run} disabled={!field || busy}>
+      <button className="btn primary search-btn" onClick={run} disabled={!field || busy || !fits}>
         {!field ? "Loading terrain…" : busy ? "Searching…" : `Search ${spots.toLocaleString()} spots`}
       </button>
+      {!fits && (
+        <div className="f-hint" role="status">
+          A {missionDays}-day mission from here runs past the end of the data ({formatUtc(hourToDate(data, data.ephem.count - 1))} UTC). Choose an
+          earlier landing time or a shorter mission.
+        </div>
+      )}
 
       {result && (
         <>
           <div className="f-stats">
-            {result.evaluated.toLocaleString()} spots × {result.params.missionDays * 24} h scored on the GPU in {result.millis.toFixed(0)} ms ·{" "}
+            {result.evaluated.toLocaleString()} spots ×{" "}
+            {Math.max(0, Math.min(result.params.missionDays * 24, data.ephem.count - result.params.startHour))} h scored on the GPU in{" "}
+            {result.millis.toFixed(0)} ms ·{" "}
             {result.rejected.toLocaleString()} ruled out
           </div>
           {result.candidates.length === 0 && <div className="f-hint">No spot meets all constraints. Loosen the night or flat-ground limits.</div>}
