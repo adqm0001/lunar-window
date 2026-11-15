@@ -1,6 +1,6 @@
 import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { sunTrack, survivedFraction } from "../lib/lander";
+import { sunTrack, survivedFraction, survivedMission } from "../lib/lander";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 import { useSites } from "../state/selectors";
 
@@ -79,7 +79,7 @@ export default function PorkchopPanel() {
       g.fillText(sites[r].name.slice(0, 22), 4, y + 13);
       for (let k = 0; k < cols; k++) {
         const v = row[k];
-        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : SURVIVAL_COLORS[v >= 0.999 ? 0 : v >= 0.75 ? 1 : v >= 0.4 ? 2 : 3];
+        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : SURVIVAL_COLORS[survivedMission(v) ? 0 : v >= 0.75 ? 1 : v >= 0.4 ? 2 : 3];
         g.fillRect(LABEL_W + k * cw, y + 2, cw + 0.5, ROW_H - 4);
       }
     });
@@ -109,14 +109,16 @@ export default function PorkchopPanel() {
   };
 
   const hv = hover && hover.row < grid.rows.length && hover.col < cols ? grid.rows[hover.row][hover.col] : null;
-  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (v >= 0.999 ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
+  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (survivedMission(v) ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
+  // The chart stores the completed hours. The reserve was reached in the following hour.
+  const deathDuration = (fraction: number) => formatDuration(Math.round(fraction * missionDays * 24) + 1);
   const pick = (cell: { row: number; col: number } | null) => {
     if (!cell || !Number.isFinite(grid.rows[cell.row]?.[cell.col])) return;
     const landingHour = start + cell.col * STEP_H;
     const site = sites[cell.row];
     const fraction = grid.rows[cell.row][cell.col];
-    const outcome = fraction >= 0.999 ? `covers the full ${missionDays}-day mission`
-      : `reaches battery reserve after about ${formatDuration(fraction * missionDays * 24)} of ${missionDays} days`;
+    const outcome = survivedMission(fraction) ? `covers the full ${missionDays}-day mission`
+      : `reaches battery reserve after ${deathDuration(fraction)} of ${missionDays} days`;
     setSelectedDate(`${site.name} · ${formatUtc(hourToDate(data, landingHour))} UTC · ${outcome}`);
     setHour(landingHour);
     select(site.id);
@@ -182,7 +184,7 @@ export default function PorkchopPanel() {
         {hover && hv !== null ? (
           <span>
             {sites[hover.row].name} · land {formatUtc(hourToDate(data, start + hover.col * STEP_H))} UTC →{" "}
-            {Number.isFinite(hv) ? <><b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--sun)" }}>{hv >= 0.999 ? "covers the full mission" : `battery reserve reached after ${formatDuration(hv * missionDays * 24)}`}</b> · select this date</> : "unavailable: not enough data for the full mission"}
+            {Number.isFinite(hv) ? <><b style={{ color: survivedMission(hv) ? "var(--link)" : "var(--sun)" }}>{survivedMission(hv) ? "covers the full mission" : `battery reserve reached after ${deathDuration(hv)}`}</b> · select this date</> : "unavailable: not enough data for the full mission"}
           </span>
         ) : (
           <span>

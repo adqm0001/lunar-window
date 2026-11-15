@@ -32,7 +32,8 @@ describe("mission data coverage", () => {
   });
 
   it("keeps a real battery failure distinct from unavailable data", () => {
-    expect(survivedFraction(track(6), { ...lander, batteryWh: 4, dayLoadW: 2 }, 2, 4)).toBe(0.5);
+    // dies in hour 2 of 4, so it lasted 1 whole hour
+    expect(survivedFraction(track(6), { ...lander, batteryWh: 4, dayLoadW: 2 }, 2, 4)).toBe(0.25);
   });
 });
 
