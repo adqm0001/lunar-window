@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { gradientCss, layerDef, LAYERS } from "../gpu/layers";
+import { gradientCss, layerDef, LAYERS, PALETTE_LAYERS, type Palette } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { formatUtc, hourToDate, useApp } from "../state/store";
 import LazyPanel from "./LazyPanel";
@@ -8,12 +8,28 @@ const RegionReport = lazy(() => import("./RegionReport"));
 
 const RANGES = [7, 30, 90, 365];
 
+function PaletteControls({ palette, onChange }: { palette: Palette; onChange: (p: Palette) => void }) {
+  return (
+    <div className="seg" role="group" aria-label="Map color palette" onKeyDown={(event) => {
+      // Let the focused button use Space before the app's playback shortcut.
+      if (event.key === " ") event.stopPropagation();
+    }}>
+      <button className={`chip ${palette === "default" ? "sel" : ""}`} aria-pressed={palette === "default"}
+        onClick={() => onChange("default")} title="Original layer colors">Default colors</button>
+      <button className={`chip ${palette === "viridis" ? "sel" : ""}`} aria-pressed={palette === "viridis"}
+        onClick={() => onChange("viridis")} title="A color-blind-friendly map palette">Viridis</button>
+    </div>
+  );
+}
+
 export default function LayerControls() {
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const fieldProgress = useApp((s) => s.fieldProgress);
   const fieldError = useApp((s) => s.fieldError);
   const layer = useApp((s) => s.layer);
+  const palette = useApp((s) => s.palette);
+  const setPalette = useApp((s) => s.setPalette);
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
   const poleField = useApp((s) => s.poleField);
@@ -31,7 +47,8 @@ export default function LayerControls() {
   const setReport = useApp((s) => s.setReportOpen);
   const { setLayer, setRangeDays, setView } = useApp.getState();
   const { metrics, error: gpuError, start, hours } = useFieldMetrics();
-  const def = layerDef(layer);
+  const def = layerDef(layer, palette);
+  const hasPalette = PALETTE_LAYERS.includes(layer);
 
   return (
     <>
@@ -86,10 +103,12 @@ export default function LayerControls() {
             ))}
           </>
         )}
+        {hasPalette && <div className="mobile-palette"><PaletteControls palette={palette} onChange={setPalette} /></div>}
       </div>
 
       <div className="glass map-legend">
         <div className="legend-title">{view === "3d" && layer === "terrain" ? "Real-time shadows" : def.label}</div>
+        {hasPalette && <PaletteControls palette={palette} onChange={setPalette} />}
         {def.stops.length > 0 && (
           <>
             <div className="legend-bar" style={{ background: gradientCss(def.stops) }} />

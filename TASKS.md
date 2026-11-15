@@ -238,10 +238,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** Escape calls `onClose`; focus moves to the close button on open; Tab/Shift+Tab cycle within the modal; focus returns to the opener on close. `role="dialog"`, `aria-modal="true"`, `aria-labelledby` the title.
   - **Verify:** keyboard-only: open each window, cycle focus, Escape closes; Space and Enter activate Close, and modal key presses do not trigger background timeline or camera shortcuts.
 
-- [ ] **41. Color-blind palette** (M)
-  - **Files:** `src/gpu/layers.ts`, `src/state/store.ts`, `src/components/LayerControls.tsx`.
-  - **Spec:** add `palette: "default" | "viridis"` to the store (persist in `localStorage` like `quality`). Add viridis stops for `sun`, `earth`, `link`, `night`, `temp`; use them in `paint`, `paintGlobal` and `gradientCss` when selected. Toggle in the legend.
-  - **Verify:** switch the palette; legend and both patch and whole-Moon overlays change.
+- [x] **41. Color-blind palette** (M) — taken: malqedra
+  - **Files:** `src/gpu/layers.ts`, `src/state/store.ts`, `src/components/LayerControls.tsx`, `src/gpu/overlay.ts`, `src/gpu/globalOverlay.ts`, `src/components/Scene3D.tsx`, `src/styles.css`.
+  - **Spec:** add `palette: "default" | "viridis"` to the store (persist in `localStorage` like `quality`). Add viridis stops for `sun`, `earth`, `link`, `night`, `temp`; use them in `paint`, `paintGlobal` and `gradientCss` when selected. Toggle in the legend. Include the palette in painted-overlay cache keys and scene updates so changing it repaints both maps using cached metrics. On phones, where the legend is hidden, expose the same choice in the layer bar.
+  - **Verify:** switch the palette; legend and both patch and whole-Moon overlays change, including during playback without recalculating the whole-Moon model on each tick. Both choices survive reloads, and the phone layer-bar controls work with Space and Enter without starting playback.
 ---
 
 ## Act 5: Science upgrades
@@ -285,7 +285,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add `estimateRateBps(earthDistanceKm: number, opts?)`. Free-space path loss `L = (4πd/λ)²`, antenna gain `G = η(πD/λ)²`, `λ = c/f`. Defaults: X-band `f = 8.4 GHz`, `Pt = 20 W`, lander dish `D = 0.5 m, η = 0.55`, DSN `D = 34 m, η = 0.6`, `Tsys = 30 K`, required `Eb/N0 = 2 dB`, margin 3 dB, other losses 2 dB. `Pr = Pt·Gt·Gr/L/losses`, link capacity `C = Pr / (k·Tsys·(Eb/N0)·margin)`. Return `min(C, radioMaxBps)` with `radioMaxBps = 2e6` by default, because a small lander's radio, not the link, is the limit. Earth distance = norm of the Earth vector in `ephem.data` at that hour.
   - **Verify:** with the defaults at 384 400 km, `C` is about 3 Gbps (Gt ≈ 30 dBi, Gr ≈ 67 dBi, L ≈ 223 dB, Pr ≈ 4e-12 W), so the function returns the 2 Mbps radio cap. With `radioMaxBps: Infinity` it returns `C`. Document all assumptions in the function comment.
 
-- [ ] **50. Show data rates** (S) — Depends on 49
+- [x] **50. Show data rates** (S) — Depends on 49
   - **Files:** `src/components/SitePanel.tsx` ("Contact with Earth, next 7 days").
   - **Spec:** each pass row shows ≈ rate (Mbps); the summary line adds total GB for the week. A `title` tooltip lists the assumptions.
 
