@@ -3,7 +3,7 @@ import type { AppData, Site } from "../data/load";
 import type { Candidate, FinderResult } from "../gpu/finder";
 
 const { addPointAt } = vi.hoisted(() => ({
-  addPointAt: vi.fn<(lat: number, lon: number, name?: string) => Site | null>(),
+  addPointAt: vi.fn<(lat: number, lon: number, name?: string, keepOwnName?: boolean) => Site | null>(),
 }));
 
 // Only the terrain/GPU lookup is replaced. Encoding, parsing, restore order and store selection run normally.
@@ -134,5 +134,41 @@ describe("shared landing finder results", () => {
     const state = restored.useApp.getState();
     expect(state.customSites).toHaveLength(1);
     expect(state.customSites.find((point) => point.id === state.selectedId)).toMatchObject({ name: custom.name, lat: custom.lat, lon: custom.lon });
+  });
+});
+
+describe("restoring a shared link", () => {
+  it.each(["%25C3", "%25C", "A%25"])("imports without throwing when a name is cut off inside an escape (%s)", async (name) => {
+    const restored = await restore(`#t=1&p=-89,10,${name}`);
+    expect(restored.useApp.getState().customSites).toHaveLength(1);
+  });
+
+  it("keeps the raw text of a name that cannot be decoded", async () => {
+    await restore("#p=-89,10,A%C");
+    expect(addPointAt.mock.calls[0][2]).toBe("A%C");
+  });
+
+  it("asks addPointAt to keep the name of a point the browser already has", async () => {
+    await restore("#p=-89,10,Theirs");
+    expect(addPointAt).toHaveBeenCalledWith(-89, 10, "Theirs", true);
+  });
+
+  async function restoreWithFailingFirst(hash: string) {
+    const page = await freshPage(hash);
+    addPointAt.mockImplementation((lat, lon, name) => {
+      if (name === "First") return null;
+      const point = site(`custom:${lat},${lon}`, name, lat, lon);
+      page.useApp.getState().setCustomSite(point);
+      return point;
+    });
+    page.share.applyEarly();
+    page.share.applyLate();
+    return page.useApp.getState();
+  }
+
+  it("selects the linked point when an earlier shared point fails to load", async () => {
+    const state = await restoreWithFailingFirst("#s=p1&p=-89,10,First;-89,20,Second;-89,30,Third");
+    expect(state.selectedId).toBe("custom:-89,20");
+    expect(state.customSites.map((c) => c.name)).toEqual(["Second", "Third"]);
   });
 });
