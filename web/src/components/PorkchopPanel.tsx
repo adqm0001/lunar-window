@@ -6,6 +6,7 @@ import { useSites } from "../state/selectors";
 const STEP_H = 12;
 const RANGES = [3, 6, 12];
 const MISSIONS = [7, 14, 30];
+const NO_DATA_COLOR = "rgba(125,136,155,0.35)";
 
 export default function PorkchopPanel() {
   const data = useApp((s) => s.data)!;
@@ -35,13 +36,15 @@ export default function PorkchopPanel() {
   }, [pinned, allSites]);
 
   const start = Math.floor(hour / 24) * 24;
-  const cols = Math.floor((months * 30 * 24) / STEP_H);
+  const requestedCols = Math.floor((months * 30 * 24) / STEP_H);
+  const cols = Math.max(0, Math.min(requestedCols, Math.floor((data.ephem.count - start - missionDays * 24) / STEP_H) + 1));
 
   const grid = useMemo(() => {
     const t0 = performance.now();
     const out = sites.map((s) => {
-      const tr = sunTrack(data.ephem, s);
       const row = new Float32Array(cols);
+      if (!cols) return row;
+      const tr = sunTrack(data.ephem, s);
       for (let c = 0; c < cols; c++) row[c] = survivedFraction(tr, lander, start + c * STEP_H, missionDays * 24);
       return row;
     });
@@ -72,7 +75,7 @@ export default function PorkchopPanel() {
       g.fillText(sites[r].name.slice(0, 22), 4, y + 13);
       for (let k = 0; k < cols; k++) {
         const v = row[k];
-        g.fillStyle = v >= 0.999 ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
+        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : v >= 0.999 ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
         g.fillRect(LABEL_W + k * cw, y + 2, Math.max(1, cw - 0.3), ROW_H - 4);
       }
     });
@@ -82,7 +85,7 @@ export default function PorkchopPanel() {
       const d = hourToDate(data, start + k * STEP_H);
       g.fillText(d.toLocaleString("en", { month: "short", timeZone: "UTC" }), LABEL_W + k * cw + 2, h - 6);
     }
-    if (hover) {
+    if (hover && hover.row < sites.length && hover.col < cols) {
       g.strokeStyle = "#fff";
       g.lineWidth = 1.5;
       g.strokeRect(LABEL_W + hover.col * cw, hover.row * ROW_H + 1, Math.max(2, cw), ROW_H - 2);
@@ -90,6 +93,7 @@ export default function PorkchopPanel() {
   }, [grid, sites, cols, data, start, hover, boxW]);
 
   const cellAt = (e: React.MouseEvent) => {
+    if (!cols) return null;
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left - LABEL_W;
     const row = Math.floor((e.clientY - rect.top) / ROW_H);
@@ -98,8 +102,8 @@ export default function PorkchopPanel() {
     return { row, col };
   };
 
-  const hv = hover ? grid.rows[hover.row][hover.col] : null;
-  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (v >= 0.999 ? 1 : 0), 0) / cols), [grid, cols]);
+  const hv = hover && hover.row < grid.rows.length && hover.col < cols ? grid.rows[hover.row][hover.col] : null;
+  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (v >= 0.999 ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
 
   return (
     <div className="glass porkchop">
@@ -126,23 +130,23 @@ export default function PorkchopPanel() {
           ✕
         </button>
       </div>
-      <canvas
+      {cols > 0 ? <canvas
         ref={canvasRef}
         className="porkchop-canvas"
         onMouseMove={(e) => setHover(cellAt(e))}
         onMouseLeave={() => setHover(null)}
         onClick={(e) => {
           const c = cellAt(e);
-          if (!c) return;
+          if (!c || !Number.isFinite(grid.rows[c.row][c.col])) return;
           setHour(start + c.col * STEP_H);
           select(sites[c.row].id);
         }}
-      />
-      <div className="porkchop-foot">
+      /> : <div className="f-hint" role="status">No complete {missionDays}-day mission fits in the remaining data. Choose an earlier landing date or a shorter mission.</div>}
+      {cols > 0 && <div className="porkchop-foot">
         {hover && hv !== null ? (
           <span>
             {sites[hover.row].name} · land {formatUtc(hourToDate(data, start + hover.col * STEP_H))} UTC →{" "}
-            <b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--danger)" }}>{hv >= 0.999 ? "survives" : `dies on day ${Math.max(1, Math.round(hv * missionDays))}`}</b> · click to jump there
+            {Number.isFinite(hv) ? <><b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--danger)" }}>{hv >= 0.999 ? "survives" : `dies on day ${Math.max(1, Math.round(hv * missionDays))}`}</b> · click to jump there</> : "unavailable: not enough data for the full mission"}
           </span>
         ) : (
           <span>
@@ -153,7 +157,8 @@ export default function PorkchopPanel() {
               : "no date survives the full mission with this lander. Try Sun-tracking panels or a bigger battery in Lander sim"}
           </span>
         )}
-      </div>
+      </div>}
+      {cols > 0 && cols < requestedCols && <div className="f-hint">Only complete mission windows are shown, through {formatUtc(hourToDate(data, start + (cols - 1) * STEP_H))} UTC.</div>}
     </div>
   );
 }

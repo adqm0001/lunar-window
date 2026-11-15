@@ -1,6 +1,7 @@
 import type { FieldData } from "../data/field";
 import { customSiteAt } from "../data/field";
 import type { Site } from "../data/load";
+import { useApp } from "../state/store";
 import { getEngine } from "./useFieldMetrics";
 
 export interface FinderParams {
@@ -37,7 +38,14 @@ export const DEFAULT_WEIGHTS = { sun: 0.45, link: 0.3, earth: 0.1, flat: 0.15 };
 const MIN_SPACING_M = 1500;
 const TOP_N = 10;
 
+export function fitsFinderMission(startHour: number, missionDays: number, count: number): boolean {
+  const missionHours = missionDays * 24;
+  return Number.isInteger(startHour) && startHour >= 0 && Number.isInteger(missionHours) && missionHours > 0 && startHour + missionHours <= count;
+}
+
 export function findBestSpots(field: FieldData, params: FinderParams): FinderResult | null {
+  const count = useApp.getState().data?.ephem.count ?? 0;
+  if (!fitsFinderMission(params.startHour, params.missionDays, count)) return null;
   const engine = getEngine();
   if (!engine) return null;
   const t0 = performance.now();

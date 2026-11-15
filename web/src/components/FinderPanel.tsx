@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_WEIGHTS, findBestSpots, type FinderParams } from "../gpu/finder";
+import { DEFAULT_WEIGHTS, findBestSpots, fitsFinderMission, type FinderParams } from "../gpu/finder";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 
 const MISSIONS = [3, 7, 14, 30, 90];
@@ -35,8 +35,9 @@ export default function FinderPanel() {
   const areaLabel = field?.meta.label ? `the ${km} × ${km} km ${field.meta.label} area` : `the ${km} × ${km} km polar area`;
 
   const start = Math.floor(hour);
+  const fits = fitsFinderMission(start, missionDays, data.ephem.count);
   const run = () => {
-    if (!field) return;
+    if (!field || !fits) return;
     setBusy(true);
     setTimeout(() => {
       try {
@@ -107,9 +108,15 @@ export default function FinderPanel() {
         ))}
       </div>
 
-      <button className="btn primary search-btn" onClick={run} disabled={!field || busy}>
+      <button className="btn primary search-btn" onClick={run} disabled={!field || busy || !fits}>
         {!field ? "Loading terrain…" : busy ? "Searching…" : `Search ${spots.toLocaleString()} spots`}
       </button>
+      {!fits && (
+        <div className="f-hint" role="status">
+          A {missionDays}-day mission from here runs past the end of the data ({formatUtc(hourToDate(data, data.ephem.count - 1))} UTC). Choose an
+          earlier landing time or a shorter mission.
+        </div>
+      )}
 
       {result && (
         <>
