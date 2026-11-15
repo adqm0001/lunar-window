@@ -47,6 +47,20 @@ class Ephemeris:
         return np.stack(cols, axis=1)
 
 
+def main():
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2029, 1, 1, tzinfo=timezone.utc)
+    hours = int((end - start).total_seconds() // 3600)
+    e = Ephemeris()
+    write_ephemeris(e, start, hours)
+
+    # Include every hourly sample on March 31; the end boundary is exclusive.
+    replay_start = datetime(2025, 2, 15, tzinfo=timezone.utc)
+    replay_end = datetime(2025, 4, 1, tzinfo=timezone.utc)
+    replay_hours = int((replay_end - replay_start).total_seconds() // 3600)
+    write_ephemeris(e, replay_start, replay_hours, suffix="_2025")
+
+
 def write_ephemeris(e: Ephemeris, start: datetime, hours: int, suffix: str = ""):
     t = e.hourly(start, hours)
     sun, earth = e.moon_fixed(t)
@@ -68,20 +82,6 @@ def write_ephemeris(e: Ephemeris, start: datetime, hours: int, suffix: str = "")
         meta["dsn"]["file"] = f"dsn{suffix}.bin"
     (OUT / f"ephem{suffix}.json").write_text(json.dumps(meta, indent=2))
     print(f"ephem{suffix}: {hours} hours written, sun dist {np.linalg.norm(sun[0]):.4g} km, earth dist {np.linalg.norm(earth[0]):.4g} km")
-
-
-def main():
-    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    end = datetime(2029, 1, 1, tzinfo=timezone.utc)
-    hours = int((end - start).total_seconds() // 3600)
-    e = Ephemeris()
-    write_ephemeris(e, start, hours)
-
-    # Include every hourly sample on March 31; the end boundary is exclusive.
-    replay_start = datetime(2025, 2, 15, tzinfo=timezone.utc)
-    replay_end = datetime(2025, 4, 1, tzinfo=timezone.utc)
-    replay_hours = int((replay_end - replay_start).total_seconds() // 3600)
-    write_ephemeris(e, replay_start, replay_hours, suffix="_2025")
 
 
 if __name__ == "__main__":
