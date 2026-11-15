@@ -73,6 +73,9 @@ interface AppState {
   compareOpen: boolean;
   togglePin: (s: Site) => void;
   setCompareOpen: (o: boolean) => void;
+  /** Side-by-side 3D views of the first two pinned sites. */
+  split: boolean;
+  setSplit: (on: boolean) => void;
   finder: FinderResult | null;
   setFinderOpen: (o: boolean) => void;
   setFinder: (r: FinderResult | null) => void;
@@ -197,9 +200,11 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => {
       const has = s.pinned.some((p) => p.id === site.id);
       const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
-      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen };
+      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen, split: s.split && pinned.length >= 2 };
     }),
   setCompareOpen: (compareOpen) => set({ compareOpen }),
+  split: false,
+  setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2, view: on ? "3d" : s.view })),
   finder: null,
   setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
@@ -228,6 +233,7 @@ export const useApp = create<AppState>((set, get) => ({
     set((s) => ({
       customSites: s.customSites.filter((c) => c.id !== id),
       pinned: s.pinned.filter((p) => p.id !== id),
+      split: s.split && s.pinned.filter((p) => p.id !== id).length >= 2,
       selectedId: s.selectedId === id ? "connecting-ridge-b" : s.selectedId,
     })),
   renameCustomSite: (id, name) => set((s) => ({ customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)) })),

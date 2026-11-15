@@ -17,6 +17,20 @@ import { applyLate, registerScene, sharedCamera } from "../state/share";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
 
+// How far the side panels reach into the 3D view on each side, in CSS px (0 where there are none).
+function panelInsets(host: HTMLElement) {
+  const h = host.getBoundingClientRect();
+  let left = 0;
+  let right = 0;
+  for (const el of document.querySelectorAll<HTMLElement>(".left, .right")) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    if (r.left + r.width / 2 < h.left + h.width / 2) left = Math.max(left, r.right - h.left);
+    else right = Math.max(right, h.right - r.left);
+  }
+  return { left, right };
+}
+
 export default function Scene3D() {
   const host = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<MoonScene | null>(null);
@@ -48,6 +62,9 @@ export default function Scene3D() {
   const lastSelected = useRef<string | null>(null);
   const displayedGlobal = useRef<GlobalPaintSource | null>(null);
   const view = useApp((s) => s.view);
+  const split = useApp((s) => s.split);
+  const pinned = useApp((s) => s.pinned);
+  const splitPair = split && pinned.length >= 2 ? [pinned[0], pinned[1]] : null;
   const [hover, setHover] = useState<{ x: number; y: number; text: string; value: string | null } | null>(null);
   const hoverAt = useRef(0);
 
@@ -121,6 +138,29 @@ export default function Scene3D() {
   useEffect(() => {
     if (scene && flyRequest) scene.flyToLatLon(flyRequest.lat, flyRequest.lon, flyRequest.altKm);
   }, [scene, flyRequest]);
+
+  // Side by side: left view goes to the first pinned site (and selects it), right view to the second.
+  const leftId = splitPair?.[0].id;
+  const rightId = splitPair?.[1].id;
+  useEffect(() => {
+    if (!scene) return;
+    const insets = () => (host.current ? panelInsets(host.current) : { left: 0, right: 0 });
+    if (!leftId || !rightId) {
+      scene.setSplit(false);
+      return;
+    }
+    scene.setSplit(true, insets());
+    const { pinned, selectedId, select } = useApp.getState();
+    const [a, b] = [pinned.find((p) => p.id === leftId), pinned.find((p) => p.id === rightId)];
+    if (a) {
+      if (selectedId === a.id) scene.select(a, true);
+      else select(a.id);
+    }
+    if (b) scene.flySplitTo(b);
+    const onResize = () => scene.setSplit(true, insets());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [scene, leftId, rightId]);
 
   useEffect(() => {
     scene?.setScatter(mc ? mc.points : null);
@@ -217,6 +257,12 @@ export default function Scene3D() {
           {hover.text}
           {hover.value && <b> · {hover.value}</b>}
         </div>
+      )}
+      {splitPair && view === "3d" && (
+        <>
+          <div className="split-tag left">{splitPair[0].name}</div>
+          <div className="split-tag right">{splitPair[1].name}</div>
+        </>
       )}
       {!field && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
       {error && <div className="stage-msg error">{error}</div>}
