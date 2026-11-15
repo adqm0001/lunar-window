@@ -4,6 +4,7 @@ import type { Site } from "../data/load";
 import { altaz, horizonAt, localFrame } from "../lib/astro";
 import { siteRadiusKm } from "../lib/visibility";
 import { formatUtc, hourToDate, useApp } from "../state/store";
+import { ephemYears } from "../lib/years";
 
 const DAYS = 30;
 const W = 680;
@@ -65,6 +66,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
   const earthUpPct = Math.round((100 * paths.earth.filter((p) => p.up).length) / paths.earth.length);
   const sMax = Math.max(...season);
   const sMin = Math.min(...season);
+  const years = ephemYears(data.ephem);
   const SW = 300;
   const SH = 60;
   let seasonPath = "";
@@ -121,7 +123,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
               floors that sit below the skyline in every direction never see sunlight at all. Earth wobbles above and below the horizon too (libration), so radio
               contact comes and goes.
             </p>
-            <svg viewBox={`0 0 ${SW} ${SH + 14}`} width={SW} role="img" aria-label="Latitude where the Sun is overhead, 2026 to 2028">
+            <svg viewBox={`0 0 ${SW} ${SH + 14}`} width={SW} role="img" aria-label={`Latitude where the Sun is overhead, ${years.first} to ${years.last}`}>
               <line x1={0} x2={SW} y1={SH / 2} y2={SH / 2} stroke="rgba(255,255,255,0.15)" />
               <path d={seasonPath} fill="none" stroke="#ffb547" strokeWidth={1.4} />
               <line x1={(nowIdx / (season.length - 1)) * SW} x2={(nowIdx / (season.length - 1)) * SW} y1={0} y2={SH} stroke="#fff" strokeWidth={0.8} />
@@ -132,7 +134,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
                 −2°
               </text>
               <text x={SW / 2} y={SH + 12} textAnchor="middle" className="tc-label">
-                Latitude where the Sun is overhead, 2026–2028 ({sMin.toFixed(2)}° to +{sMax.toFixed(2)}°)
+                Latitude where the Sun is overhead, {years.label} ({sMin.toFixed(2)}° to +{sMax.toFixed(2)}°)
               </text>
             </svg>
           </div>

@@ -275,7 +275,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** set the end to `datetime(2037, 1, 1, tzinfo=timezone.utc)`. Rerun `python ephemeris.py` (needs `data/raw/` from `fetch_data.py`). `ephem.bin` grows ~210 kB/year; the app reads `count` from `ephem.json`, and the GPU textures pack hours in rows of 4096, so no shader change is needed.
   - **Verify:** the timeline reaches 2036; 1-year layers, finder and porkchop work near the end of the range. Landing dates include only missions with full data coverage; check a mission ending exactly at the cutoff and one crossing it, and show an unavailable state when none fit. Finder, including the guided tour, rejects incomplete missions. Year layers report a shortened range at the cutoff.
 
-- [ ] **48. Remove hard-coded years** (S) — Depends on 47
+- [x] **48. Remove hard-coded years** (S) — Depends on 47
   - **Files:** `src/components/Timeline.tsx` (`for (let y = 2026; y <= 2028; y++)` year labels), `src/components/SkylinePanel.tsx`, `src/components/Tour.tsx`, `src/components/ValidationPanel.tsx`, `README.md`.
   - **Spec:** derive the first and last year from `data.ephem.startMs` and `count`; text says "2026–<last year>".
   - **Verify:** `grep -rn "2028" web/src` returns nothing.
