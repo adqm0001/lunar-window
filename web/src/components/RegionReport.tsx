@@ -44,8 +44,8 @@ export default function RegionReport({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal className="report" title="Artemis III candidate regions: report card"
-      subtitle={<>{formatUtc(hourToDate(data, start)).slice(0, 10)} + {rangeDays} days (change with the timeline and the range buttons) · ice uses a full year</>}
+    <Modal className="report" title="Artemis III candidate regions"
+      subtitle={<>{formatUtc(hourToDate(data, start)).slice(0, 10)} + {rangeDays} days (use the timeline and Layers range) · ice uses a full year</>}
       onClose={onClose}>
         {!rows && <div className="legend-gpu">{status}</div>}
         {rows && (
@@ -86,7 +86,7 @@ export default function RegionReport({ onClose }: { onClose: () => void }) {
         )}
         <p className="muted report-note">
           Ranked by sunlight and Earth contact at each region's best spot, the length of its longest night, and how much ice-stable ground is nearby. Computed
-          from the whole-Moon models (about 1.4 km cells); open a region in detail with "Analyze this area" for 250 m cells. {ARTEMIS_SOURCE}
+          from the whole-Moon models (about 1.4 km cells); open a region in detail with "Analyze area" for 250 m cells. {ARTEMIS_SOURCE}
         </p>
     </Modal>
   );

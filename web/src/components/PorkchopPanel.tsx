@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sunTrack, survivedFraction } from "../lib/lander";
 import { formatUtc, hourToDate, useApp } from "../state/store";
@@ -68,19 +69,19 @@ export default function PorkchopPanel() {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
     const cw = (w - LABEL_W) / cols;
-    g.font = "11px Inter, sans-serif";
+    g.font = "11px Geist, sans-serif";
     grid.rows.forEach((row, r) => {
       const y = r * ROW_H;
       g.fillStyle = "#aab3c3";
       g.fillText(sites[r].name.slice(0, 22), 4, y + 13);
       for (let k = 0; k < cols; k++) {
         const v = row[k];
-        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : v >= 0.999 ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
+        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : v >= 0.999 ? "rgba(167,217,200,0.9)" : v >= 0.75 ? "rgba(185,205,235,0.85)" : v >= 0.4 ? "rgba(216,181,175,0.85)" : "rgba(217,137,132,0.85)";
         g.fillRect(LABEL_W + k * cw, y + 2, Math.max(1, cw - 0.3), ROW_H - 4);
       }
     });
-    g.fillStyle = "#7d889b";
-    g.font = "10px JetBrains Mono, monospace";
+    g.fillStyle = "#bdc3cd";
+    g.font = "10px Geist, sans-serif";
     for (let k = 0; k < cols; k += Math.round((30 * 24) / STEP_H)) {
       const d = hourToDate(data, start + k * STEP_H);
       g.fillText(d.toLocaleString("en", { month: "short", timeZone: "UTC" }), LABEL_W + k * cw + 2, h - 6);
@@ -127,7 +128,7 @@ export default function PorkchopPanel() {
           ))}
         </div>
         <button className="icon-btn" onClick={() => setPorkchopOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
       {cols > 0 ? <canvas

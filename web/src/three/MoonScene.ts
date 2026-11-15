@@ -250,7 +250,7 @@ export class MoonScene {
     this.earthLabel.center.set(0.5, -1.4);
     this.earth.add(this.earthLabel);
 
-    this.sunRay = rayLine(0xffb547);
+    this.sunRay = rayLine(0xf7d577);
     this.earthRay = rayLine(0x4ea8ff);
     this.scene.add(this.sunRay, this.earthRay);
 
@@ -1649,13 +1649,13 @@ export class MoonScene {
       }
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineDashedMaterial({ color: new THREE.Color(1.6, 1.25, 0.45), dashSize: 2.2, gapSize: 1.4, transparent: true, opacity: 0.9 }),
+        new THREE.LineDashedMaterial({ color: new THREE.Color("#b8cbe3"), dashSize: 2.2, gapSize: 1.4, transparent: true, opacity: 0.9 }),
       );
       line.computeLineDistances();
       this.regionGroup.add(line);
       const el = document.createElement("div");
       el.className = "region-label";
-      el.innerHTML = `<b>ARTEMIS III</b> ${r.name}`;
+      el.innerHTML = `<b>Artemis III</b> ${r.name}`;
       el.addEventListener("pointerdown", (ev) => {
         ev.stopPropagation();
         this.onFlyRegion?.(r);

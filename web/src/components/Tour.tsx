@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect, useState } from "react";
 import { fieldCell } from "../data/field";
 import { DEFAULT_WEIGHTS, findBestSpots } from "../gpu/finder";
@@ -225,7 +226,7 @@ export default function Tour() {
   useEffect(() => {
     if (step === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setStep(null);
+      if (e.key === "Escape" && !e.defaultPrevented) setStep(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -259,7 +260,7 @@ export default function Tour() {
               setStep(0);
             }}
           >
-            ▶ Take the tour
+            <Icon name="play" /> Take the tour
           </button>
         </div>
       </div>

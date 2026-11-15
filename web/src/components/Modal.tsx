@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -68,7 +69,7 @@ export default function Modal({ className, title, subtitle, onClose, children }:
             <div className="finder-title" id={titleId}>{title}</div>
             <div className="finder-sub">{subtitle}</div>
           </div>
-          <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+          <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
         </div>
         {children}
       </div>

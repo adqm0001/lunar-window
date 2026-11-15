@@ -1,3 +1,6 @@
+import ControlMenu from "./ControlMenu";
+import { useSites } from "../state/selectors";
+import Icon from "./Icon";
 import { useMemo } from "react";
 import { fieldSafePct } from "../data/field";
 import { formatLatLon } from "../lib/astro";
@@ -17,6 +20,7 @@ interface Row {
 }
 
 export default function ComparePanel() {
+  const sites = useSites();
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const pinned = useApp((s) => s.pinned);
@@ -55,14 +59,19 @@ export default function ComparePanel() {
     ];
   }, [data, field, pinned, h, day, seriesVersion]);
 
-  if (pinned.length === 0) return null;
-
   return (
     <div className={`glass compare${split ? " compact" : ""}`}>
       <div className="compare-head">
-        <span className="finder-title">Compare</span>
-        <span className="f-hint">Pin sites with “+ Compare” · times follow the timeline</span>
+        <span className="finder-title">Compare sites</span>
+
         <span className="spacer" />
+        <ControlMenu label="Add site" placement="above" align="end">
+          {(close) => sites.filter((site) => !pinned.some((chosen) => chosen.id === site.id)).map((site) => (
+            <button key={site.id} className="control-action" onClick={() => { togglePin(site); close(); }}>
+              {site.name}
+            </button>
+          ))}
+        </ControlMenu>
         {pinned.length >= 2 && (
           <button
             className={`chip${split ? " sel" : ""}`}
@@ -74,10 +83,14 @@ export default function ComparePanel() {
           </button>
         )}
         <button className="icon-btn" onClick={() => setCompareOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
-      {!split && (
+      <p className="compare-intro">
+        {pinned.length < 2 ? "Choose another site with Add site to compare sunlight, Earth visibility, and communications."
+          : "Both sites use the same date and time. Choose Side by side for two 3D views."}
+      </p>
+      {pinned.length > 0 && !split && (
       <div className="compare-scroll">
         <table className="compare-table">
           <thead>
@@ -90,7 +103,7 @@ export default function ComparePanel() {
                   </button>
                   <div className="c-pos">{formatLatLon(s.lat, s.lon)}</div>
                   <button className="c-x" onClick={() => togglePin(s)} aria-label={`Unpin ${s.name}`}>
-                    ✕
+                    <Icon name="close" />
                   </button>
                 </th>
               ))}

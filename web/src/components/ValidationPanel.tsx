@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useMemo } from "react";
 import Modal from "./Modal";
 import { percentOn } from "../lib/visibility";
@@ -47,7 +48,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sun and Earth positions
+            <span className="ok"><Icon name="check" /></span> Sun and Earth positions
           </h3>
           <p>
             Our positions (JPL DE421 ephemeris, Moon body-fixed frame) were compared with NASA JPL's Horizons service for 3 sites, every day of a year, for both
@@ -57,7 +58,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sunlight at the famous "peaks of light"
+            <span className="ok"><Icon name="check" /></span> Sunlight at the famous "peaks of light"
           </h3>
           <p>
             Share of the year with at least half the Sun's disc above the real terrain horizon, compared with Bussey et al. 2010 (Icarus), which used Japan's
@@ -93,7 +94,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Ground temperature
+            <span className="ok"><Icon name="check" /></span> Ground temperature
           </h3>
           <p>Our soil heat-flow model against NASA's Diviner thermal instrument on the Lunar Reconnaissance Orbiter:</p>
           <table className="vtable">
@@ -134,7 +135,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Engines agree with each other
+            <span className="ok"><Icon name="check" /></span> Engines agree with each other
           </h3>
           <p>
             The C++ horizon engine (6 billion terrain lookups on 8 cores) builds the horizon data. The browser's GPU engine reproduces the reference sunlight

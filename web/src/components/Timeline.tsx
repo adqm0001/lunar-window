@@ -1,3 +1,5 @@
+import ControlMenu from "./ControlMenu";
+import Icon from "./Icon";
 import { useEffect, useRef, useState } from "react";
 import { formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSeries } from "../state/selectors";
@@ -7,11 +9,15 @@ import { ephemYears } from "../lib/years";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
-const LABEL_W = 54;
+const LABEL_W = 72;
+const SUN = [247, 213, 119] as const;
+const EARTH = [167, 199, 250] as const;
+const LINK = [167, 217, 200] as const;
+const timelineDate = new Intl.DateTimeFormat("en", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 const ROWS = [
-  { key: "sun", label: "SUN", color: [255, 181, 71] },
-  { key: "earth", label: "EARTH", color: [78, 168, 255] },
-  { key: "link", label: "DSN", color: [61, 220, 151] },
+  { key: "sun", label: "Sun", color: SUN },
+  { key: "earth", label: "Earth", color: EARTH },
+  { key: "link", label: "DSN", color: LINK },
 ] as const;
 
 export default function Timeline() {
@@ -28,8 +34,10 @@ export default function Timeline() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const chartHeight = compare ? Math.max(size.h, OVERVIEW_H + 34 + pinned.length * 84) : size.h;
   const [windowDays, setWindowDays] = useState(30);
   const scrubbing = useRef<"main" | "overview" | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const view = useApp((s) => s.view);
   const [recStart, setRecStart] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -51,30 +59,38 @@ export default function Timeline() {
   };
 
   const total = data.ephem.count;
-  const span = windowDays * 24;
+  const span = Math.min(windowDays * 24, total);
   const start = Math.max(0, Math.min(total - span, hour - span / 3));
 
   useEffect(() => {
     const el = wrapRef.current!;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    let active = true;
+    const measure = () => {
+      if (active) setSize({ w: el.clientWidth, h: el.clientHeight });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    return () => ro.disconnect();
+    void document.fonts.ready.then(measure);
+    return () => {
+      active = false;
+      ro.disconnect();
+    };
   }, []);
 
   useEffect(() => {
     const c = canvasRef.current;
-    if (!c || !size.w) return;
+    if (!c || size.w <= LABEL_W + 12 || size.h <= OVERVIEW_H + 34) return;
     const dpr = window.devicePixelRatio || 1;
     c.width = size.w * dpr;
-    c.height = size.h * dpr;
+    c.height = chartHeight * dpr;
     const g = c.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, size.w, size.h);
+    g.clearRect(0, 0, size.w, chartHeight);
     const W = size.w - LABEL_W - 12;
     const x0 = LABEL_W;
 
-    g.fillStyle = "#0b0f17";
-    g.fillRect(x0, 8, W, OVERVIEW_H - 6);
+    g.fillStyle = "rgba(207,205,202,0.15)";
+    g.fillRect(x0, 13, W, 4);
     const ov = series?.sun;
     const bucket = Math.max(1, Math.floor(total / W));
     for (let px = 0; ov && px < W; px++) {
@@ -82,14 +98,16 @@ export default function Timeline() {
       let s = 0;
       for (let i = a; i < Math.min(total, a + bucket); i++) s += ov[i];
       const v = s / bucket / 255;
-      g.fillStyle = `rgba(255,181,71,${0.15 + v * 0.75})`;
-      g.fillRect(x0 + px, 8, 1, OVERVIEW_H - 6);
+      if (v > 0) {
+        g.fillStyle = `rgba(${SUN.join(",")},${0.2 + v * 0.65})`;
+        g.fillRect(x0 + px, 13, 1, 4);
+      }
     }
-    g.strokeStyle = "#8b9cff";
+    g.strokeStyle = "#e7ecf4";
     g.lineWidth = 1;
-    g.strokeRect(x0 + (start / total) * W, 7, Math.max(2, (span / total) * W), OVERVIEW_H - 4);
-    g.fillStyle = "#7d889b";
-    g.font = "10px JetBrains Mono, monospace";
+    g.strokeRect(x0 + (start / total) * W, 12, Math.max(2, (span / total) * W), 6);
+    g.fillStyle = "#bdc3cd";
+    g.font = "11px Geist, system-ui, sans-serif";
     // One label per year, or every 2nd / 5th year when the overview is too narrow for them all.
     const years = ephemYears(data.ephem);
     const yearPx = ((365.25 * 24) / total) * W;
@@ -97,65 +115,117 @@ export default function Timeline() {
     for (let y = years.first; y <= years.last; y++) {
       const h = (Date.UTC(y, 0, 1) - data.ephem.startMs) / 3600e3;
       if (h < 0 || h >= total || y % every !== 0) continue;
-      g.fillText(String(y), x0 + (h / total) * W + 3, 6 + 0);
+      g.fillText(String(y), x0 + (h / total) * W, 10);
     }
 
     const top = OVERVIEW_H + 18;
-    // arr is null while the compute worker is still producing that site's series: the row is drawn empty.
-    type Spec = { label: string; arr: Uint8Array | null; color: number[]; kind: "sun" | "flag"; link?: Uint8Array };
+    // Each compared site keeps the same three channels as the single-site view.
+    type Spec = { label: string; arr: Uint8Array | null; color: readonly number[]; kind: "sun" | "flag"; siteName?: string };
     const specs: Spec[] = compare
-      ? pinned.slice(0, 6).map((s) => {
-          const se = getSeries(data.ephem, s);
-          return { label: s.name.replace("Best spot ", "★").slice(0, 9).toUpperCase(), arr: se?.sun ?? null, color: [255, 181, 71], kind: "sun", link: se?.link };
+      ? pinned.flatMap((site) => {
+          const source = getSeries(data.ephem, site);
+          return ROWS.map((row, index) => ({
+            label: row.label,
+            siteName: index === 0 ? site.name : undefined,
+            arr: source?.[row.key] ?? null,
+            color: row.color,
+            kind: row.key === "sun" ? "sun" as const : "flag" as const,
+          }));
         })
-      : ROWS.map((row) => ({ label: row.label, arr: series?.[row.key] ?? null, color: [...row.color], kind: row.key === "sun" ? "sun" : "flag" }));
-    const rowH = Math.max(8, (size.h - top - 18) / specs.length - 3);
-    specs.forEach((row, r) => {
-      const y = top + r * (rowH + 3);
-      g.fillStyle = "#7d889b";
-      g.font = "10px JetBrains Mono, monospace";
-      g.fillText(row.label, 6, y + rowH / 2 + 3);
-      g.fillStyle = "#0b0f17";
-      g.fillRect(x0, y, W, rowH);
-      const [cr, cg, cb] = row.color;
+      : ROWS.map((row) => ({ label: row.label, arr: series?.[row.key] ?? null, color: row.color, kind: row.key === "sun" ? "sun" : "flag" }));
+    const rowH = compare ? 20 : Math.max(3, (chartHeight - top - 16) / specs.length - 2);
+    const plotBottom = chartHeight - 17;
+    g.strokeStyle = "rgba(224,234,248,0.13)";
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let tick = 0; tick <= 6; tick++) {
+      const gx = Math.round(x0 + W * tick / 6) + 0.5;
+      g.moveTo(gx, top - 3);
+      g.lineTo(gx, plotBottom);
+    }
+    g.stroke();
+    let nextY = top;
+    specs.forEach((row, index) => {
+      if (row.siteName) {
+        g.fillStyle = "rgba(4,8,14,0.54)";
+        g.fillRect(0, nextY - 2, size.w, 18);
+        g.fillStyle = "#f2f4f7";
+        g.font = "600 12px Geist, system-ui, sans-serif";
+        let siteName = row.siteName;
+        while (siteName.length > 1 && g.measureText(siteName).width > size.w - 28) siteName = siteName.slice(0, -1);
+        if (siteName !== row.siteName) siteName = siteName.slice(0, -1) + "…";
+        g.fillText(siteName, 12, nextY + 11);
+        nextY += 18;
+      }
+      const y = nextY;
+      nextY += rowH + 2;
+      const baseline = Math.round(y + rowH - 2) + 0.5;
+      const amplitude = Math.max(2, Math.min(13, rowH - 5));
+      g.fillStyle = index % 2 === 0 ? "rgba(224,234,248,0.035)" : "rgba(0,0,0,0.06)";
+      g.fillRect(0, y - 1, size.w, rowH + 2);
+      g.strokeStyle = "rgba(224,234,248,0.14)";
+      g.lineWidth = 1;
+      g.strokeRect(0.5, Math.round(y - 1) + 0.5, size.w - 1, Math.round(rowH + 2));
+      g.beginPath();
+      g.moveTo(x0 - 9.5, y);
+      g.lineTo(x0 - 9.5, y + rowH + 1);
+      g.stroke();
+      g.fillStyle = `rgb(${row.color.join(",")})`;
+      g.font = "500 13px Geist, system-ui, sans-serif";
+      g.fillText(row.label, 12, y + rowH / 2 + 4);
+      g.fillStyle = "rgba(207,205,202,0.16)";
+      g.fillRect(x0, baseline - 0.5, W, 1);
       const arr = row.arr;
-      for (let px = 0; arr && px < W; px++) {
+      if (!arr) {
+        g.fillStyle = "#bdc3cd";
+        g.font = "11px Geist, system-ui, sans-serif";
+        g.fillText("Calculating…", x0 + 8, y + rowH / 2 + 4);
+        return;
+      }
+      g.strokeStyle = `rgb(${row.color.join(",")})`;
+      g.lineWidth = 1.4;
+      g.beginPath();
+      let previousLevel = baseline;
+      for (let px = 0; px < W; px++) {
         const a = Math.floor(start + (px / W) * span);
         const b = Math.max(a + 1, Math.floor(start + ((px + 1) / W) * span));
-        let s = 0;
-        let l = 0;
-        for (let i = a; i < b && i < total; i++) {
-          s += row.kind === "sun" ? arr[i] / 255 : arr[i];
-          if (row.link) l += row.link[i];
+        let value = 0;
+        for (let i = a; i < b && i < total; i++) value += row.kind === "sun" ? arr[i] / 255 : arr[i];
+        const signal = baseline - value / (b - a) * amplitude;
+        const x = x0 + px + 0.5;
+        if (px === 0) g.moveTo(x, signal);
+        else {
+          g.lineTo(x, previousLevel);
+          g.lineTo(x, signal);
         }
-        const v = s / (b - a);
-        if (v > 0.02) {
-          g.fillStyle = `rgba(${cr},${cg},${cb},${0.2 + 0.8 * v})`;
-          g.fillRect(x0 + px, y, 1, row.link ? rowH - 3 : rowH);
-        }
-        if (row.link && l / (b - a) > 0.5) {
-          g.fillStyle = "rgba(61,220,151,0.95)";
-          g.fillRect(x0 + px, y + rowH - 2, 1, 2);
-        }
+        previousLevel = signal;
       }
+      g.lineTo(x0 + W, previousLevel);
+      g.stroke();
     });
 
-    const dayStep = windowDays <= 7 ? 1 : windowDays <= 30 ? 5 : windowDays <= 90 ? 15 : 60;
+    const dayStep = [1, 2, 5, 10, 15, 30, 60, 90, 180, 365].find((step) => W / windowDays * step >= 60) ?? 365;
     const firstDay = Math.ceil(start / 24);
-    g.fillStyle = "#4b5568";
+    g.fillStyle = "#bdc3cd";
+    g.font = "12px Geist, system-ui, sans-serif";
     for (let d = firstDay; d * 24 < start + span; d++) {
       const x = x0 + ((d * 24 - start) / span) * W;
       g.fillRect(x, top - 4, 1, 3);
-      if (d % dayStep === 0) {
+      if (d % dayStep === 0 && x + 44 < size.w) {
         const date = hourToDate(data, d * 24);
-        g.fillText(`${date.toLocaleString("en", { month: "short", timeZone: "UTC" })} ${date.getUTCDate()}`, x + 2, size.h - 4);
+        g.fillText(`${date.toLocaleString("en", { month: "short", timeZone: "UTC" })} ${date.getUTCDate()}`, x + 2, chartHeight - 4);
       }
     }
 
     const cx = x0 + ((hour - start) / span) * W;
-    g.fillStyle = "#ffffff";
-    g.fillRect(cx - 0.75, top - 6, 1.5, size.h - top);
-  }, [data, series, seriesVersion, size, hour, start, span, total, windowDays, compare, pinned]);
+    g.fillStyle = "#f0eeea";
+    g.fillRect(cx - 0.5, top - 8, 1, chartHeight - top - 7);
+    g.beginPath();
+    g.moveTo(cx - 3, top - 9);
+    g.lineTo(cx + 3, top - 9);
+    g.lineTo(cx, top - 5);
+    g.fill();
+  }, [data, series, seriesVersion, size, hour, start, span, total, windowDays, compare, pinned, chartHeight]);
 
   const hourFromEvent = (e: React.PointerEvent, mode: "main" | "overview") => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -164,56 +234,87 @@ export default function Timeline() {
     return mode === "overview" ? f * total : start + f * span;
   };
 
+  const date = hourToDate(data, hour);
   return (
-    <footer className="bottom">
+    <footer className={compare ? "bottom comparison-timeline" : "bottom"} aria-label="Site timeline">
       <div className="transport">
-        <div className="row">
-          <button className="btn primary" onClick={togglePlaying}>
-            {playing ? "Pause" : "Play"}
+        <div className="row" role="group" aria-label="Time playback">
+          <button className="control-action play-toggle" aria-label={playing ? "Pause" : "Play"} onClick={togglePlaying}>
+            <Icon name={playing ? "pause" : "play"} />
           </button>
-          <button className="btn" onClick={() => setHour(Math.floor(hour) - 24)}>
-            −1d
+          <button className="control-action" aria-label="Back one day" onClick={() => setHour(Math.floor(hour) - 24)}>
+            <Icon name="left" />
           </button>
-          <button className="btn" onClick={() => setHour(Math.floor(hour) + 24)}>
-            +1d
+          <button className="control-action" aria-label="Forward one day" onClick={() => setHour(Math.floor(hour) + 24)}>
+            <Icon name="right" />
           </button>
           {view === "3d" && canRecord() && (
-            <button className={`btn rec ${recStart !== null ? "on" : ""}`} onClick={toggleRec} title="Record the 3D view to a video file (plays time while recording)">
-              {recStart === null ? "● Rec" : `■ ${Math.floor((Date.now() - recStart) / 1000)}s`}
+            <button className={`control-action rec ${recStart !== null ? "on" : ""}`} onClick={toggleRec}
+              aria-label={recStart === null ? "Record 3D view" : "Stop recording"}
+              title={recStart === null ? "Record 3D view" : "Stop recording"}>
+              <span className="record-symbol" aria-hidden="true" />
+              {recStart !== null && <span>{Math.floor((Date.now() - recStart) / 1000)}s</span>}
             </button>
           )}
         </div>
-        <div className="row">
-          {SPEEDS.map((s, i) => (
-            <button key={s.label} className={`btn small ${i === speedIndex ? "sel" : ""}`} onClick={() => setSpeedIndex(i)}>
-              {s.label}
-            </button>
-          ))}
+        <time className="timeline-time" dateTime={date.toISOString()}>
+          <span>{timelineDate.format(date)}</span>
+          <strong>{formatUtc(date).slice(-5)}</strong>
+          <span className="time-zone">UTC</span>
+        </time>
+        <div className="row timeline-options">
+          <ControlMenu label="Speed" value={SPEEDS[speedIndex].label} placement="above">
+            {(close) => SPEEDS.map((speed, index) => (
+              <button key={speed.label} className="control-action" aria-pressed={index === speedIndex}
+                onClick={() => { setSpeedIndex(index); close(); }}>
+                {speed.label}
+              </button>
+            ))}
+          </ControlMenu>
+          <ControlMenu label="Window" value={windowDays === 365 ? "1 year" : windowDays + " days"} placement="above" align="end">
+            {(close) => WINDOWS.map((days) => (
+              <button key={days} className="control-action" aria-pressed={days === windowDays}
+                onClick={() => { setWindowDays(days); close(); }}>
+                {days === 365 ? "1 year" : days + " days"}
+              </button>
+            ))}
+          </ControlMenu>
         </div>
-        <div className="row">
-          {WINDOWS.map((d) => (
-            <button key={d} className={`btn small ${d === windowDays ? "sel" : ""}`} onClick={() => setWindowDays(d)}>
-              {d}d
-            </button>
-          ))}
-        </div>
-        <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted)" }}>{formatUtc(hourToDate(data, hour))} UTC</div>
       </div>
       <div
         className="timeline"
         ref={wrapRef}
+        tabIndex={0}
+        aria-label={compare ? "Sun, Earth, and DSN for each compared site. Scroll for more sites, or drag horizontally to change time." : "Sun, Earth, and DSN timeline. Drag or use the arrow keys to change the time."}
         onPointerDown={(e) => {
           (e.target as Element).setPointerCapture(e.pointerId);
           const rect = canvasRef.current!.getBoundingClientRect();
           scrubbing.current = e.clientY - rect.top < OVERVIEW_H + 8 ? "overview" : "main";
-          setHour(hourFromEvent(e, scrubbing.current));
+          if (e.pointerType === "touch") touchStart.current = { x: e.clientX, y: e.clientY };
+          else setHour(hourFromEvent(e, scrubbing.current));
         }}
-        onPointerMove={(e) => {
-          if (scrubbing.current) setHour(hourFromEvent(e, scrubbing.current));
+        onPointerMove={(event) => {
+          if (!scrubbing.current) return;
+          if (touchStart.current) {
+            const dx = Math.abs(event.clientX - touchStart.current.x);
+            const dy = Math.abs(event.clientY - touchStart.current.y);
+            if (dx < 6 && dy < 6) return;
+            touchStart.current = null;
+            if (dy > dx) {
+              scrubbing.current = null;
+              return;
+            }
+          }
+          setHour(hourFromEvent(event, scrubbing.current));
         }}
-        onPointerUp={() => (scrubbing.current = null)}
+        onPointerUp={(event) => {
+          if (touchStart.current && scrubbing.current) setHour(hourFromEvent(event, scrubbing.current));
+          touchStart.current = null;
+          scrubbing.current = null;
+        }}
+        onPointerCancel={() => { touchStart.current = null; scrubbing.current = null; }}
       >
-        <canvas ref={canvasRef} />
+        <canvas ref={canvasRef} style={{ height: chartHeight }} />
       </div>
     </footer>
   );

@@ -1,19 +1,21 @@
 import { lazy, useState } from "react";
-import { formatUtc, hourToDate, useApp } from "../state/store";
+import { useApp } from "../state/store";
 import { copyShareLink } from "../state/share";
-import { useSelectedSite, useSiteState } from "../state/selectors";
+import ControlMenu from "./ControlMenu";
 import LazyPanel from "./LazyPanel";
 
 const ValidationPanel = lazy(() => import("./ValidationPanel"));
 
-export default function TopBar() {
-  const data = useApp((s) => s.data)!;
-  const hour = useApp((s) => s.hour);
-  const site = useSelectedSite();
-  const st = useSiteState();
-  const sunPct = Math.round(st.sunFraction * 100);
+export type PanelAppearance = "glass" | "solid";
+
+export default function TopBar({ panelAppearance, setPanelAppearance }: {
+  panelAppearance: PanelAppearance;
+  setPanelAppearance: (value: PanelAppearance) => void;
+}) {
   const quality = useApp((s) => s.quality);
   const setQuality = useApp((s) => s.setQuality);
+  const cinema = useApp((s) => s.cinema);
+  const toggleCinema = useApp((s) => s.toggleCinema);
   const [copied, setCopied] = useState<null | boolean>(null);
   const validation = useApp((s) => s.validationOpen);
   const setValidation = useApp((s) => s.setValidationOpen);
@@ -22,48 +24,66 @@ export default function TopBar() {
     setCopied(await copyShareLink());
     setTimeout(() => setCopied(null), 2200);
   };
+
   return (
     <header className="topbar">
-      <div className="brand">
-        <div className="brand-mark" />
-        LUNAR WINDOW <small>south pole mission planner</small>
-      </div>
-      <div className="clock">
-        {formatUtc(hourToDate(data, hour))}
-        <span>UTC</span>
-      </div>
-      <div className="spacer" />
-      <div className="power" title="Graphics power: Saver uses the least GPU">
-        {(["saver", "balanced", "high"] as const).map((q) => (
-          <button key={q} className={`chip ${q === quality ? "sel" : ""}`} onClick={() => setQuality(q)}>
-            {q === "saver" ? "Saver" : q === "balanced" ? "Balanced" : "High"}
-          </button>
-        ))}
-      </div>
-      {!touring && (
-        <button className="chip tour-btn" onClick={() => useApp.getState().setTourStep(0)} title="A one-minute guided tour of what Lunar Window does">
-          ▶ Tour
-        </button>
+      {!cinema && (
+        <div className="glass app-title">
+          <h1>Lunar Window</h1>
+        </div>
       )}
-      <button className="chip" onClick={() => setValidation(true)} title="How every number is checked against NASA tools and published measurements">
-        ✓ Validation
-      </button>
-      <button className="chip share" onClick={share} title="Copy a link that opens this exact view: site, time, layer, your points and the camera">
-        {copied === null ? "⤴ Share view" : copied ? "✓ Link copied" : "Link is in the address bar"}
-      </button>
-      <span style={{ color: "var(--muted)", fontSize: 12 }}>{site.name}</span>
-      <span className={`pill ${sunPct > 0 ? "on-sun" : ""}`}>
-        <i />
-        SUN {sunPct > 0 ? `${sunPct}%` : "BLOCKED"}
-      </span>
-      <span className={`pill ${st.earthUp ? "on-earth" : ""}`}>
-        <i />
-        EARTH {st.earthUp ? "IN VIEW" : "HIDDEN"}
-      </span>
-      <span className={`pill ${st.link ? "on-link" : ""}`}>
-        <i />
-        DSN LINK {st.link ? "OPEN" : "DOWN"}
-      </span>
+      <div className="glass view-actions">
+        {!cinema && (
+          <ControlMenu label="Settings" align="end">
+            {(close) => (
+              <>
+                <div className="control-label">Graphics</div>
+                <div className="seg control-options" role="group" aria-label="Graphics quality">
+                  {(["saver", "balanced", "high"] as const).map((q) => (
+                    <button key={q} className="control-action" aria-pressed={q === quality} onClick={() => setQuality(q)}>
+                      {q === "saver" ? "Saver" : q === "balanced" ? "Balanced" : "High"}
+                    </button>
+                  ))}
+                </div>
+                <div className="control-label">Panel appearance</div>
+                <div className="seg control-options" role="group" aria-label="Panel appearance">
+                  {(["glass", "solid"] as const).map((appearance) => (
+                    <button key={appearance} className="control-action" aria-pressed={appearance === panelAppearance}
+                      onClick={() => setPanelAppearance(appearance)}>
+                      {appearance === "glass" ? "Glass" : "Solid"}
+                    </button>
+                  ))}
+                </div>
+                <button className="control-action" onClick={share}>Share view</button>
+                <span className="share-status" role="status">
+                  {copied === null ? "" : copied ? "Link copied" : "Link is in the address bar"}
+                </span>
+                {!touring && (
+                  <button className="control-action" onClick={() => { close(); useApp.getState().setTourStep(0); }}>
+                    Guided tour
+                  </button>
+                )}
+                <button className="control-action" onClick={() => { close(); setValidation(true); }}>Validation</button>
+                <details className="shortcut-help">
+                  <summary>Keyboard and mouse</summary>
+                  <ul>
+                    <li>WASD move · R / F up or down</li>
+                    <li>Q / E turn · Drag to look</li>
+                    <li>Right-drag to pan · Scroll to zoom</li>
+                    <li>Click terrain to add a point</li>
+                    <li>Space plays · ← / → change hour</li>
+                    <li>H hides or shows panels</li>
+                  </ul>
+                </details>
+              </>
+            )}
+          </ControlMenu>
+        )}
+        <button type="button" className="control-trigger panels-toggle" onClick={toggleCinema} aria-keyshortcuts="H"
+          title={cinema ? "Show panels (H)" : "Hide panels (H)"}>
+          {cinema ? "Show panels" : "Hide panels"}
+        </button>
+      </div>
       {validation && (
         <LazyPanel name="the validation window" onClose={() => setValidation(false)}>
           <ValidationPanel onClose={() => setValidation(false)} />
