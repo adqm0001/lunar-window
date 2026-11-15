@@ -1163,12 +1163,12 @@ export class MoonScene {
     this.last = now;
     const keys = this.keys;
     if (this.splitOn && this.activeRight) this.keys = NO_KEYS;
-    this.stepCamera(dt);
+    this.stepCamera(dt, flightDt);
     this.keys = keys;
     if (this.splitOn)
       this.inView(true, () => {
         if (!this.activeRight) this.keys = NO_KEYS;
-        this.stepCamera(dt);
+        this.stepCamera(dt, flightDt);
         this.keys = keys;
       });
     this.updateDepthAndSky();
@@ -1192,7 +1192,7 @@ export class MoonScene {
   };
 
   // Moves the current view's camera one frame: flight, 2D map keys, or orbit/surface controls.
-  private stepCamera(dt: number) {
+  private stepCamera(dt: number, flightDt: number) {
     if (this.flight) {
       const f = this.flight;
       f.t = Math.min(1, f.t + flightDt / f.dur);
