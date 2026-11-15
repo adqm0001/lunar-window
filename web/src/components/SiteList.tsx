@@ -107,7 +107,7 @@ export default function SiteList() {
       {/* A replay reloads the page with its own ephemeris (see REPLAYS in data/load.ts); exiting reloads without it. */}
       <div className="section-label">{data.replay ? `Replaying ${data.replay.name}` : "Mission replays"}</div>
       {data.replay ? (
-        <button className="site-row" onClick={() => location.assign(location.pathname)} title="Reload with the 2026–2028 Sun and Earth positions">
+        <button className="site-row" onClick={() => location.assign(location.pathname)} title="Reload with the regular Sun and Earth positions">
           <span className="name">Exit the {data.replay.name} replay</span>
           <span className="meta">↩</span>
         </button>
