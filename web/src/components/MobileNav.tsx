@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect } from "react";
 import { currentScene } from "../state/share";
 import { useApp } from "../state/store";
@@ -25,7 +26,8 @@ export default function MobileNav() {
 
   // Hidden while a sheet, the chart / compare table or the tour card covers that corner; release both if they hide
   // while one is held.
-  const showLift = panel === "none" && !touring && !midOpen;
+  const cinema = useApp((s) => s.cinema);
+  const showLift = !cinema && panel === "none" && !touring && !midOpen;
   useEffect(() => {
     if (!showLift) return;
     return () => {
@@ -41,7 +43,7 @@ export default function MobileNav() {
   );
 
   // Held like the R / F keys: the camera keeps moving until the finger lifts, even if it slides off the button.
-  const lift = (key: "r" | "f", label: string, glyph: string) => (
+  const lift = (key: "r" | "f", label: string, glyph: "up" | "down") => (
     <button
       className="m-lift-btn"
       aria-label={label}
@@ -59,7 +61,7 @@ export default function MobileNav() {
       onPointerLeave={() => currentScene()?.setHeld(key, false)}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {glyph}
+      <Icon name={glyph} />
     </button>
   );
 
@@ -67,16 +69,16 @@ export default function MobileNav() {
     <>
       {showLift && (
         <div className="m-lift">
-          {lift("r", "Move the camera up", "▲")}
-          {lift("f", "Move the camera down", "▼")}
+          {lift("r", "Move the camera up", "up")}
+          {lift("f", "Move the camera down", "down")}
         </div>
       )}
       <nav className="glass mobile-nav" aria-label="Panels">
         {tab("sites", tool ? "Tools" : "Sites")}
         {tab("site", "Site")}
         {tab("time", "Time")}
-        <button className="m-tab play" onClick={() => useApp.getState().togglePlaying()}>
-          {playing ? "❚❚" : "▶"}
+        <button className="m-tab play" aria-label={playing ? "Pause timeline" : "Play timeline"} onClick={() => useApp.getState().togglePlaying()}>
+          <Icon name={playing ? "pause" : "play"} />
         </button>
       </nav>
     </>
