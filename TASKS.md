@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Disclose the site's available contact interval** ([#205](https://github.com/adqm0001/lunar-window/issues/205)) — taken: malqedra
+  - **Files:** `web/src/components/SitePanel.tsx` and regression tests.
+  - **Spec:** retain the next-seven-days label when fully covered; otherwise show the exact available hours and the active dataset's cutoff. Describe no-pass results only for the covered interval, without inferring an all-week blocked horizon or a necessary relay. Preserve contact windows, rates and totals.
+  - **Verify:** full-week and exact-boundary controls, 167 hours remaining, final main/replay hour, passes and no passes; TypeScript, tests, build and production before/after checks without console errors.
+
 - [x] **Apply the rover slope limit to the destination** ([#203](https://github.com/adqm0001/lunar-window/issues/203)) — taken: malqedra
   - **Files:** `web/src/lib/rover.ts` and regression tests.
   - **Spec:** entering the destination obeys the same slope limit as entering other terrain cells. Reject too-steep targets with an actionable reason, preserve exact-limit destinations, and allow a zero-distance start=goal result because it requires no driving. Keep the existing slope data and model.
