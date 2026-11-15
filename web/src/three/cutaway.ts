@@ -49,6 +49,31 @@ void main() {
   fragColor = vec4(col, 1.0);
 }`;
 
+/**
+ * Whether the label anchored at `anchor` can be seen from `cam` (both relative to the Moon's centre, km). The removed
+ * wedge is dot(p, a) > 0 and dot(p, b) > 0 (as in the shader), so the anchor is seen only if the line from the camera
+ * reaches the Moon's surface inside the wedge, where there is no rock in the way: the entry point of the ray into the
+ * sphere (the camera itself if it is inside) must be in the wedge. The wedge is convex, so the rest of the line to the
+ * anchor then stays in it. The anchors sit a little off the cut planes (the layer labels are lifted towards the
+ * camera's up), so the entry point may be that far outside the planes and still count.
+ */
+export function cutawayLabelVisible(cam: THREE.Vector3, anchor: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, radius: number): boolean {
+  const d = anchor.clone().sub(cam);
+  const A = d.lengthSq();
+  if (A === 0) return true;
+  let t = 0; // a camera inside the sphere sees from where it is
+  if (cam.lengthSq() > radius * radius) {
+    const B = cam.dot(d);
+    const disc = B * B - A * (cam.lengthSq() - radius * radius);
+    if (disc < 0) return false;
+    t = (-B - Math.sqrt(disc)) / A;
+    if (t > 1) return true; // the anchor is in front of the sphere
+  }
+  const p = cam.clone().addScaledVector(d, Math.max(t, 0));
+  const tol = 0.1 * radius;
+  return p.dot(a) >= -tol && p.dot(b) >= -tol;
+}
+
 export class Cutaway {
   group = new THREE.Group();
   a = new THREE.Vector3(1, 0, 0);
@@ -147,9 +172,15 @@ export class Cutaway {
     if (!this.group.visible) return;
     if (!(width > 0 && height > 0)) return;
     // where CSS2DRenderer puts each label; one it hides (outside the depth range, e.g. behind the camera) gets NaN
-    // so it doesn't push the visible ones around
+    // so it doesn't push the visible ones around; a label hidden by the Moon's rock (seen from outside the open
+    // wedge) is hidden (CSS2DRenderer gives it display none) and gets NaN the same way
+    const cam = camera.position.clone().sub(MOON_CENTER);
     const pts = this.labels.map((o) => {
-      const v = o.getWorldPosition(this.scratch).project(camera);
+      const w = o.getWorldPosition(this.scratch);
+      const seen = cutawayLabelVisible(cam, w.clone().sub(MOON_CENTER), this.a, this.b, R_MOON_KM);
+      o.visible = seen; // CSS2DRenderer sets display none on an invisible label (it overwrites the element style)
+      if (!seen) return [NaN, NaN];
+      const v = w.project(camera);
       return v.z < -1 || v.z > 1 ? [NaN, NaN] : [(v.x + 1) * 0.5 * width, (1 - v.y) * 0.5 * height];
     });
     // until the observer has measured a box (before its first render) use typical sizes; it then re-renders
