@@ -92,3 +92,39 @@ export class LanderModel {
     this.sunLight.target.updateMatrixWorld();
   }
 }
+
+// Shadow the lander casts on the ground, for both terrain shaders. The lander is treated as an upright cylinder
+// (radius uLanderR, height uLanderH, km) standing at uLanderPos. Within 0.2 km of it, a ground point is projected
+// into the lander's local tangent plane and tested against the cylinder's shadow: its footprint swept away from the
+// Sun for H / tan(sun elevation). The edge widens with distance like a penumbra (the Sun's disc is 0.53° across).
+// Same idea as rockShadow in craterTexture.ts.
+export const LANDER_SHADOW_R_KM = 0.0025;
+export const LANDER_SHADOW_H_KM = 0.0045;
+
+export const LANDER_SHADOW_GLSL = /* glsl */ `
+uniform vec3 uLanderPos;
+uniform vec3 uLanderUp;
+uniform float uLanderR;
+uniform float uLanderH;
+uniform float uLanderOn;
+
+// 0 in the lander's shadow, 1 outside it. pw: ground point (world km); sunW: unit direction to the Sun (world).
+float landerShadow(vec3 pw, vec3 sunW) {
+  if (uLanderOn < 0.5) return 1.0;
+  vec3 rel = pw - uLanderPos;
+  float r2 = dot(rel, rel);
+  if (r2 > 0.04) return 1.0;
+  float sinE = dot(sunW, uLanderUp);
+  vec3 s = sunW - uLanderUp * sinE;
+  float sl = length(s);
+  if (sinE <= 0.0 || sl < 1e-6) return 1.0;
+  vec3 sd = s / sl;
+  vec3 p = rel - uLanderUp * dot(rel, uLanderUp);
+  float len = uLanderH / max(sinE / sl, 1e-3);
+  float along = -dot(p, sd);
+  float dist = length(p + sd * clamp(along, 0.0, len));
+  float pen = 0.0002 + max(along, 0.0) * 0.0093;
+  float shadow = 1.0 - smoothstep(uLanderR - pen * 0.5, uLanderR + pen * 0.5, dist);
+  return 1.0 - shadow * (1.0 - smoothstep(0.03, 0.04, r2));
+}
+`;

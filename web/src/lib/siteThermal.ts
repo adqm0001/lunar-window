@@ -1,7 +1,7 @@
 import type { Ephemeris, Site } from "../data/load";
 import { altaz, localFrame } from "./astro";
 import { siteRadiusKm, siteSeries, type SiteSeries } from "./visibility";
-import { ICE_K, NZ } from "../gpu/thermal";
+import { BOUNCE_ABSORBED, ICE_K, NZ } from "../gpu/thermal";
 
 // Same regolith heat-flow model as the GPU layer (see gpu/thermal.ts), for one site, hourly,
 // on level ground. Runs in the compute worker (src/workers); the UI reads results through state/seriesCache.ts.
@@ -27,6 +27,16 @@ export interface SiteThermal {
 
 const cache = new Map<string, SiteThermal>();
 
+/** Fraction of the (cosine-weighted) sky covered by terrain: mean of sin² of the horizon elevation. */
+export function terrainViewFactor(horizonDeg: ArrayLike<number>): number {
+  let f = 0;
+  for (let i = 0; i < horizonDeg.length; i++) {
+    const s = Math.sin((Math.max(0, horizonDeg[i]) * Math.PI) / 180);
+    f += s * s;
+  }
+  return horizonDeg.length ? f / horizonDeg.length : 0;
+}
+
 /** The window siteThermal actually models: start rounded down to a whole day, clipped to the ephemeris. */
 export function thermalWindow(e: Ephemeris, startHour: number, hours: number) {
   const start = Math.max(0, Math.min(e.count - 1, Math.floor(startHour / 24) * 24));
@@ -43,13 +53,15 @@ export function siteThermal(e: Ephemeris, site: Site, startHour: number, hours =
   const sun = (series ?? siteSeries(e, site)).sun;
   const frame = localFrame(site.lat, site.lon);
   const r = siteRadiusKm(site);
+  // share of the sky covered by terrain, for light and heat bounced off it (see gpu/thermal.ts)
+  const F = terrainViewFactor(site.horizon);
   const absorbedAt = (i: number) => {
     const o = i * 6;
     const s = altaz([e.data[o], e.data[o + 1], e.data[o + 2]], frame, r);
     const mu = Math.max(0, Math.sin((s.el * Math.PI) / 180));
     const inc = (Math.acos(Math.min(1, mu)) * 180) / Math.PI;
     const albedo = 0.12 + 0.06 * (inc / 45) ** 3 + 0.25 * (inc / 90) ** 8;
-    return (1 - albedo) * S0 * (sun[i] / 255) * mu;
+    return (1 - albedo) * S0 * (sun[i] / 255) * mu + F * S0 * mu * BOUNCE_ABSORBED;
   };
   const absorbed = new Float32Array(len);
   let fluxSum = 0;
