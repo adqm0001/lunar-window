@@ -1,7 +1,7 @@
 import type { Ephemeris } from "../data/load";
 import type { GlobeData } from "../data/globe";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
-import { NZ, ICE_K } from "./thermal";
+import { BOUNCE_ABSORBED, NZ, ICE_K } from "./thermal";
 
 // The same sunlight, Earth, link, night, temperature and ice maps as the polar engine, for the
 // whole Moon on a 0.25° grid (1440 x 720, about a million points), all on the GPU.
@@ -223,6 +223,7 @@ const float S0 = 1361.0;
 const float EMIS = 0.95;
 const float SIGMA = 5.670374e-8;
 const float QGEO = 0.018;
+const float BOUNCE = ${BOUNCE_ABSORBED.toFixed(6)};
 float cpOf(float T) { return -3.6125 + T * (2.7431 + T * (2.3616e-3 + T * (-1.2340e-5 + T * 8.9093e-9))); }
 void main() {
   vec3 up, east, north;
@@ -235,6 +236,14 @@ void main() {
   float dE = (heightAt(normalize(up + east * e)) - heightAt(normalize(up - east * e))) / 2000.0;
   float dN = (heightAt(normalize(up + north * e)) - heightAt(normalize(up - north * e))) / 2000.0;
   vec3 nrm = normalize(up - dE * east - dN * north);
+
+  // share of the sky covered by terrain, for light and heat bounced off it (see gpu/thermal.ts)
+  float F = 0.0;
+  for (int b = 0; b < ${N_AZ}; b++) {
+    float sinH = sin(radians(max(hzBin(c, b), 0.0)));
+    F += sinH * sinH;
+  }
+  F /= ${N_AZ}.0;
 
   float dz[NZ]; float z[NZ]; float rhoZ[NZ]; float kc[NZ]; float T[NZ]; float Tmx[NZ];
   float depth = 0.0;
@@ -257,7 +266,7 @@ void main() {
     float saz = degrees(atan(dot(sv, east), dot(sv, north)));
     if (saz < 0.0) saz += 360.0;
     float d = clamp((sel - horizonAt(c, saz)) / SUN_R, -1.0, 1.0);
-    fluxSum += S0 * (acos(-d) + d * sqrt(1.0 - d * d)) / PI * max(0.0, dot(nrm, sv)) * 0.88;
+    fluxSum += S0 * (acos(-d) + d * sqrt(1.0 - d * d)) / PI * max(0.0, dot(nrm, sv)) * 0.88 + F * S0 * max(0.0, sin(radians(sel))) * BOUNCE;
   }
   float T0 = max(30.0, pow((fluxSum / float(uSteps) + QGEO) / (EMIS * SIGMA), 0.25) * 0.9);
   for (int i = 0; i < NZ; i++) { T[i] = T0; Tmx[i] = 0.0; }
@@ -273,7 +282,7 @@ void main() {
     float mu = max(0.0, dot(nrm, sv));
     float inc = degrees(acos(clamp(mu, 0.0, 1.0)));
     float albedo = 0.12 + 0.06 * pow(inc / 45.0, 3.0) + 0.25 * pow(inc / 90.0, 8.0);
-    float absorbed = (1.0 - albedo) * S0 * frac * mu;
+    float absorbed = (1.0 - albedo) * S0 * frac * mu + F * S0 * max(0.0, sin(radians(sel))) * BOUNCE;
     for (int s = 0; s < nsub; s++) {
       float Tn[NZ]; float kk[NZ];
       for (int i = 0; i < NZ; i++) { float r = T[i] / 350.0; kk[i] = kc[i] * (1.0 + 2.7 * r * r * r); }

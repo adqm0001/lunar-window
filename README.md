@@ -63,9 +63,9 @@ Mission planners have to answer two questions at once: **where** is there light,
 | Sun and Earth positions vs. NASA JPL Horizons (3 sites, one year) | agree to **0.00003°** |
 | Sunlight at the five "peaks of light" vs. Bussey et al. 2010 | within **3.7 percentage points** on average |
 | Equatorial temperature (Apollo 11 site) vs. NASA Diviner | **86–385 K** modelled, about 95–390 K measured |
-| Shackleton crater floor | below 110 K all year: a cold trap where ice is stable |
+| Shackleton crater floor (never sunlit) | **39–99 K** over a year with light bounced off the crater walls; below 110 K, a cold trap where ice is stable |
 
-The validation panel in the app recomputes several of these live. Its limits are stated openly too: the terrain is only as sharp as the LOLA data (40 m near the pole), small craters and rocks shown up close are for looks only, and the thermal model leaves out light reflected from nearby slopes.
+The validation panel in the app recomputes several of these live. Its limits are stated openly too: the terrain is only as sharp as the LOLA data (40 m near the pole), small craters and rocks shown up close are for looks only, and the thermal model treats light and heat bounced between slopes with a single-bounce crater approximation (Ingersoll et al. 1992).
 
 ## How it works
 

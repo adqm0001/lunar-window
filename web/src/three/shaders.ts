@@ -1,4 +1,5 @@
 import { CRATER_TEX_GLSL, GROUND_GLSL } from "./craterTexture";
+import { LANDER_SHADOW_GLSL } from "./landerModel";
 export const TERRAIN_VERT = /* glsl */ `
 attribute vec2 aMap;
 varying vec2 vMap;
@@ -77,6 +78,7 @@ float horizonAt(vec2 m, float az) {
 
 ${CRATER_TEX_GLSL}
 ${GROUND_GLSL}
+${LANDER_SHADOW_GLSL}
 
 void main() {
   if (uCutOn > 0.5) {
@@ -132,6 +134,7 @@ void main() {
     if (lit > 0.0 && sel > 0.0) lit *= mix(1.0, rockShadow(vMap, sunMap, tan(radians(sel))), fd);
     rockAlb = mix(1.0, 1.2, rmask * fd);
   }
+  if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);
