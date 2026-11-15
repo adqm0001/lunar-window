@@ -416,6 +416,11 @@ export class MoonScene {
     if (this.selected) this.highlight(this.selected);
   }
 
+  /** The site the scene last highlighted (and flew to, if it changed); set by Scene3D's effect after the store changes. */
+  get selectedSiteId(): string | null {
+    return this.selected;
+  }
+
   select(site: Site, fly: boolean) {
     this.dirty = true;
     this.selected = site.id;
