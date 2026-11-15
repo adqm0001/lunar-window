@@ -205,7 +205,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** split the 6250² grid into 8×8 tiles (782² each; last row/col may be smaller), each `int16` metres with row deltas, gzip, named `ty_tx.bin.gz`. Record `tile`, `tiles`, `size`, `cellMeters`, `firstCenterMeters` in `globe.json` under `polar80`. Keep `−32768` for missing.
   - **Verify:** reassembling the tiles in Python equals the old array exactly.
 
-- [ ] **35. Load 80 m tiles on demand** (M) — Depends on 34
+- [x] **35. Load 80 m tiles on demand** (M) — Depends on 34
   - **Files:** `src/data/globe.ts` (`loadPolar80`), `src/three/lod.ts` (`refreshPolar80`, uniform `uP80`), `src/three/MoonScene.ts`.
   - **Spec:** allocate the full 6250² `Int16Array` filled with `−32768` and a matching R16I texture once. Fetch tiles nearest the camera first (sort by distance from the camera's polar-map position), max 4 in flight. For each arrival: copy into the array, `texSubImage2D` that region, mark LOD nodes whose bounds overlap that tile dirty (instead of all polar nodes).
   - **Verify:** DevTools network: first sharp view of the pole needs < 8 MB of polar80 data; heights unchanged (spot-check `globeHeight` at 5 points against the old file).
@@ -251,22 +251,22 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** in `THERMAL_MAIN`, before the time loop, compute the fraction of the (cosine-weighted) sky covered by terrain from the horizon field: `F = (1/N) Σ_az sin²(max(h(az), 0))` over the `uAzBins` directions, using the existing `horizonAt(col, row, az)` (degrees). This is the radiative view factor from the cell to surrounding terrain.
   - **Verify:** temporarily output `F` in a channel: flat plains ≈ 0, crater floors (Shackleton floor) ≈ 0.05–0.15. Revert the debug output.
 
-- [ ] **43. Scattered sunlight term** (M) — Depends on 42
+- [x] **43. Scattered sunlight term** (M) — Depends on 42
   - **Files:** `src/gpu/thermal.ts`.
-  - **Spec:** per time step add `Q_scat = F · A_t · S0 · max(0, sin(elevSun + 20°)) · L_up` to `absorbed`, where `A_t = 0.12` is terrain albedo, `20°` approximates the mean slope of sunlit crater walls facing the Sun, and `L_up = 1` if the Sun is above the ideal horizon (`sel > 0`) else 0. This is a first-order estimate (Paige et al. 2010 handle it with full view-factor matrices); keep the formula and assumptions in a comment.
-  - **Verify:** Shackleton floor max temperature rises from ~26 K into roughly 35–60 K; equator unchanged (F ≈ 0).
+  - **Spec (corrected):** the first version assumed every wall around a crater is sunlit at ~21° incidence, which puts Shackleton's floor near 186 K. Only light entering the crater's opening reaches the bowl, so the term follows Ingersoll, Svitek & Murray 1992 (Icarus 100) instead: with `E = S0 · max(0, sin(sunElevation))` (elevation above the flat horizon) and wall albedo `A = 0.12`, add `F · E · A · (1 − A)` to `absorbed`. Constants live in `src/gpu/thermal.ts` (`WALL_ALBEDO`, `BOUNCE_ABSORBED`).
+  - **Verify:** Shackleton floor annual maximum rises from ~26 K and stays below 110 K; the equator and the peaks (F ≈ 0) are unchanged.
 
-- [ ] **44. Infrared from surrounding terrain** (M) — Depends on 42
+- [x] **44. Infrared from surrounding terrain** (M) — Depends on 42
   - **Files:** `src/gpu/thermal.ts`.
-  - **Spec:** add `Q_ir = F · ε · σ · T_w⁴`, with `T_w` the temperature of sunlit walls: `T_w = ((1 − A_t) · S0 · max(0, sin(elevSun + 20°)) / (ε σ))^(1/4)` when the Sun is up, else 0.
-  - **Verify:** with 43, Shackleton floor max in the Diviner range (~40–60 K); equator still 86–385 K.
+  - **Spec (corrected):** the infrared part of the same bowl result: walls absorb `(1 − A) · E` and re-emit it, so add `F · E · (1 − A) · ε` (ε = 0.95). Together with 43 a shadowed point absorbs `F · E · BOUNCE_ABSORBED` (≈ 0.94 · F · E).
+  - **Verify:** Shackleton floor roughly 40–100 K over a year, still below 110 K; equator still 86–385 K.
 
-- [ ] **45. Apply 42–44 to the other thermal models** (M) — Depends on 44
+- [x] **45. Apply 42–44 to the other thermal models** (M) — Depends on 44
   - **Files:** `src/gpu/globalLayers.ts` (`THERMAL` shader; it has its own `horizonAt(ivec2, az)` over 32 directions), `src/lib/siteThermal.ts` (CPU; horizon is `site.horizon`, 720 directions).
   - **Spec:** same three changes, same constants.
-  - **Verify:** site panel temperature for Shackleton crater floor and the Temp layer agree within ~5 K.
+  - **Verify:** the site panel (point model, 720 directions) and the polar Temp layer (250 m cells, 180 directions) agree to ~10 K at the Shackleton floor (99 K vs 90 K max); the cell average includes some sloped wall.
 
-- [ ] **46. Update validation text** (S) — Depends on 45
+- [x] **46. Update validation text** (S) — Depends on 45
   - **Files:** `src/components/ValidationPanel.tsx`, `README.md`, `src/components/LayerControls.tsx` (thermal note text).
   - **Spec:** replace "leaves out bounced light… ~25 K vs 30–50 K" with the new behaviour and numbers.
 

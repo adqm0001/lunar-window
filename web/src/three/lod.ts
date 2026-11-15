@@ -33,6 +33,11 @@ const FACES: Face[] = [
   { n: new THREE.Vector3(0, 0, -1), u: new THREE.Vector3(-1, 0, 0), v: new THREE.Vector3(0, 1, 0) },
 ];
 
+// world direction (unit vector) -> planetocentric latitude/longitude in degrees
+function latLonOfWorldDir(d: THREE.Vector3): [number, number] {
+  return [(Math.asin(Math.max(-1, Math.min(1, -d.y))) * 180) / Math.PI, (Math.atan2(d.x, -d.z) * 180) / Math.PI];
+}
+
 function cubeToDir(f: Face, a: number, b: number, out: THREE.Vector3) {
   const ta = Math.tan((a * Math.PI) / 4);
   const tb = Math.tan((b * Math.PI) / 4);
@@ -200,6 +205,25 @@ export class LodTerrain {
     u.uP80First.value = g.p80First;
     for (const n of this.nodes.values()) if (n.center.y > 0.97) n.dirty = true;
     this.hasWork = true;
+  }
+
+  get polar80Texture(): THREE.DataTexture {
+    return this.material.uniforms.uP80.value as THREE.DataTexture;
+  }
+
+  // A rectangle of the 80 m grid (polar map metres) just got data: rebuild the tiles that cover it.
+  markPolar80Rect(x0: number, y0: number, x1: number, y1: number) {
+    const d = new THREE.Vector3();
+    for (const n of this.nodes.values()) {
+      d.copy(n.center);
+      if (d.y < 0.95) continue;
+      const [lat, lon] = latLonOfWorldDir(d);
+      const [x, y] = toMap(lat, lon);
+      const r = n.sizeKm * 1000 * 0.75;
+      if (x + r < x0 || x - r > x1 || y + r < y0 || y - r > y1) continue;
+      n.dirty = true;
+      this.hasWork = true;
+    }
   }
 
   setQuality(q: Quality) {

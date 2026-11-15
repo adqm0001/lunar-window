@@ -1,7 +1,7 @@
 import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
-import { loadGlobe, loadPolar80 } from "./data/globe";
+import { loadGlobe, startPolar80 } from "./data/globe";
 import { useApp } from "./state/store";
 import { applyEarly, currentScene, openedFromLink, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
@@ -102,9 +102,11 @@ export default function App() {
     loadGlobe()
       .then((g) => {
         s.setGlobe(g);
-        loadPolar80(g)
-          .then((ok) => ok && currentScene()?.refreshPolar80())
-          .catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
+        startPolar80(g, {
+          focus: () => currentScene()?.polarFocus() ?? null,
+          onStart: () => currentScene()?.beginPolar80(),
+          onTile: (t) => currentScene()?.applyPolar80Tile(t),
+        }).catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
       })
       .catch((e: Error) => console.warn("Globe data failed to load:", e.message));
   }, [data]);
