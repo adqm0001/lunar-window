@@ -120,7 +120,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [ ] **18. Tour** (S). ▶ Tour, all 9 steps.
 
-- [ ] **19. Every button** (S). Each layer chip and tool button in the layer bar; note console errors.
+- [x] **19. Every button** (S). Each layer chip and tool button in the layer bar; note console errors.
 
 ---
 
