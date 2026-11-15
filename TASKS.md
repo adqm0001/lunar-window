@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Apply the rover slope limit to the destination** ([#203](https://github.com/adqm0001/lunar-window/issues/203)) — taken: malqedra
+  - **Files:** `web/src/lib/rover.ts` and regression tests.
+  - **Spec:** entering the destination obeys the same slope limit as entering other terrain cells. Reject too-steep targets with an actionable reason, preserve exact-limit destinations, and allow a zero-distance start=goal result because it requires no driving. Keep the existing slope data and model.
+  - **Verify:** a 50° destination with a 20° limit is rejected; 15°/20°/25° thresholds and the next encoded 0.25° step; raising the limit; zero-distance and existing transit-slope controls; TypeScript, tests, build and production tool loading without console errors.
+
 - [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
   - **Files:** `web/src/state/share.ts` and regression tests.
   - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
