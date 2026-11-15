@@ -49,6 +49,8 @@ interface AppState {
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
   reportOpen: boolean;
+  skylineOpen: boolean;
+  setSkylineOpen: (open: boolean) => void;
   mobilePanel: "none" | "sites" | "site" | "time";
   setMobilePanel: (p: "none" | "sites" | "site" | "time") => void;
   setReportOpen: (o: boolean) => void;
@@ -153,7 +155,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ palette });
   },
   porkchopOpen: false,
-  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
+  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen, split: porkchopOpen ? false : s.split })),
   poleField: null,
   regionStatus: null,
   setRegionStatus: (regionStatus) => set({ regionStatus }),
@@ -177,6 +179,8 @@ export const useApp = create<AppState>((set, get) => ({
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
   reportOpen: false,
+  skylineOpen: false,
+  setSkylineOpen: (skylineOpen) => set({ skylineOpen }),
   mobilePanel: "none",
   setMobilePanel: (mobilePanel) => set({ mobilePanel }),
   setReportOpen: (reportOpen) => set({ reportOpen }),
@@ -197,16 +201,17 @@ export const useApp = create<AppState>((set, get) => ({
   globe: null,
   setGlobe: (globe) => set({ globe }),
   orbitRequest: 0,
-  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d" })),
+  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d", split: false, compareOpen: false })),
   pinned: [],
   compareOpen: false,
   togglePin: (site) =>
     set((s) => {
       const has = s.pinned.some((p) => p.id === site.id);
       const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
-      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen, split: s.split && pinned.length >= 2 };
+      const compareOpen = pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen;
+      return { pinned, compareOpen, split: s.split && pinned.length >= 2, porkchopOpen: compareOpen ? false : s.porkchopOpen };
     }),
-  setCompareOpen: (compareOpen) => set({ compareOpen }),
+  setCompareOpen: (compareOpen) => set((s) => ({ compareOpen, split: compareOpen && s.split, porkchopOpen: compareOpen ? false : s.porkchopOpen })),
   split: false,
   setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,
