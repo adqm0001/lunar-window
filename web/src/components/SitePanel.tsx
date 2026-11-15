@@ -2,7 +2,8 @@ import { lazy, useMemo, useState } from "react";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
-import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
+import { nextChanges } from "../lib/countdown";
+import { longestRun, percentOn } from "../lib/visibility";
 import { PANEL_THERMAL_HOURS, thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
 import { iceVerdictPossible } from "../gpu/thermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
@@ -69,14 +70,8 @@ export default function SitePanel() {
   const on = (v: number) => v === 1;
 
   const hourBucket = Math.floor(hour);
-  const next = useMemo(
-    () => ({
-      sun: series && hoursUntilChange(series.sun, hourBucket, lit),
-      earth: series && hoursUntilChange(series.earth, hourBucket, on),
-      link: series && hoursUntilChange(series.link, hourBucket, on),
-    }),
-    [series, hourBucket],
-  );
+  // Countdowns start from the fractional hour and are measured against the state the cards show.
+  const next = useMemo(() => (series ? nextChanges(data.ephem, site, series, hour, st) : null), [data, site, series, hour, st]);
 
   const statsStart = Math.floor(hourBucket / 24) * 24;
   const statsEnd = Math.min(statsStart + YEAR, data.ephem.count);
@@ -127,21 +122,21 @@ export default function SitePanel() {
           <div className="k">Sun</div>
           <div className="v">{sunUp ? "UP" : "DOWN"}</div>
           <div className="s">
-            {sunUp ? "sets in" : "rises in"} {formatDuration(next.sun)}
+            {sunUp ? "sets in" : "rises in"} {formatDuration(next?.sun ?? null)}
           </div>
         </div>
         <div className={`card ${st.earthUp ? "earth" : "bad"}`}>
           <div className="k">Earth</div>
           <div className="v">{st.earthUp ? "IN VIEW" : "HIDDEN"}</div>
           <div className="s">
-            {st.earthUp ? "sets in" : "rises in"} {formatDuration(next.earth)}
+            {st.earthUp ? "sets in" : "rises in"} {formatDuration(next?.earth ?? null)}
           </div>
         </div>
         <div className={`card ${st.link ? "link" : "bad"}`} style={{ gridColumn: "span 2" }}>
           <div className="k">Direct-to-Earth link via DSN</div>
           <div className="v">{st.link ? `OPEN · ${data.ephem.stations[bestStation].name}` : "DOWN"}</div>
           <div className="s">
-            {st.link ? "closes in" : "opens in"} {formatDuration(next.link)}
+            {st.link ? "closes in" : "opens in"} {formatDuration(next?.link ?? null)}
           </div>
         </div>
       </div>
