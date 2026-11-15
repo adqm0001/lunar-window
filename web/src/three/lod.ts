@@ -4,6 +4,7 @@ import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
 import { craterTexture, CRATER_TEX_GLSL, GROUND_GLSL } from "./craterTexture";
+import { LANDER_SHADOW_GLSL, LANDER_SHADOW_H_KM, LANDER_SHADOW_R_KM } from "./landerModel";
 import { POLAR_EXTENT_M } from "../gpu/globalLayers";
 import { MOON_CENTER } from "./globe";
 import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
@@ -159,6 +160,11 @@ export class LodTerrain {
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uT64Index: { value: null },
+        uLanderPos: { value: new THREE.Vector3() },
+        uLanderUp: { value: new THREE.Vector3(0, 1, 0) },
+        uLanderR: { value: LANDER_SHADOW_R_KM },
+        uLanderH: { value: LANDER_SHADOW_H_KM },
+        uLanderOn: { value: 0 },
       },
     });
     this.group.name = "lod-terrain";
@@ -512,6 +518,7 @@ ${PROCEDURAL_GLSL}
 ${TILE_CACHE_GLSL}
 ${CRATER_TEX_GLSL}
 ${GROUND_GLSL}
+${LANDER_SHADOW_GLSL}
 
 // The crater tile projected onto the sphere from three directions, blended by which way the
 // ground faces, so it covers the whole Moon without seams. Returns the 3D slope and halo.
@@ -715,6 +722,7 @@ void main() {
     if (lit > 0.0 && sinR > 0.0) lit *= mix(1.0, rockShadow(m, normalize(sdp + vec2(1e-6, 0.0)), sinR / sqrt(max(1.0 - sinR * sinR, 1e-4))), fd);
     rockAlb = mix(1.0, 1.2, rmask * fd);
   }
+  if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
   vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
