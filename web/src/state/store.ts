@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AppData, Site } from "../data/load";
 import type { FieldData } from "../data/field";
 import type { GlobeData } from "../data/globe";
-import type { LayerId } from "../gpu/layers";
+import type { LayerId, Palette } from "../gpu/layers";
 import type { Quality } from "../three/lod";
 import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
@@ -31,6 +31,8 @@ interface AppState {
   toggleCutaway: () => void;
   quality: Quality;
   setQuality: (q: Quality) => void;
+  palette: Palette;
+  setPalette: (p: Palette) => void;
   porkchopOpen: boolean;
   setPorkchopOpen: (o: boolean) => void;
   poleField: FieldData | null;
@@ -107,6 +109,14 @@ function loadQuality(): Quality {
   return "balanced";
 }
 
+function loadPalette(): Palette {
+  try {
+    return localStorage.getItem("lw-palette") === "viridis" ? "viridis" : "default";
+  } catch {
+    return "default";
+  }
+}
+
 export const useApp = create<AppState>((set, get) => ({
   data: null,
   field: null,
@@ -127,6 +137,15 @@ export const useApp = create<AppState>((set, get) => ({
       void e;
     }
     set({ quality });
+  },
+  palette: loadPalette(),
+  setPalette: (palette) => {
+    try {
+      localStorage.setItem("lw-palette", palette);
+    } catch (e) {
+      void e;
+    }
+    set({ palette });
   },
   porkchopOpen: false,
   setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
