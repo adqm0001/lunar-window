@@ -38,19 +38,25 @@ export function craterTexture(): THREE.DataTexture {
   tex.anisotropy = 8;
   tex.needsUpdate = true;
   cached = tex;
-  if (typeof Worker === "undefined") {
-    fill(tex, buildCraterLevels());
-    return tex;
+  if (typeof Worker !== "undefined") {
+    try {
+      const worker = new Worker(new URL("./craterWorker.ts", import.meta.url), { type: "module" });
+      worker.onmessage = (e: MessageEvent<Uint16Array[]>) => {
+        worker.terminate();
+        fill(tex, e.data);
+      };
+      const fallback = () => {
+        worker.terminate();
+        fill(tex, buildCraterLevels());
+      };
+      worker.onerror = fallback;
+      worker.onmessageerror = fallback;
+      return tex;
+    } catch {
+      // Some environments expose Worker but block its construction. Build the texture locally there.
+    }
   }
-  const worker = new Worker(new URL("./craterWorker.ts", import.meta.url), { type: "module" });
-  worker.onmessage = (e: MessageEvent<Uint16Array[]>) => {
-    fill(tex, e.data);
-    worker.terminate();
-  };
-  worker.onerror = () => {
-    worker.terminate();
-    fill(tex, buildCraterLevels());
-  };
+  fill(tex, buildCraterLevels());
   return tex;
 }
 
