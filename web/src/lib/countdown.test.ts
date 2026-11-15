@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadTestEphemeris, loadTestSites } from "./testData";
 import { siteSeries, siteStateAt } from "./visibility";
-import { nextChanges } from "./countdown";
+import { createCountdownCache, nextChanges } from "./countdown";
 
 const e = loadTestEphemeris();
 const ridgeB = loadTestSites().find((s) => s.id === "connecting-ridge-b")!;
@@ -57,5 +57,38 @@ describe("nextChanges", () => {
         expect(now(h + d + 0.01)).toBe(!on);
       }
     }
+  });
+
+  it("does not throw at the end of the data and gives null or a positive time", () => {
+    const n = next(e.count - 1.5);
+    for (const d of [n.sun, n.earth, n.link]) expect(d === null || d > 0).toBe(true);
+  });
+});
+
+describe("createCountdownCache", () => {
+  it("matches a fresh nextChanges at fractional hours within one hour, including a state flip inside it", () => {
+    for (const base of [2077, 2170, 1800]) {
+      const cache = createCountdownCache();
+      for (let f = 0; f < 1; f += 0.05) {
+        const h = base + f;
+        const st = siteStateAt(e, ridgeB, h);
+        const got = cache(e, ridgeB, series, h, st);
+        const want = nextChanges(e, ridgeB, series, h, st);
+        for (const k of ["sun", "earth", "link"] as const) {
+          if (want[k] === null) expect(got[k]).toBeNull();
+          else expect(Math.abs(got[k]! - want[k]!)).toBeLessThan(2 / 3600);
+        }
+      }
+    }
+  });
+
+  it("recomputes when the site changes", () => {
+    const other = loadTestSites().find((s) => s.id === "shackleton-a")!;
+    const cache = createCountdownCache();
+    cache(e, ridgeB, series, 2077.5, siteStateAt(e, ridgeB, 2077.5));
+    const so = siteSeries(e, other);
+    const got = cache(e, other, so, 2077.5, siteStateAt(e, other, 2077.5));
+    const want = nextChanges(e, other, so, 2077.5, siteStateAt(e, other, 2077.5));
+    expect(got).toEqual(want);
   });
 });

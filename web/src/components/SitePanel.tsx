@@ -2,7 +2,7 @@ import { lazy, useMemo, useState } from "react";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
-import { nextChanges } from "../lib/countdown";
+import { createCountdownCache } from "../lib/countdown";
 import { longestRun, percentOn } from "../lib/visibility";
 import { PANEL_THERMAL_HOURS, thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
 import { iceVerdictPossible } from "../gpu/thermal";
@@ -71,7 +71,8 @@ export default function SitePanel() {
 
   const hourBucket = Math.floor(hour);
   // Countdowns start from the fractional hour and are measured against the state the cards show.
-  const next = useMemo(() => (series ? nextChanges(data.ephem, site, series, hour, st) : null), [data, site, series, hour, st]);
+  const countdown = useMemo(() => createCountdownCache(), []);
+  const next = series ? countdown(data.ephem, site, series, hour, st) : null;
 
   const statsStart = Math.floor(hourBucket / 24) * 24;
   const statsEnd = Math.min(statsStart + YEAR, data.ephem.count);
