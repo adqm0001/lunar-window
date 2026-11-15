@@ -1056,22 +1056,28 @@ export class MoonScene {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Flights keep to their duration even when frames are slow (a region analysis busy on the GPU), up to 1/4 s
+    // per frame so a tab that was hidden doesn't skip the whole flight.
+    const flightDt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / f.dur);
+      f.t = Math.min(1, f.t + flightDt / f.dur);
       const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
       this.controls.target.lerpVectors(f.from, f.to, k);
       const a = f.camFrom.clone().sub(MOON_CENTER);
       const b = f.camTo.clone().sub(MOON_CENTER);
-      const altA = Math.max(0.05, a.length() - R_MOON_KM);
-      const altB = Math.max(0.05, b.length() - R_MOON_KM);
+      // Altitudes are measured from just below the lower end of the flight, not from the reference sphere:
+      // mare sites such as Apollo 11 lie ~2 km below it, and clamping there left the camera 2 km up.
+      const base = Math.min(a.length(), b.length()) - 0.05;
+      const altA = a.length() - base;
+      const altB = b.length() - base;
       const arc = a.angleTo(b);
       const hop = arc * R_MOON_KM * 0.7 * Math.sin(Math.PI * k);
       const alt = Math.exp(Math.log(altA) + (Math.log(altB) - Math.log(altA)) * k) + hop;
       const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
       if (dir.lengthSq() < 1e-8) dir.copy(b);
-      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
+      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(base + alt));
       // Roll: carry last frame's screen-up (never parallel to the view, so it can't flip), then turn it
       // about the view axis only, gently and faster near the end, toward the wanted up. Where the wanted up
       // points almost along the view (looking straight down) it is ignored.

@@ -23,6 +23,9 @@ export default function SiteList() {
     if (value.trim()) useApp.getState().renameCustomSite(id, value.trim().slice(0, 40));
     setEditing(null);
   };
+  // After the box closes from the keyboard, put focus back on the row instead of losing it to the page.
+  const refocusRow = (id: string) =>
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`button[data-site="${CSS.escape(id)}"]`)?.focus());
 
   // Sites whose series is still being computed are left out and show an empty bar.
   const sunlit = useMemo(() => {
@@ -60,14 +63,20 @@ export default function SiteList() {
                   onFocus={(e) => e.currentTarget.select()}
                   onBlur={(e) => saveName(s.id, e.currentTarget.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                    else if (e.key === "Escape") setEditing(null);
+                    if (e.key === "Enter") {
+                      saveName(s.id, e.currentTarget.value);
+                      refocusRow(s.id);
+                    } else if (e.key === "Escape") {
+                      setEditing(null);
+                      refocusRow(s.id);
+                    }
                   }}
                 />
               );
             const row = (
               <button
                 key={s.id}
+                data-site={s.id}
                 className={`site-row ${s.id === selectedId ? "active" : ""}`}
                 onClick={() => select(s.id)}
                 onDoubleClick={() => custom && setEditing(s.id)}
