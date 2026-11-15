@@ -916,15 +916,20 @@ export class MoonScene {
 
   private bindPicking() {
     const el = this.renderer.domElement;
-    // A pick is one pointer pressed and released without moving. Once a second pointer goes down (a pinch or
-    // other multi-touch gesture), nothing in that gesture picks, until every pointer is up again.
+    // A pick is one pointer pressed and released without moving away: never more than 4 px for a mouse, or
+    // 10 px for a finger (taps always wobble a little). Once a second pointer goes down (a pinch or other
+    // multi-touch gesture), nothing in that gesture picks, until every pointer is up again.
     const active = new Set<number>();
     let multi = false;
-    let down: { id: number; x: number; y: number } | null = null;
+    let down: { id: number; x: number; y: number; slop: number } | null = null;
     el.addEventListener("pointerdown", (e) => {
       active.add(e.pointerId);
       if (active.size > 1) multi = true;
-      down = !multi && e.button === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+      down = !multi && e.button === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY, slop: e.pointerType === "touch" ? 10 : 4 } : null;
+    });
+    // Checked on every move, not just at release, so a drag that wanders off and comes back isn't a tap.
+    window.addEventListener("pointermove", (e) => {
+      if (down && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) > down.slop) down = null;
     });
     // On window (after the canvas handler below), so pointers released or cancelled anywhere end the gesture.
     const release = (e: PointerEvent) => {
@@ -935,7 +940,7 @@ export class MoonScene {
     window.addEventListener("pointerup", release);
     window.addEventListener("pointercancel", release);
     el.addEventListener("pointerup", (e) => {
-      const tap = down !== null && !multi && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 4;
+      const tap = down !== null && !multi && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= down.slop;
       down = null;
       if (!tap) return;
       const rect = el.getBoundingClientRect();

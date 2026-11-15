@@ -66,12 +66,13 @@ Everything already built, so you know what exists before adding to it. Feature �
 
 ## Workflow
 
-1. Pick an open task. Claim it by appending `— taken: <name>` to its heading in a small commit or PR, so nobody doubles up.
-2. Branch: `task-<number>-<short-name>` (for example `task-23-vitest`).
+1. **Claim it on GitHub first.** Every open task has an issue titled `Task <number>: <title>` ([open issues](https://github.com/adqm0001/lunar-window/issues)). Before writing any code, check the issue has no assignee and no "taking this" comment, then assign yourself (collaborators) or comment `taking this` (everyone else). If someone already has it, pick another task. If you stop working on it, unassign yourself or comment `dropping this`.
+2. Branch: `task-<number>-<short-name>` (for example `task-23-vitest`). Open the PR with `Closes #<issue number>` in its description so the issue closes when it's merged.
 3. Implement exactly the spec. If the spec turns out to be wrong, fix the spec in this file in the same PR and say why.
 4. Before the PR: `cd web && npx tsc --noEmit -p . && npm run build` pass, the app loads with no console errors, and the task's **Verify** steps hold. Visual changes: before/after screenshots in the PR description.
 5. **Mark it done only after checking it.** Change the task's `- [ ]` to `- [x]` in this file, in the same PR, and only once every item in its **Verify** line has actually been run and passes, plus `npx tsc --noEmit -p .` and `npm run build`. If something can't be verified (no device, no data), leave it unchecked and say what's missing in the PR.
 6. Commit messages: one plain sentence saying what changed.
+7. Every PR is checked automatically (type check, tests, build) by `.github/workflows/pr-checks.yml`, and `main` only accepts PRs whose checks pass and that are up to date with `main`. If your PR falls behind, update it from `main` (rebase or merge) and resolve any conflicts, usually just neighbouring ticks in this file.
 
 Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h, M ≈ half a day, L ≈ a day or more.
 
@@ -154,7 +155,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** helper reads `web/public/data/ephem.json`, `ephem.bin` (float32), `dsn.bin` (int8) and `sites.json` with `node:fs`, and builds an `Ephemeris` (`{ startMs, stepHours, count, data, dsn, stations }`, see `src/data/load.ts`). Then `siteThermal(ephem, apollo11, 0, 24 * 365)`: `max ∈ [370, 400]`, `min ∈ [80, 100]`. `siteThermal(ephem, shackletonFloor, 0, 8760)`: `max < 110`, `iceDepth === 0`.
   - **Verify:** `npm test` green in < 10 s.
 
-- [ ] **25. Run tests in CI** (S) — Depends on 20
+- [x] **25. Run tests in CI** (S) — Depends on 20
   - **Files:** `.github/workflows/pages.yml`.
   - **Spec:** in the `build` job, add `- name: Test` / `working-directory: web` / `run: npm test` between Install and Build. A failing test must stop the deploy.
   - **Verify:** `npm test` passes locally and the step order in the YAML is Install → Test → Build. After merge, the Actions run on `main` shows the Test step passing. (The workflow only runs on `main`; to see a failure block the deploy, temporarily break a test on `main` in a test fork.)
@@ -222,7 +223,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add `setHeld(key: "r" | "f", down: boolean)` to `MoonScene` that adds/removes the key in `this.keys` (the same set the keyboard uses) and sets `dirty`. In the phone layout, two round buttons (▲ ▼) above the tab bar call it on `pointerdown` / `pointerup` / `pointercancel`.
   - **Verify:** on a phone viewport, holding ▲ raises the camera and ▼ lowers it, in surface, orbit and map modes.
 
-- [ ] **38. Tap to add a point on touch screens** (S)
+- [x] **38. Tap to add a point on touch screens** (S)
   - **Files:** `src/three/MoonScene.ts` (`bindPicking`).
   - **Spec:** currently `pointerdown` records only `button === 0` and `pointerup` checks movement < 4 px. Make it work for touch (`pointerType === "touch"`): use a 10 px threshold and ignore if a second pointer went down in between (pinch).
   - **Verify:** on a phone viewport, a tap adds a point; a drag or pinch doesn't.
