@@ -90,12 +90,22 @@ export interface SunTrack {
   el: Float32Array;
 }
 
-const trackCache = new Map<string, SunTrack>();
+// Everything a track depends on: the ephemeris, the site's position and height, and the whole horizon. The id is
+// not part of it, so finder results reusing an id such as "best:1" cannot collide. Each track is about 1 MB, so
+// the cache keeps only the most recently used ones (Map iteration order is insertion order).
+const TRACK_CACHE_SIZE = 32;
+const trackCaches = new WeakMap<Ephemeris, Map<string, SunTrack>>();
 
 export function sunTrack(e: Ephemeris, site: Site): SunTrack {
-  const key = `${site.id}:${site.horizon.length}:${site.horizon[0]}`;
+  let trackCache = trackCaches.get(e);
+  if (!trackCache) trackCaches.set(e, (trackCache = new Map()));
+  const key = `${site.lat},${site.lon},${site.height_m},${site.horizon.join(",")}`;
   const hit = trackCache.get(key);
-  if (hit) return hit;
+  if (hit) {
+    trackCache.delete(key);
+    trackCache.set(key, hit);
+    return hit;
+  }
   const frame = localFrame(site.lat, site.lon);
   const r = siteRadiusKm(site);
   const n = e.count;
@@ -112,6 +122,7 @@ export function sunTrack(e: Ephemeris, site: Site): SunTrack {
   }
   const t = { frac, az, el };
   trackCache.set(key, t);
+  if (trackCache.size > TRACK_CACHE_SIZE) trackCache.delete(trackCache.keys().next().value as string);
   return t;
 }
 
