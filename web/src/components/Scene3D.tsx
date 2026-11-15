@@ -165,8 +165,25 @@ export default function Scene3D() {
       else select(a.id);
     }
     if (b) scene.flySplitTo(b);
+    // Re-measure when anything that frames the two views changes size without a window resize: the layer bar
+    // (switching to a layer with range buttons adds a row) and the tool panels that replace the site list.
     window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
+    const bar = document.querySelector(".layer-bar");
+    const ro = new ResizeObserver(() => fit());
+    if (bar) ro.observe(bar);
+    let timer = 0;
+    const unsub = useApp.subscribe((s, prev) => {
+      if (s.layer !== prev.layer || s.finderOpen !== prev.finderOpen || s.landerOpen !== prev.landerOpen || s.roverOpen !== prev.roverOpen || s.view !== prev.view) {
+        clearTimeout(timer);
+        timer = window.setTimeout(fit, 60);
+      }
+    });
+    return () => {
+      window.removeEventListener("resize", fit);
+      ro.disconnect();
+      unsub();
+      clearTimeout(timer);
+    };
   }, [scene, leftId, rightId]);
 
   useEffect(() => {
