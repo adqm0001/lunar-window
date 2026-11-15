@@ -3,7 +3,8 @@ import { lazy, useMemo } from "react";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
-import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
+import { createCountdownCache } from "../lib/countdown";
+import { longestRun, percentOn } from "../lib/visibility";
 import { PANEL_THERMAL_HOURS, thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
 import { iceVerdictPossible } from "../gpu/thermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
@@ -71,14 +72,9 @@ export default function SitePanel() {
   const on = (v: number) => v === 1;
 
   const hourBucket = Math.floor(hour);
-  const next = useMemo(
-    () => ({
-      sun: series && hoursUntilChange(series.sun, hourBucket, lit),
-      earth: series && hoursUntilChange(series.earth, hourBucket, on),
-      link: series && hoursUntilChange(series.link, hourBucket, on),
-    }),
-    [series, hourBucket],
-  );
+  // Countdowns start from the fractional hour and are measured against the state the cards show.
+  const countdown = useMemo(() => createCountdownCache(), []);
+  const next = series ? countdown(data.ephem, site, series, hour, st) : null;
 
   const statsStart = Math.floor(hourBucket / 24) * 24;
   const statsEnd = Math.min(statsStart + YEAR, data.ephem.count);
@@ -130,7 +126,7 @@ export default function SitePanel() {
           <div className="v">{sunUp ? "Up" : "Down"}</div>
           <div className="card-angle">Elevation {st.sun.el.toFixed(2)}°</div>
           <div className="s">
-            {sunUp ? "sets in" : "rises in"} {formatDuration(next.sun)}
+            {sunUp ? "sets in" : "rises in"} {formatDuration(next?.sun ?? null)}
           </div>
         </div>
         <div className={`card earth ${st.earthUp ? "" : "bad"}`}>
@@ -138,14 +134,14 @@ export default function SitePanel() {
           <div className="v">{st.earthUp ? "In view" : "Hidden"}</div>
           <div className="card-angle">Elevation {st.earth.el.toFixed(2)}°</div>
           <div className="s">
-            {st.earthUp ? "sets in" : "rises in"} {formatDuration(next.earth)}
+            {st.earthUp ? "sets in" : "rises in"} {formatDuration(next?.earth ?? null)}
           </div>
         </div>
         <div className={`card link ${st.link ? "" : "bad"}`}>
           <div className="k" title="Direct-to-Earth link via Deep Space Network">DSN</div>
           <div className="v">{st.link ? `Open · ${data.ephem.stations[bestStation].name}` : "Down"}</div>
           <div className="s">
-            {st.link ? "closes in" : "opens in"} {formatDuration(next.link)}
+            {st.link ? "closes in" : "opens in"} {formatDuration(next?.link ?? null)}
           </div>
         </div>
       </div>
