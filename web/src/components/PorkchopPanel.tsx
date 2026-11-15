@@ -1,12 +1,14 @@
+import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sunTrack, survivedFraction } from "../lib/lander";
-import { formatUtc, hourToDate, useApp } from "../state/store";
+import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 import { useSites } from "../state/selectors";
 
 const STEP_H = 12;
 const RANGES = [3, 6, 12];
 const MISSIONS = [7, 14, 30];
 const NO_DATA_COLOR = "rgba(125,136,155,0.35)";
+const SURVIVAL_COLORS = ["#a7d9c8", "#8fb9f0", "#e8c479", "#dc8580"];
 
 export default function PorkchopPanel() {
   const data = useApp((s) => s.data)!;
@@ -18,6 +20,8 @@ export default function PorkchopPanel() {
   const [months, setMonths] = useState(6);
   const [missionDays, setMissionDays] = useState(14);
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  useEffect(() => setSelectedDate(null), [lander, missionDays]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Redraw when the canvas changes width, including when it first becomes visible (on phones it is hidden while a
   // sheet is open, and a hidden canvas measures 0 px).
@@ -68,20 +72,22 @@ export default function PorkchopPanel() {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
     const cw = (w - LABEL_W) / cols;
-    g.font = "11px Inter, sans-serif";
+    g.font = "11px Geist, sans-serif";
     grid.rows.forEach((row, r) => {
       const y = r * ROW_H;
       g.fillStyle = "#aab3c3";
       g.fillText(sites[r].name.slice(0, 22), 4, y + 13);
       for (let k = 0; k < cols; k++) {
         const v = row[k];
-        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : v >= 0.999 ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
-        g.fillRect(LABEL_W + k * cw, y + 2, Math.max(1, cw - 0.3), ROW_H - 4);
+        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : SURVIVAL_COLORS[v >= 0.999 ? 0 : v >= 0.75 ? 1 : v >= 0.4 ? 2 : 3];
+        g.fillRect(LABEL_W + k * cw, y + 2, cw + 0.5, ROW_H - 4);
       }
     });
-    g.fillStyle = "#7d889b";
-    g.font = "10px JetBrains Mono, monospace";
-    for (let k = 0; k < cols; k += Math.round((30 * 24) / STEP_H)) {
+    g.fillStyle = "#bdc3cd";
+    g.font = "10px Geist, sans-serif";
+    const monthStep = Math.round((30 * 24) / STEP_H);
+    const labelStep = monthStep * Math.max(1, Math.ceil(42 / (cw * monthStep)));
+    for (let k = 0; k < cols; k += labelStep) {
       const d = hourToDate(data, start + k * STEP_H);
       g.fillText(d.toLocaleString("en", { month: "short", timeZone: "UTC" }), LABEL_W + k * cw + 2, h - 6);
     }
@@ -104,6 +110,17 @@ export default function PorkchopPanel() {
 
   const hv = hover && hover.row < grid.rows.length && hover.col < cols ? grid.rows[hover.row][hover.col] : null;
   const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (v >= 0.999 ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
+  const pick = (cell: { row: number; col: number } | null) => {
+    if (!cell || !Number.isFinite(grid.rows[cell.row]?.[cell.col])) return;
+    const landingHour = start + cell.col * STEP_H;
+    const site = sites[cell.row];
+    const fraction = grid.rows[cell.row][cell.col];
+    const outcome = fraction >= 0.999 ? `covers the full ${missionDays}-day mission`
+      : `reaches battery reserve after about ${formatDuration(fraction * missionDays * 24)} of ${missionDays} days`;
+    setSelectedDate(`${site.name} · ${formatUtc(hourToDate(data, landingHour))} UTC · ${outcome}`);
+    setHour(landingHour);
+    select(site.id);
+  };
 
   return (
     <div className="glass porkchop">
@@ -127,30 +144,48 @@ export default function PorkchopPanel() {
           ))}
         </div>
         <button className="icon-btn" onClick={() => setPorkchopOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
+      </div>
+      <p className="date-chart-explainer">Battery endurance · green covers all {missionDays} days. Other colors show the share before reaching {lander.minSocPct}% battery reserve. Each row is a site. Tap a date to select it.</p>
+      <div className="date-chart-legend" aria-label="Share of the mission before the battery reaches its reserve">
+        {["Full mission", "75–99%", "40–74%", "Under 40%"].map((label, index) => (
+          <span key={label}><i style={{ background: SURVIVAL_COLORS[index] }} />{label}</span>
+        ))}
       </div>
       {cols > 0 ? <canvas
         ref={canvasRef}
         className="porkchop-canvas"
+        tabIndex={0}
+        role="img"
+        aria-label="Landing dates. Tap a colored cell, or use arrow keys to choose a site and time and Enter to select."
+        onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Enter", " "].includes(event.key)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const cell = hover ?? { row: 0, col: 0 };
+          if (event.key === "Enter" || event.key === " ") pick(cell);
+          else setHover({
+            row: Math.max(0, Math.min(sites.length - 1, cell.row + (event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0))),
+            col: Math.max(0, Math.min(cols - 1, cell.col + (event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0))),
+          });
+        }}
         onMouseMove={(e) => setHover(cellAt(e))}
         onMouseLeave={() => setHover(null)}
         onClick={(e) => {
           const c = cellAt(e);
-          if (!c || !Number.isFinite(grid.rows[c.row][c.col])) return;
-          setHour(start + c.col * STEP_H);
-          select(sites[c.row].id);
+          pick(c);
         }}
       /> : <div className="f-hint" role="status">No complete {missionDays}-day mission fits in the remaining data. Choose an earlier landing date or a shorter mission.</div>}
+      {selectedDate && <div className="f-hint" role="status">Selected {selectedDate}</div>}
       {cols > 0 && <div className="porkchop-foot">
         {hover && hv !== null ? (
           <span>
             {sites[hover.row].name} · land {formatUtc(hourToDate(data, start + hover.col * STEP_H))} UTC →{" "}
-            {Number.isFinite(hv) ? <><b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--danger)" }}>{hv >= 0.999 ? "survives" : `dies on day ${Math.max(1, Math.round(hv * missionDays))}`}</b> · click to jump there</> : "unavailable: not enough data for the full mission"}
+            {Number.isFinite(hv) ? <><b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--sun)" }}>{hv >= 0.999 ? "covers the full mission" : `battery reserve reached after ${formatDuration(hv * missionDays * 24)}`}</b> · select this date</> : "unavailable: not enough data for the full mission"}
           </span>
         ) : (
           <span>
-            <i className="sw g" /> survives <i className="sw y" /> lasts 75%+ <i className="sw o" /> 40%+ <i className="sw r" /> dies early ·{" "}
             {pinned.length >= 2 ? "your pinned sites" : "polar sites (pin 2+ to choose your own)"} ·{" "}
             {Math.max(...best) > 0
               ? `most forgiving: ${sites[best.indexOf(Math.max(...best))]?.name} (${Math.round(Math.max(...best) * 100)}% of dates work)`

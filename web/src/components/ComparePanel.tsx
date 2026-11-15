@@ -1,3 +1,6 @@
+import ControlMenu from "./ControlMenu";
+import { useSites } from "../state/selectors";
+import Icon from "./Icon";
 import { useMemo } from "react";
 import { fieldSafePct } from "../data/field";
 import { formatLatLon } from "../lib/astro";
@@ -17,6 +20,7 @@ interface Row {
 }
 
 export default function ComparePanel() {
+  const sites = useSites();
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const pinned = useApp((s) => s.pinned);
@@ -26,6 +30,10 @@ export default function ComparePanel() {
   const { select, togglePin, setCompareOpen, setSplit } = useApp.getState();
   const h = Math.floor(hour);
   const day = Math.floor(hour / 24) * 24;
+  const monthHours = Math.min(720, data.ephem.count - day);
+  const yearHours = Math.min(8760, data.ephem.count - day);
+  const monthLabel = monthHours === 720 ? "next 30 d" : `available ${formatDuration(monthHours)}`;
+  const yearLabel = yearHours === 8760 ? "next 12 mo" : `available ${formatDuration(yearHours)}`;
   const seriesVersion = useSeriesVersion();
 
   const rows = useMemo<Row[]>(() => {
@@ -42,10 +50,10 @@ export default function ComparePanel() {
         format: (v) => formatDuration(v),
         better: null,
       },
-      { label: "Sunlit, next 30 d", values: se.map((x) => x && percentOn(x.sun, day, day + 720, lit)), format: pct, better: "high" },
-      { label: "Power + comms, next 30 d", values: se.map((x) => x && percentOn(x.link, day, day + 720, on)), format: pct, better: "high" },
-      { label: "Sunlit, next 12 mo", values: se.map((x) => x && percentOn(x.sun, day, day + 8760, lit)), format: pct, better: "high" },
-      { label: "Longest night, 12 mo", values: se.map((x) => x && longestRun(x.sun, day, day + 8760, dark)), format: (v) => formatDuration(v), better: "low" },
+      { label: `Sunlit, ${monthLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + monthHours, lit)), format: pct, better: "high" },
+      { label: `DSN contact, ${monthLabel}`, values: se.map((x) => x && percentOn(x.link, day, day + monthHours, on)), format: pct, better: "high" },
+      { label: `Sunlit, ${yearLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + yearHours, lit)), format: pct, better: "high" },
+      { label: `Longest night, ${yearLabel}`, values: se.map((x) => x && longestRun(x.sun, day, day + yearHours, dark)), format: (v) => formatDuration(v), better: "low" },
       {
         label: "Flat ground (< 10°)",
         values: pinned.map((s) => (field ? fieldSafePct(field, s.lat, s.lon) : null)),
@@ -53,16 +61,21 @@ export default function ComparePanel() {
         better: "high",
       },
     ];
-  }, [data, field, pinned, h, day, seriesVersion]);
-
-  if (pinned.length === 0) return null;
+  }, [data, field, pinned, h, day, seriesVersion, monthHours, yearHours, monthLabel, yearLabel]);
 
   return (
     <div className={`glass compare${split ? " compact" : ""}`}>
       <div className="compare-head">
-        <span className="finder-title">Compare</span>
-        <span className="f-hint">Pin sites with “+ Compare” · times follow the timeline</span>
+        <span className="finder-title">Compare sites</span>
+
         <span className="spacer" />
+        <ControlMenu label="Add site" placement="above" align="end">
+          {(close) => sites.filter((site) => !pinned.some((chosen) => chosen.id === site.id)).map((site) => (
+            <button key={site.id} className="control-action" onClick={() => { togglePin(site); close(); }}>
+              {site.name}
+            </button>
+          ))}
+        </ControlMenu>
         {pinned.length >= 2 && (
           <button
             className={`chip${split ? " sel" : ""}`}
@@ -74,10 +87,14 @@ export default function ComparePanel() {
           </button>
         )}
         <button className="icon-btn" onClick={() => setCompareOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
-      {!split && (
+      <p className="compare-intro">
+        {pinned.length < 2 ? "Choose another site with Add site to compare sunlight, Earth visibility, and communications."
+          : "Both sites use the same date and time. Choose Side by side for two 3D views."}
+      </p>
+      {pinned.length > 0 && !split && (
       <div className="compare-scroll">
         <table className="compare-table">
           <thead>
@@ -90,7 +107,7 @@ export default function ComparePanel() {
                   </button>
                   <div className="c-pos">{formatLatLon(s.lat, s.lon)}</div>
                   <button className="c-x" onClick={() => togglePin(s)} aria-label={`Unpin ${s.name}`}>
-                    ✕
+                    <Icon name="close" />
                   </button>
                 </th>
               ))}
