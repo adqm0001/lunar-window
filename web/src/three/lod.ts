@@ -746,7 +746,13 @@ void main() {
   if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
-  vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
+  // uv.x jumps from 1 to 0 at longitude ±180°, which would make the GPU pick the smallest mip level along that
+  // line. Take the x derivative from a copy shifted by half a turn wherever that copy is continuous.
+  vec2 uvDx = dFdx(uv), uvDy = dFdy(uv);
+  float uxs = fract(uv.x + 0.5);
+  float sDx = dFdx(uxs), sDy = dFdy(uxs);
+  if (abs(sDx) + abs(sDy) < abs(uvDx.x) + abs(uvDy.x)) { uvDx.x = sDx; uvDy.x = sDy; }
+  vec3 mapAlbedo = textureGrad(uColor, uv, uvDx, uvDy).rgb * 0.30;
   float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
   vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
