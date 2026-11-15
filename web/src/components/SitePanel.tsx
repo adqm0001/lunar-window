@@ -77,16 +77,18 @@ export default function SitePanel() {
     [series, hourBucket],
   );
 
+  const statsStart = Math.floor(hourBucket / 24) * 24;
+  const statsEnd = Math.min(statsStart + YEAR, data.ephem.count);
+  const statsHours = statsEnd - statsStart;
   const yearStats = useMemo(() => {
     if (!series) return null;
-    const from = Math.floor(hourBucket / 24) * 24;
     return {
-      sun: percentOn(series.sun, from, from + YEAR, lit),
-      earth: percentOn(series.earth, from, from + YEAR, on),
-      link: percentOn(series.link, from, from + YEAR, on),
-      night: longestRun(series.sun, from, from + YEAR, (v) => v < 128),
+      sun: percentOn(series.sun, statsStart, statsEnd, lit),
+      earth: percentOn(series.earth, statsStart, statsEnd, on),
+      link: percentOn(series.link, statsStart, statsEnd, on),
+      night: longestRun(series.sun, statsStart, statsEnd, (v) => v < 128),
     };
-  }, [series, Math.floor(hourBucket / 24)]);
+  }, [series, statsStart, statsEnd]);
 
   const thermStart = Math.floor(hourBucket / 720) * 720;
   const seriesVersion = useSeriesVersion();
@@ -164,7 +166,9 @@ export default function SitePanel() {
         ))}
       </dl>
 
-      <div className="section-label" style={{ margin: "16px 0 6px" }}>Next 12 months</div>
+      <div className="section-label" style={{ margin: "16px 0 6px" }}>
+        {statsHours === YEAR ? "Next 12 months" : `Available data · ${formatDuration(statsHours)}`}
+      </div>
       {yearStats ? (
         <dl className="kv">
           <dt>Sunlit</dt>
