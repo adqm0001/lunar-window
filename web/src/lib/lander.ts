@@ -44,15 +44,22 @@ export interface SimResult {
   panelAz: number;
 }
 
-export function simulate(e: Ephemeris, site: Site, lander: Lander, startHour: number, hours: number): SimResult {
+/** True when every hour of the mission [startHour, startHour + hours) has ephemeris data. */
+export function missionFits(startHour: number, hours: number, count: number): boolean {
+  return Number.isInteger(startHour) && Number.isInteger(hours) && startHour >= 0 && hours > 0 && startHour + hours <= count;
+}
+
+/** Null when the ephemeris doesn't cover the whole mission: a shortened run must not be reported as survival. */
+export function simulate(e: Ephemeris, site: Site, lander: Lander, startHour: number, hours: number): SimResult | null {
+  if (!missionFits(startHour, hours, e.count)) return null;
   const frame = localFrame(site.lat, site.lon);
   const r = siteRadiusKm(site);
-  const n = Math.max(1, Math.min(hours, e.count - Math.floor(startHour)));
+  const n = hours;
   const soc = new Float32Array(n + 1);
   const power = new Float32Array(n);
   let panelAz = lander.panelAz;
   if (lander.panel === "vertical" && panelAz < 0) {
-    const o0 = Math.floor(startHour) * 6;
+    const o0 = startHour * 6;
     panelAz = altaz([e.data[o0], e.data[o0 + 1], e.data[o0 + 2]], frame, r).az;
   }
   let wh = lander.batteryWh;
@@ -62,7 +69,7 @@ export function simulate(e: Ephemeris, site: Site, lander: Lander, startHour: nu
   soc[0] = 100;
   const d = e.data;
   for (let k = 0; k < n; k++) {
-    const i = Math.floor(startHour) + k;
+    const i = startHour + k;
     const o = i * 6;
     const s = altaz([d[o], d[o + 1], d[o + 2]], frame, r);
     const frac = discFraction(s.el - horizonAt(site.horizon, s.az));
@@ -117,8 +124,7 @@ export function sunTrack(e: Ephemeris, site: Site): SunTrack {
 
 /** NaN means the requested hourly mission is not fully covered by the track. */
 export function survivedFraction(t: SunTrack, lander: Lander, start: number, hours: number): number {
-  const available = Math.min(t.frac.length, t.az.length, t.el.length);
-  if (!Number.isInteger(start) || !Number.isInteger(hours) || start < 0 || hours <= 0 || start + hours > available) return NaN;
+  if (!missionFits(start, hours, Math.min(t.frac.length, t.az.length, t.el.length))) return NaN;
   const panelAz = lander.panel === "vertical" && lander.panelAz < 0 ? t.az[start] : lander.panelAz;
   let wh = lander.batteryWh;
   const floor = (lander.minSocPct / 100) * lander.batteryWh;

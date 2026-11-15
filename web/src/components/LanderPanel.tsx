@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toMap } from "../lib/astro";
-import { LANDER_PRESETS, PANEL_LABEL, simulate, type Lander, type PanelMode, type SimResult } from "../lib/lander";
+import { LANDER_PRESETS, missionFits, PANEL_LABEL, simulate, type Lander, type PanelMode, type SimResult } from "../lib/lander";
 import { monteCarlo } from "../lib/montecarlo";
 import { inField } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
@@ -30,7 +30,9 @@ export default function LanderPanel() {
   const [busy, setBusy] = useState(false);
   const start = Math.floor(hour);
 
-  const sim: SimResult = useMemo(() => simulate(data.ephem, site, lander, start, missionDays * 24), [data, site, lander, start, missionDays]);
+  const fits = missionFits(start, missionDays * 24, data.ephem.count);
+  // null when the data ends before the mission does (see simulate)
+  const sim: SimResult | null = useMemo(() => simulate(data.ephem, site, lander, start, missionDays * 24), [data, site, lander, start, missionDays]);
 
   const siteInField = useMemo(() => {
     if (!field) return false;
@@ -41,7 +43,7 @@ export default function LanderPanel() {
   const set = (patch: Partial<Lander>) => setLander({ ...lander, ...patch, name: "Custom" });
 
   const runMap = () => {
-    if (!field) return;
+    if (!field || !fits) return;
     setBusy(true);
     setTimeout(() => {
       try {
@@ -55,6 +57,7 @@ export default function LanderPanel() {
           minSocPct: lander.minSocPct,
           horizontal: lander.panel === "horizontal",
         });
+        if (!m) return;
         setSurvival(m);
         if (siteInField) {
           const [x, y] = toMap(site.lat, site.lon);
@@ -72,7 +75,7 @@ export default function LanderPanel() {
     setMc(monteCarlo(field, survival, x, y, miss));
   }, [miss, site, survival, field, siteInField]);
 
-  const survived = sim.diedAtHour === null;
+  const survived = sim !== null && sim.diedAtHour === null;
 
   return (
     <aside className="left finder lander">
@@ -112,7 +115,7 @@ export default function LanderPanel() {
             <span>Panel faces</span>
             <span className="chips">
               <button className={`chip ${lander.panelAz < 0 ? "sel" : ""}`} onClick={() => set({ panelAz: -1 })}>Sun at landing</button>
-              <button className={`chip ${lander.panelAz >= 0 ? "sel" : ""}`} onClick={() => set({ panelAz: Math.round(sim.panelAz) })}>{lander.panelAz >= 0 ? `${lander.panelAz}°` : "Fixed"}</button>
+              <button className={`chip ${lander.panelAz >= 0 ? "sel" : ""}`} disabled={!sim} onClick={() => sim && set({ panelAz: Math.round(sim.panelAz) })}>{lander.panelAz >= 0 ? `${lander.panelAz}°` : "Fixed"}</button>
             </span>
           </label>
         )}
@@ -128,13 +131,25 @@ export default function LanderPanel() {
         ))}
       </div>
 
-      <div className={`verdict ${survived ? "ok" : "bad"}`}>
-        {survived ? `Survives ${missionDays} days` : `Battery dead after ${formatDuration(sim.diedAtHour)}`}
-        <span>
-          lowest charge {Math.round(sim.minSocPct)}% · {sim.energyInKWh.toFixed(1)} kWh collected
-        </span>
-      </div>
-      <SocChart sim={sim} minSoc={lander.minSocPct} />
+      {sim ? (
+        <>
+          <div className={`verdict ${survived ? "ok" : "bad"}`}>
+            {survived ? `Survives ${missionDays} days` : `Battery dead after ${formatDuration(sim.diedAtHour)}`}
+            <span>
+              lowest charge {Math.round(sim.minSocPct)}% · {sim.energyInKWh.toFixed(1)} kWh collected
+            </span>
+          </div>
+          <SocChart sim={sim} minSoc={lander.minSocPct} />
+        </>
+      ) : (
+        <div className="verdict na" role="status">
+          Not enough data for this mission
+          <span>
+            A {missionDays}-day mission from here runs past the end of the data ({formatUtc(hourToDate(data, data.ephem.count - 1))} UTC). Choose an earlier
+            landing time or a shorter mission.
+          </span>
+        </div>
+      )}
 
       <button
         className="btn view-lander"
@@ -146,7 +161,7 @@ export default function LanderPanel() {
         👁 See the lander on the ground
       </button>
 
-      <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy}>
+      <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy || !fits}>
         {busy ? "Simulating…" : `Simulate ${field ? (field.meta.horizon.size ** 2).toLocaleString() : ""} landing spots`}
       </button>
       {survival && (
