@@ -58,7 +58,17 @@ export class MoonScene {
   private sunRay: THREE.Line;
   private earthRay: THREE.Line;
   private selected: string | null = null;
-  private flight: { from: THREE.Vector3; to: THREE.Vector3; camFrom: THREE.Vector3; camTo: THREE.Vector3; t: number; dur: number; orbit: boolean } | null = null;
+  private flight: {
+    from: THREE.Vector3;
+    to: THREE.Vector3;
+    camFrom: THREE.Vector3;
+    camTo: THREE.Vector3;
+    upTo: THREE.Vector3 | null;
+    rollAim: THREE.Vector3 | null;
+    t: number;
+    dur: number;
+    orbit: boolean;
+  } | null = null;
   private globeMats: THREE.ShaderMaterial[] = [];
   private lod: LodTerrain | null = null;
   private terrainMesh!: THREE.Mesh;
@@ -532,18 +542,20 @@ export class MoonScene {
     this.dirty = true;
   }
 
-  flyToOrbit(dur = 3.5) {
+  /** `southUp`: end with the south pole up on screen (overview button); otherwise keep the current roll. */
+  flyToOrbit(dur = 3.5, southUp = true) {
     const dir = this.camera.position.clone().sub(MOON_CENTER).normalize();
     if (dir.y > 0.97) dir.set(0, 0.62, 1).normalize();
-    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), dur, null);
+    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), dur, null, southUp ? new THREE.Vector3(0, 1, 0) : null);
   }
 
-  private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null) {
+  // `up`: the destination's vertical for a surface view (null = orbit). `orbitUp`: optional screen-up to end an orbit flight with.
+  private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null, orbitUp: THREE.Vector3 | null = null) {
     const from = this.controls.target.clone();
     const camFrom = this.camera.position.clone();
-    this.camera.up.copy(up ?? new THREE.Vector3(0, 1, 0));
     this.controls.enabled = false;
-    this.flight = { from, to: to.clone(), camFrom, camTo: to.clone().add(offTo), t: 0, dur, orbit: up === null };
+    const rollAim = (up ?? orbitUp)?.clone() ?? null;
+    this.flight = { from, to: to.clone(), camFrom, camTo: to.clone().add(offTo), upTo: up?.clone() ?? null, rollAim, t: 0, dur, orbit: up === null };
   }
 
   private configureControls(orbit: boolean) {
@@ -570,6 +582,9 @@ export class MoonScene {
       this.controls.screenSpacePanning = false;
       this.controls.panSpeed = 1.2;
     }
+    // The constructor already aimed the camera at its default target (the world origin); re-aim it
+    // now, or the first frame after a flight shows the wrong view, rolled upside down.
+    this.controls.update();
   }
 
   // ---- 2D map mode: the same terrain seen straight down, north up (0 longitude up near the poles)
@@ -782,7 +797,10 @@ export class MoonScene {
     const up = target.clone().sub(MOON_CENTER).normalize();
     const dist = this.camera.position.distanceTo(target);
     if (this.keys.size) {
-      const fwd = target.clone().sub(this.camera.position).projectOnPlane(up);
+      // "Forward" on the ground. The view direction alone degenerates when looking straight down and
+      // the screen's up alone when looking at the horizon; both point the same way, so add them.
+      const fwd = target.clone().sub(this.camera.position).projectOnPlane(up).divideScalar(Math.max(dist, 1e-6));
+      fwd.add(new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).projectOnPlane(up));
       if (fwd.lengthSq() < 1e-9) fwd.set(0, 0, -1).projectOnPlane(up);
       fwd.normalize();
       const right = fwd.clone().cross(up);
@@ -792,10 +810,13 @@ export class MoonScene {
       if (this.keys.has("d")) v.add(right);
       if (this.keys.has("a")) v.sub(right);
       if (v.lengthSq() > 0) {
+        // Travel over the sphere, not along a straight line: rotating target and camera together about
+        // the Moon's centre keeps the camera's tilt and heading relative to the ground unchanged.
         const fast = this.keys.has("shift") ? 3 : 1;
-        v.setLength(Math.max(0.3, dist) * 0.9 * fast * dt);
-        target.add(v);
-        this.camera.position.add(v);
+        const step = Math.max(0.3, dist) * 0.9 * fast * dt;
+        const q = new THREE.Quaternion().setFromAxisAngle(up.clone().cross(v).normalize(), step / target.distanceTo(MOON_CENTER));
+        target.sub(MOON_CENTER).applyQuaternion(q).add(MOON_CENTER);
+        this.camera.position.sub(MOON_CENTER).applyQuaternion(q).add(MOON_CENTER);
       }
       const lift = (this.keys.has("r") ? 1 : 0) - (this.keys.has("f") ? 1 : 0);
       if (lift) {
@@ -803,7 +824,7 @@ export class MoonScene {
         const alt = Math.max(0.15, this.camera.position.distanceTo(MOON_CENTER) - this.groundRadius(camUp, 0.1));
         const fast = this.keys.has("shift") ? 3 : 1;
         this.camera.position.addScaledVector(camUp, lift * alt * 1.1 * fast * dt);
-        if (lift > 0 && this.camera.position.distanceTo(target) > this.controls.maxDistance * 0.97) this.flyToOrbit(1.8);
+        if (lift > 0 && this.camera.position.distanceTo(target) > this.controls.maxDistance * 0.97) this.flyToOrbit(1.8, false);
       }
       const turn = (this.keys.has("e") ? 1 : 0) - (this.keys.has("q") ? 1 : 0);
       if (turn) {
@@ -871,7 +892,7 @@ export class MoonScene {
         if (this.flight || this.mapMode) return;
         const d = this.camera.position.distanceTo(this.controls.target);
         if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
-          this.flyToOrbit(1.8);
+          this.flyToOrbit(1.8, false);
           return;
         }
         if (this.orbitMode && e.deltaY < 0 && d < this.controls.minDistance * 1.01 + 30) {
@@ -924,20 +945,31 @@ export class MoonScene {
         if (hit) this.diveTo(hit.point);
       }
     }
+    if (this.upDirty && !this.dragging) {
+      this.upDirty = false;
+      this.syncControlsUp();
+    }
     const moving = ["w", "a", "s", "d"].some((k) => this.keys.has(k));
     if (!moving) return;
     const off = this.camera.position.clone().sub(MOON_CENTER);
     const alt = off.length() - R_MOON_KM;
     const rate = 0.9 * Math.min(1, Math.max(0.08, alt / 3000)) * (this.keys.has("shift") ? 2.5 : 1) * dt;
+    // Trackball: the camera's up turns with it, so it can pass over the poles without the picture
+    // whipping round (a fixed world up is parallel to the view there).
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
     const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
-    if (this.keys.has("a")) off.applyAxisAngle(camUp, -rate);
-    if (this.keys.has("d")) off.applyAxisAngle(camUp, rate);
-    if (this.keys.has("w")) off.applyAxisAngle(right, -rate);
-    if (this.keys.has("s")) off.applyAxisAngle(right, rate);
-    if (Math.abs(off.clone().normalize().y) > 0.995) return;
+    const q = new THREE.Quaternion();
+    const turn = (axis: THREE.Vector3, a: number) => q.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, a));
+    if (this.keys.has("a")) turn(camUp, -rate);
+    if (this.keys.has("d")) turn(camUp, rate);
+    if (this.keys.has("w")) turn(right, -rate);
+    if (this.keys.has("s")) turn(right, rate);
+    off.applyQuaternion(q);
     this.camera.position.copy(MOON_CENTER).add(off);
+    this.camera.up.copy(camUp.applyQuaternion(q));
     this.camera.lookAt(MOON_CENTER);
+    if (this.dragging) this.upDirty = true;
+    else this.syncControlsUp();
   }
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
@@ -1040,8 +1072,30 @@ export class MoonScene {
       const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
       if (dir.lengthSq() < 1e-8) dir.copy(b);
       this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
+      // Roll: carry last frame's screen-up (never parallel to the view, so it can't flip), then turn it
+      // about the view axis only, gently and faster near the end, toward the wanted up. Where the wanted up
+      // points almost along the view (looking straight down) it is ignored.
+      const view = this.controls.target.clone().sub(this.camera.position).normalize();
+      const screenUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).projectOnPlane(view);
+      if (screenUp.lengthSq() > 1e-9) {
+        screenUp.normalize();
+        const want = f.rollAim?.clone().projectOnPlane(view);
+        const strength = want?.length() ?? 0;
+        if (want && strength > 0.05) {
+          want.normalize();
+          const phi = Math.atan2(screenUp.clone().cross(want).dot(view), screenUp.dot(want));
+          let turn = phi;
+          if (f.t < 1) {
+            const cap = THREE.MathUtils.degToRad(2 + 20 * k ** 4);
+            turn = THREE.MathUtils.clamp(phi * k * k * Math.min(1, strength / 0.3), -cap, cap);
+          }
+          screenUp.applyAxisAngle(view, turn);
+        }
+        this.camera.up.copy(screenUp);
+      }
       this.camera.lookAt(this.controls.target);
       if (f.t >= 1) {
+        if (f.upTo) this.camera.up.copy(f.upTo);
         this.flight = null;
         this.configureControls(f.orbit);
         if (this.cutPending) this.applyCut();
