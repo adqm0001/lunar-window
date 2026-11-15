@@ -205,7 +205,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** split the 6250² grid into 8×8 tiles (782² each; last row/col may be smaller), each `int16` metres with row deltas, gzip, named `ty_tx.bin.gz`. Record `tile`, `tiles`, `size`, `cellMeters`, `firstCenterMeters` in `globe.json` under `polar80`. Keep `−32768` for missing.
   - **Verify:** reassembling the tiles in Python equals the old array exactly.
 
-- [ ] **35. Load 80 m tiles on demand** (M) — Depends on 34
+- [x] **35. Load 80 m tiles on demand** (M) — Depends on 34
   - **Files:** `src/data/globe.ts` (`loadPolar80`), `src/three/lod.ts` (`refreshPolar80`, uniform `uP80`), `src/three/MoonScene.ts`.
   - **Spec:** allocate the full 6250² `Int16Array` filled with `−32768` and a matching R16I texture once. Fetch tiles nearest the camera first (sort by distance from the camera's polar-map position), max 4 in flight. For each arrival: copy into the array, `texSubImage2D` that region, mark LOD nodes whose bounds overlap that tile dirty (instead of all polar nodes).
   - **Verify:** DevTools network: first sharp view of the pole needs < 8 MB of polar80 data; heights unchanged (spot-check `globeHeight` at 5 points against the old file).
