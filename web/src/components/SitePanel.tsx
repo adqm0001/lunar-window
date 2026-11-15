@@ -5,7 +5,8 @@ import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
 import type { SiteThermal } from "../lib/siteThermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
-import { contactWindows } from "../lib/contacts";
+import { contactWindows, estimateRateBps, type ContactWindow } from "../lib/contacts";
+import { ephemAt, type Ephemeris } from "../data/load";
 import { formatUtc, hourToDate } from "../state/store";
 import { formatDuration, useApp } from "../state/store";
 import { useSelectedSite, useSeries, useSiteState } from "../state/selectors";
@@ -14,6 +15,39 @@ import LazyPanel from "./LazyPanel";
 const SkylinePanel = lazy(() => import("./SkylinePanel"));
 
 const YEAR = 24 * 365;
+
+function earthDistanceKm(e: Ephemeris, hour: number) {
+  const [x, y, z] = ephemAt(e, hour).earth;
+  return Math.hypot(x, y, z);
+}
+
+function formatMbps(bps: number) {
+  const m = bps / 1e6;
+  return `${m >= 100 ? Math.round(m) : m.toPrecision(2)} Mbps`;
+}
+
+// Downlink estimates for the week's passes (estimateRateBps with its defaults, at the Earth distance of the hour).
+// The week's volume counts every hour with at least one station in view once, even when passes overlap.
+function contactRates(e: Ephemeris, windows: ContactWindow[], fromHour: number) {
+  const passBps = windows.map((w) => estimateRateBps(earthDistanceKm(e, (w.start + w.end) / 2)));
+  const hours = new Set<number>();
+  for (const w of windows) for (let h = w.start; h < w.end; h++) hours.add(h);
+  let bits = 0;
+  for (const h of hours) bits += estimateRateBps(earthDistanceKm(e, h + 0.5)) * 3600;
+  const mid = windows.length ? (windows[0].start + windows[0].end) / 2 : fromHour;
+  const d = earthDistanceKm(e, mid);
+  const linkBps = estimateRateBps(d, { radioMaxBps: Infinity });
+  const usedBps = estimateRateBps(d);
+  const title =
+    "Estimated X-band downlink to the Deep Space Network: 8.4 GHz, 20 W transmitter, 0.5 m lander dish (55% efficient) " +
+    "to a 34 m DSN dish (60%), 30 K system noise, 2 dB required Eb/N0 plus a 3 dB margin, 2 dB other losses, free space " +
+    `at the Earth's distance (≈${Math.round(d / 1000).toLocaleString("en")} 000 km). ` +
+    (usedBps < linkBps
+      ? `The link itself could carry ≈${(linkBps / 1e9).toPrecision(2)} Gbps, so the lander radio's ${formatMbps(usedBps)} limit sets the rate.`
+      : "The link budget, not the radio, sets the rate.") +
+    " The weekly total counts each hour with any station in view once.";
+  return { passBps, gb: bits / 8e9, title };
+}
 
 export default function SitePanel() {
   const data = useApp((s) => s.data)!;
@@ -60,6 +94,7 @@ export default function SitePanel() {
   const tNow = therm ? therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))] : 0;
 
   const contacts = useMemo(() => (series ? contactWindows(data.ephem, series, hourBucket, 24 * 7) : null), [data, series, hourBucket]);
+  const rates = useMemo(() => (contacts ? contactRates(data.ephem, contacts.windows, hourBucket) : null), [data, contacts, hourBucket]);
 
   const sunUp = st.sunFraction >= 0.5;
   const bestStation = st.dsn.reduce((b, v, i) => (v > st.dsn[b] ? i : b), 0);
@@ -146,17 +181,20 @@ export default function SitePanel() {
       )}
 
       <div className="section-label" style={{ margin: "16px 0 6px" }}>Contact with Earth, next 7 days</div>
-      {contacts ? (
-        <div className="contacts">
+      {contacts && rates ? (
+        <div className="contacts" title={rates.title}>
           <div className="contacts-sum">
             {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} passes
+            {contacts.windows.length > 0 && ` · ≈ ${rates.gb >= 10 ? Math.round(rates.gb) : rates.gb.toFixed(1)} GB`}
           </div>
           {contacts.windows.length === 0 && <div className="f-hint">Earth stays below this site's horizon all week: a relay satellite would be needed.</div>}
-          {contacts.windows.slice(0, 7).map((w) => (
+          {contacts.windows.slice(0, 7).map((w, i) => (
             <div key={`${w.station}-${w.start}`} className="contact-row">
               <span className="c-station">{w.station}</span>
               <span className="c-time">{formatUtc(hourToDate(data, w.start)).slice(5)}</span>
-              <span className="c-dur">{formatDuration(w.end - w.start)}</span>
+              <span className="c-dur">
+                {formatDuration(w.end - w.start)} · ≈ {formatMbps(rates.passBps[i])}
+              </span>
             </div>
           ))}
           {contacts.windows.length > 7 && <div className="f-hint">+{contacts.windows.length - 7} more</div>}

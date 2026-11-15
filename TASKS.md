@@ -285,7 +285,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add `estimateRateBps(earthDistanceKm: number, opts?)`. Free-space path loss `L = (4πd/λ)²`, antenna gain `G = η(πD/λ)²`, `λ = c/f`. Defaults: X-band `f = 8.4 GHz`, `Pt = 20 W`, lander dish `D = 0.5 m, η = 0.55`, DSN `D = 34 m, η = 0.6`, `Tsys = 30 K`, required `Eb/N0 = 2 dB`, margin 3 dB, other losses 2 dB. `Pr = Pt·Gt·Gr/L/losses`, link capacity `C = Pr / (k·Tsys·(Eb/N0)·margin)`. Return `min(C, radioMaxBps)` with `radioMaxBps = 2e6` by default, because a small lander's radio, not the link, is the limit. Earth distance = norm of the Earth vector in `ephem.data` at that hour.
   - **Verify:** with the defaults at 384 400 km, `C` is about 3 Gbps (Gt ≈ 30 dBi, Gr ≈ 67 dBi, L ≈ 223 dB, Pr ≈ 4e-12 W), so the function returns the 2 Mbps radio cap. With `radioMaxBps: Infinity` it returns `C`. Document all assumptions in the function comment.
 
-- [ ] **50. Show data rates** (S) — Depends on 49
+- [x] **50. Show data rates** (S) — Depends on 49
   - **Files:** `src/components/SitePanel.tsx` ("Contact with Earth, next 7 days").
   - **Spec:** each pass row shows ≈ rate (Mbps); the summary line adds total GB for the week. A `title` tooltip lists the assumptions.
 
@@ -317,7 +317,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 6: New features
 
-- [ ] **56. Lander shadow** (M)
+- [x] **56. Lander shadow** (M)
   - **Files:** `src/three/lod.ts`, `src/three/shaders.ts`, `src/three/MoonScene.ts` (`updateLander`), `src/three/landerModel.ts`.
   - **Spec:** uniforms `uLanderPos` (world km), `uLanderUp`, `uLanderR = 0.0025` km, `uLanderH = 0.0045` km, `uLanderOn`. In both terrain fragment shaders, within 0.2 km of the lander, project the pixel into the lander's local tangent plane and test it against the shadow of a vertical cylinder of radius R, height H, cast away from the Sun (length `H / tan(sunElevation)`). Same idea as `rockShadow` in `src/three/craterTexture.ts`.
   - **Verify:** "See the lander on the ground" shows a long shadow pointing away from the Sun that rotates as time plays.
@@ -336,7 +336,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 through 2025-03-31 inclusive (same format), with a matching `dsn_2025.bin` named in the replay metadata. Don't change the main ephemeris.
   - **Verify:** 1,080 hourly vector and DSN records, ending 2025-03-31 23:00 UTC; binary lengths match the metadata; original main ephemeris and DSN files remain byte-for-byte identical.
 
-- [ ] **60. IM-2 replay: UI** (M) — Depends on 59
+- [x] **60. IM-2 replay: UI** (M) — Depends on 59
   - **Files:** `pipeline/sites.py` (site `im2-athena` already exists at −84.78°, 29.13°), `src/data/load.ts`, new replay entry in `src/components/SiteList.tsx`.
   - **Spec:** "Replay IM-2" loads the 2025 ephemeris, jumps to the landing time (from Intuitive Machines / NASA public reports; cite it in a comment), selects the site, shows the 3D lander, starts playback.
   - **Verify:** lighting at the site around the landing date matches public reports of the conditions.
