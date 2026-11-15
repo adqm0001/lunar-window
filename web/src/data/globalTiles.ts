@@ -4,6 +4,9 @@ const PPD = 64;
 const COLS = 48;
 const ROWS = 24;
 const MAX_INFLIGHT = 6;
+// Decoded tiles kept in memory (460 KB each). Flying around the whole Moon would otherwise keep all
+// 1152 (530 MB); the least recently used are dropped and fetched again if needed.
+const MAX_KEPT = 160;
 
 type Entry = Int16Array | "loading" | "missing";
 const tiles = new Map<number, Entry>();
@@ -40,6 +43,7 @@ function pump() {
           for (let c = 1; c < TILE; c++) a[o + c] += a[o + c - 1];
         }
         tiles.set(key, a);
+        trim();
         listeners.forEach((cb) => cb(key));
       })
       .catch(() => tiles.set(key, "missing"))
@@ -50,9 +54,29 @@ function pump() {
   }
 }
 
+// Map order is insertion order: re-inserting a tile on use keeps the least recently used first.
+function touch(key: number, t: Int16Array) {
+  tiles.delete(key);
+  tiles.set(key, t);
+}
+
+function trim() {
+  let kept = 0;
+  for (const t of tiles.values()) if (t instanceof Int16Array) kept++;
+  for (const [k, t] of tiles) {
+    if (kept <= MAX_KEPT) break;
+    if (t instanceof Int16Array) {
+      tiles.delete(k);
+      kept--;
+    }
+  }
+}
+
 export function getGlobalTile(key: number): Int16Array | null {
   const t = tiles.get(key);
-  return t instanceof Int16Array ? t : null;
+  if (!(t instanceof Int16Array)) return null;
+  touch(key, t);
+  return t;
 }
 
 export function requestGlobalTile(key: number) {

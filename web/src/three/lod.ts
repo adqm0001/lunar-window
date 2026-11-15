@@ -57,9 +57,11 @@ export interface Surface {
   h: number;
   res: number;
   want: number;
+  /** 64 px/deg tile the height came from, or -1 */
+  tile: number;
 }
 
-const surf: Surface = { h: 0, res: 0, want: -1 };
+const surf: Surface = { h: 0, res: 0, want: -1, tile: -1 };
 
 export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpacingKm: number): Surface {
   const ux = -dirWorld.z;
@@ -70,11 +72,13 @@ export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpac
   let res = dataResKm(lat, lon);
   let base: number;
   surf.want = -1;
+  surf.tile = -1;
   if (res > 1 && vertexSpacingKm < 2.0) {
     const h64 = sampleGlobal64(lat, lon);
     if (h64 !== null) {
       base = h64;
       res = 0.474;
+      surf.tile = tileFor(lat, lon);
     } else {
       const miss = lastMissingGlobal64();
       surf.want = miss >= 0 ? miss : tileFor(lat, lon);
@@ -92,6 +96,8 @@ class Node {
   mesh: THREE.Mesh | null = null;
   lastUsed = 0;
   pending = new Set<number>();
+  // 64 px/deg tiles this node was built from: the shader needs them on the GPU while it is drawn
+  tiles = new Set<number>();
   dirty = false;
   center = new THREE.Vector3();
   constructor(
@@ -267,6 +273,9 @@ export class LodTerrain {
     this.viewSets = sets;
     this.viewCams = cams;
     for (const set of sets) for (const n of set) n.lastUsed = this.frame;
+    const need = new Set<number>();
+    for (const set of sets) for (const n of set) for (const k of n.tiles) need.add(k);
+    this.cache.use(need);
     this.useView(0);
     if (this.nodes.size > MAX_CACHED) this.evict();
     return this.changedFlag;
@@ -344,6 +353,7 @@ export class LodTerrain {
     const resArr = new Float32Array(E * E);
     const dir = new THREE.Vector3();
     n.pending.clear();
+    n.tiles.clear();
     n.dirty = false;
     for (let r = 0; r < E; r++) {
       for (let c = 0; c < E; c++) {
@@ -355,6 +365,7 @@ export class LodTerrain {
           n.pending.add(s.want);
           requestGlobalTile(s.want);
         }
+        if (s.tile >= 0) n.tiles.add(s.tile);
         resArr[r * E + c] = s.res;
         const h = s.h / 1000;
         const k = (r * E + c) * 3;
@@ -666,13 +677,29 @@ void main() {
   vec3 n = normalize(vNormal);
   float halo = 0.0;
   float footprint = max(camDist * 0.0012, 0.004);
+  // Per-pixel relief from the height data. A tile only has a vertex every vSpacing km, so from far away its
+  // normals are much smoother than the data, slopes look flat and the shadows (traced per pixel through
+  // the data) sit on featureless ground as hard black blobs. Where the mesh is coarser than the data, light
+  // the pixel with the data's own slope, measured over about one pixel so it doesn't sparkle.
+  float demW = smoothstep(res * 0.7, res * 2.0, vSpacing);
+  if (demW > 0.0) {
+    vec3 eastU = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+    vec3 northU = cross(u, eastU);
+    float eM = max(res * 1000.0, footprint * 1500.0);
+    float rE;
+    float hE = demH(normalize(u + eastU * (eM / R_M)), rE);
+    float hN = demH(normalize(u + northU * (eM / R_M)), rE);
+    vec3 nU = normalize(u - eastU * ((hE - h0) / eM) - northU * ((hN - h0) / eM));
+    n = normalize(mix(n, vec3(nU.y, -nU.z, -nU.x), demW));
+  }
   float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
   // Quality: Saver keeps only the near crater detail, skips rocks and mottling; High draws rocks further out.
   float detailFar = uQuality == 0 ? 45.0 : 140.0;
   float rockFar = uQuality == 0 ? 0.0 : uQuality == 1 ? 0.3 : 0.6;
   if (camDist < detailFar) {
     vec4 cd = craterTri((vWorld - CENTER) * 1000.0, dW);
-    float fade = 1.0 - smoothstep(detailFar * 0.57, detailFar, camDist);
+    // long fade: in a low oblique view a short one is squeezed into a visible line across the screen
+    float fade = 1.0 - smoothstep(detailFar * 0.2, detailFar, camDist);
     vec3 G = cd.xyz - dW * dot(cd.xyz, dW);
     n = normalize(n - G * 0.85 * fade);
     halo = cd.w * fade;
@@ -689,6 +716,7 @@ void main() {
     vec3 sdir = normalize(sv - u * dot(sv, u));
     float hs = h0 + 2.0;
     float best = -1.5;
+    float dBest = 1e9;
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
     float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.45), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
@@ -703,7 +731,11 @@ void main() {
       float r2;
       float dh = demH(q, r2) - hs;
       if (camDist < 25.0 && i < detailSteps) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.45)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
-      best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
+      float ang = atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta));
+      if (ang > best) {
+        best = ang;
+        dBest = d;
+      }
       if (best > sel + 0.02) break;
       d *= grow;
       if (d > 220000.0) break;
@@ -715,7 +747,11 @@ void main() {
       float bound = atan(11100.0 - hs - 2.0 * R_M * shn * shn, R_M * sin(dn));
       if (bound < max(best, sel - radians(0.27))) break;
     }
-    lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);
+    // Penumbra: the Sun's 0.53 degree disc, widened when a pixel covers ground comparable to the distance
+    // to whatever casts the shadow (far views). A sub-pixel shadow then averages to grey instead of
+    // flickering between black and lit from pixel to pixel.
+    float pen = radians(0.53) + 0.5 * atan(footprint * 1000.0, dBest);
+    lit = clamp((sel - best) / pen + 0.5, 0.0, 1.0);
   }
 
   if (camDist < detailFar && lit > 0.0 && uQuality > 0) {
@@ -762,7 +798,15 @@ void main() {
   if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
-  vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
+  // Longitude jumps by 360 degrees at the antimeridian, which made the GPU pick the blurriest mip level
+  // along that line (a dashed seam down the Moon). Take the texture gradients from the unwrapped longitude.
+  float dlx = dFdx(lon);
+  float dly = dFdy(lon);
+  dlx -= 360.0 * round(dlx / 360.0);
+  dly -= 360.0 * round(dly / 360.0);
+  vec2 uvDx = vec2(dlx / 360.0, dFdx(lat) / 180.0);
+  vec2 uvDy = vec2(dly / 360.0, dFdy(lat) / 180.0);
+  vec3 mapAlbedo = textureGrad(uColor, uv, uvDx, uvDy).rgb * 0.30;
   float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
   vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
@@ -796,7 +840,7 @@ void main() {
 
   if (any(isnan(col))) col = vec3(0.0);
   if (uGOverlayMix > 0.0) {
-    vec4 o = texture(uGOverlay, uv);
+    vec4 o = textureGrad(uGOverlay, uv, uvDx, uvDy);
     // near either pole switch to the polar grids (square cells instead of thin wedges)
     float kp = 2.0 * R_M * tan((PI / 2.0 - abs(latR)) / 2.0);
     vec2 pm = vec2(kp * sin(lonR), kp * cos(lonR));

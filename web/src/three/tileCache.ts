@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { getGlobalTile, onGlobalTile } from "../data/globalTiles";
+import { getGlobalTile, onGlobalTile, requestGlobalTile } from "../data/globalTiles";
 
 const TILE = 480;
 const COLS = 48;
@@ -12,7 +12,9 @@ export class GpuTileCache {
   readonly index: THREE.DataTexture;
   private layerOf = new Map<number, number>();
   private keyOf: number[] = new Array(CACHE_LAYERS).fill(-1);
-  private next = 0;
+  // When each layer was last needed (use() calls); the least recently needed one is replaced first.
+  private lastUse: number[] = new Array(CACHE_LAYERS).fill(-1);
+  private tick = 0;
   private indexData = new Int16Array(COLS * ROWS).fill(-1);
 
   constructor() {
@@ -34,12 +36,27 @@ export class GpuTileCache {
     onGlobalTile((key) => this.add(key));
   }
 
+  /**
+   * Marks the tiles the visible terrain needs. Any that were pushed out of the GPU (or out of memory) are
+   * brought back, so the shader never falls back to the 4x coarser global heights under the camera.
+   */
+  use(keys: Iterable<number>) {
+    this.tick++;
+    for (const key of keys) {
+      const layer = this.layerOf.get(key);
+      if (layer !== undefined) this.lastUse[layer] = this.tick;
+      else if (getGlobalTile(key)) this.add(key);
+      else requestGlobalTile(key);
+    }
+  }
+
   private add(key: number) {
     if (this.layerOf.has(key)) return;
     const tile = getGlobalTile(key);
     if (!tile) return;
-    const layer = this.next;
-    this.next = (this.next + 1) % CACHE_LAYERS;
+    let layer = 0;
+    for (let i = 1; i < CACHE_LAYERS; i++) if (this.lastUse[i] < this.lastUse[layer]) layer = i;
+    this.lastUse[layer] = this.tick;
     const old = this.keyOf[layer];
     if (old >= 0) {
       this.layerOf.delete(old);
