@@ -331,7 +331,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/components/ComparePanel.tsx`, `src/state/store.ts`.
   - **Spec:** "Side by side" toggle when ≥ 2 sites are pinned; left view flies to pin 1, right to pin 2; the shared timeline drives both.
 
-- [ ] **59. IM-2 replay: ephemeris** (S)
+- [ ] **59. IM-2 replay: ephemeris** (S) — taken: malqedra
   - **Files:** `pipeline/ephemeris.py`.
   - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 to 2025-03-31 (same format). Don't change the main ephemeris.
 
