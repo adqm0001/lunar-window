@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { createPortal } from "react-dom";
+import Modal from "./Modal";
 import type { Site } from "../data/load";
 import { altaz, horizonAt, localFrame } from "../lib/astro";
 import { siteRadiusKm } from "../lib/visibility";
@@ -73,20 +73,10 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
   });
   const nowIdx = Math.floor(start / 24);
 
-  return createPortal(
-    <div className="modal-back" onClick={onClose}>
-      <div className="glass modal skyline" onClick={(e) => e.stopPropagation()}>
-        <div className="finder-head">
-          <div>
-            <div className="finder-title">Skyline from {site.name}</div>
-            <div className="finder-sub">
-              The terrain all around you, with the paths of the Sun and Earth over the next {DAYS} days from {formatUtc(hourToDate(data, start)).slice(0, 10)}
-            </div>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
+  return (
+    <Modal className="skyline" title={<>Skyline from {site.name}</>}
+      subtitle={<>The terrain all around you, with the paths of the Sun and Earth over the next {DAYS} days from {formatUtc(hourToDate(data, start)).slice(0, 10)}</>}
+      onClose={onClose}>
         <svg viewBox={`0 0 ${W} ${H + 18}`} width="100%" role="img" aria-label="Horizon skyline with Sun and Earth paths">
           <rect x={0} y={0} width={W} height={H} fill="#05070d" />
           <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.18)" strokeDasharray="2 4" />
@@ -147,8 +137,6 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
             </svg>
           </div>
         </section>
-      </div>
-    </div>,
-    document.body,
+    </Modal>
   );
 }
