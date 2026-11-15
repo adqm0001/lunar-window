@@ -84,7 +84,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **2. Video clip: moving shadows** (S). At the pole, speed 6 h/s, Play, record ~15 s. [Verified 15-second clip](docs/videos/task-2-moving-shadows.md).
 
-- [ ] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each.
+- [x] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each. [Verified layer sequence](docs/videos/task-3-layers.md).
 
 - [ ] **4. Video clip: landing finder** (S). Screen-record (OBS / Win+G): ★ Find landing spot → Search → click result #1.
 
