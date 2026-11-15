@@ -166,9 +166,13 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
         if (!hereOk) break;
         const ta = td + moveH;
         const ha = Math.floor(ta);
-        // a move can span several hours (diagonals at low speed): both ends must be lit in each of them
-        let ok = !p.needLink || bit(bits.link, cell, hd);
-        for (let h = hd; ok && h <= ha; h++) ok = bit(bits.sun, cell, h) && bit(bits.sun, next, h);
+        // A move can span several hours: apply both rules at both ends in every sampled hour.
+        // Contact, like sunlight, includes the arrival hour; waiting itself does not require contact.
+        let ok = true;
+        for (let h = hd; ok && h <= ha; h++) {
+          ok = bit(bits.sun, cell, h) && bit(bits.sun, next, h)
+            && (!p.needLink || (bit(bits.link, cell, h) && bit(bits.link, next, h)));
+        }
         if (ok) {
           found = ta;
           break;
