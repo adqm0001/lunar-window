@@ -41,14 +41,22 @@ Review open PRs **oldest first**, one at a time: `gh pr list --state open`. If a
 
 6. **Decide and record it on GitHub.**
    - All good: `gh pr review <n> --approve --body "<what you verified and how>"`.
+   - All good, but the PR was opened from the account you're signed in as (GitHub won't let an account approve its own PR, which is the case for PRs opened from the owner's account): post a comment that **starts with `okay to merge`** instead. That comment is the approval. The PR's author merges after seeing it.
+     ```bash
+     gh pr comment <n> --body "okay to merge. <what you verified and how>"
+     ```
    - Problems: `gh pr review <n> --request-changes --body "<list>"`. Each item names the file and line, what's wrong, and what would fix it. Separate **must fix** from **nice to have**; only must-fix items block.
    - Small, unambiguous fixes (a typo, a missing tick in TASKS.md, `Closes #` missing) can be pushed to the PR branch directly instead, with a comment saying what you changed.
 
-7. **Merge** (if you've been asked to merge, otherwise leave it to the maintainer): only when approved, `checks` is green and the branch is up to date.
+7. **Merge** (if you've been asked to merge, otherwise leave it to the PR's author or the maintainer): only when approved (a GitHub approval, or an `okay to merge` comment from the reviewer), `checks` is green and the branch is up to date.
    ```bash
    gh pr merge <n> --squash --delete-branch
    ```
    Then confirm the linked issue closed and the deploy run on `main` succeeded (`gh run list --workflow pages.yml --limit 1`). Move on to the next PR; the others will need `gh pr update-branch` because `main` moved.
+
+## When the `okay to merge` stops counting
+
+An approval or `okay to merge` covers the commits that were reviewed. If the author pushes new changes after it, other than `gh pr update-branch` / merging `main` in, the PR needs a new review and a new `okay to merge`.
 
 ## Never
 
