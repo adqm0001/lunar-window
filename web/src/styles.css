@@ -280,6 +280,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 
 .btn.view-lander { width: 100%; margin: 10px 0 2px; }
 
+/* While a window (report, validation, skyline) is open during the tour, the card moves to the bottom edge and the
+   window is fitted in the space above it, scrolling if needed, so neither hides the other. */
+body:has(.modal-back) .tour-card:not(.welcome) { bottom: 12px; }
+body:has(.tour-card:not(.welcome)) .modal-back { padding-bottom: calc(var(--tour-h, 200px) + 24px); }
+body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(--tour-h, 200px)); }
 .tour-card.welcome { border-color: rgba(139,156,255,0.6); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
 .load-error { position: fixed; left: 50%; transform: translateX(-50%); bottom: 182px; width: min(480px, calc(100vw - 32px)); padding: 12px 14px; z-index: 60; display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .load-error span { flex: 1; }
@@ -312,6 +317,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
   .m-lift { display: flex; flex-direction: column; gap: 8px; position: fixed; right: 12px; bottom: 66px; z-index: 6; }
   .m-lift-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: rgba(16, 20, 30, 0.72); backdrop-filter: blur(10px); color: var(--text); font-size: 14px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   .m-lift-btn:active { background: rgba(139, 156, 255, 0.28); }
+  .porkchop, .compare { left: 8px; right: 8px; bottom: 64px; max-height: 58vh; overflow: auto; }
+  .app.m-sites .porkchop, .app.m-site .porkchop, .app.m-time .porkchop,
+  .app.m-sites .compare, .app.m-site .compare, .app.m-time .compare { display: none; }
+  /* header: title and close on the first line, then the hint, then the chips, each full width */
+  .porkchop .compare-head, .compare .compare-head { flex-wrap: wrap; row-gap: 6px; }
+  .porkchop .compare-head .spacer, .compare .compare-head .spacer { order: 1; }
+  .porkchop .compare-head .icon-btn, .compare .compare-head .icon-btn { order: 2; }
+  .porkchop .compare-head .f-hint, .compare .compare-head .f-hint { order: 3; flex-basis: 100%; }
+  .porkchop .compare-head .chips { order: 4; flex-basis: 100%; }
   .tour-card { bottom: 66px; }
   .hover-tip { display: none; }
   .modal { padding: 14px; }

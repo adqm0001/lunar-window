@@ -118,7 +118,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
                   <td>Shackleton crater floor (never sunlit)</td>
                   <td>below 110 K all year: a cold trap</td>
                   <td>
-                    {Math.round(thermal.b.max)} K max · ice {thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}
+                    {Math.round(thermal.b.min)}–{Math.round(thermal.b.max)} K · ice {thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}
                   </td>
                 </tr>
               )}
@@ -126,7 +126,8 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           </table>
           <p className="muted">
             Sources: Williams et al. 2017 (Icarus) for global Diviner temperatures; Paige et al. 2010 (Science) for polar cold traps; soil properties from Hayne
-            et al. 2017. Both are a full year of hourly heat flow, run in your browser.
+            et al. 2017; light and heat bounced off crater walls from Ingersoll et al. 1992 (Icarus). Both are a full year of hourly heat flow, run in your
+            browser.
           </p>
         </section>
 
@@ -148,7 +149,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           <ul>
             <li>Terrain is NASA LOLA: 40 m near the pole, 80 m to 85°S, 474 m elsewhere. Rocks smaller than that are not in the data.</li>
             <li>Small craters you see up close are generated for looks only; they never affect any number.</li>
-            <li>Temperatures ignore light and heat bounced from nearby slopes, so the darkest floors come out colder than measured (≈25 K vs 30–50 K).</li>
+            <li>Light and heat bounced off surrounding slopes use a single-bounce crater approximation: multiple reflections and walls cooling after sunset are left out.</li>
             <li>Sun and Earth positions cover 2026–2028.</li>
           </ul>
         </section>
