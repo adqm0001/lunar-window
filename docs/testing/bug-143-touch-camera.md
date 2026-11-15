@@ -26,3 +26,5 @@ This confirms an event-delivery-dependent camera behavior; it does not prove tha
 Open the candidate build in Safari and wait for terrain loading to finish. In 3D, drag slowly, drag quickly in both directions, lift and drag again, then pinch. Compare with the deployed upstream app. Check that movement follows the gesture without the reported jumps, and that 2D pan/pinch, site selection and panels still work. Record any remaining lag or jumps before treating the original issue as resolved.
 
 Status: awaiting the tester's result. Desktop testing and Node input events do not substitute for Safari on a real iPhone.
+
+[Candidate preview](https://raw.githack.com/hanoudee/lunar-window/e6a28b9cb96ee61624849ba9de8dfb98f1d89a30/index.html), built from source commit `71323f0`, loads the Moon and terrain in Chromium. The isolated preview branch adds anonymous CORS requests for CDN-hosted images in its HTML only; its compiled app assets match the tested production build. The preview's hosting adjustment is not part of the application change in this PR.
