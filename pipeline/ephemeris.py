@@ -52,12 +52,22 @@ def main():
     end = datetime(2037, 1, 1, tzinfo=timezone.utc)
     hours = int((end - start).total_seconds() // 3600)
     e = Ephemeris()
+    write_ephemeris(e, start, hours)
+
+    # Include every hourly sample on March 31; the end boundary is exclusive.
+    replay_start = datetime(2025, 2, 15, tzinfo=timezone.utc)
+    replay_end = datetime(2025, 4, 1, tzinfo=timezone.utc)
+    replay_hours = int((replay_end - replay_start).total_seconds() // 3600)
+    write_ephemeris(e, replay_start, replay_hours, suffix="_2025")
+
+
+def write_ephemeris(e: Ephemeris, start: datetime, hours: int, suffix: str = ""):
     t = e.hourly(start, hours)
     sun, earth = e.moon_fixed(t)
     dsn = e.dsn_elevations(t)
     OUT.mkdir(parents=True, exist_ok=True)
-    np.concatenate([sun, earth], axis=1).astype("<f4").tofile(OUT / "ephem.bin")
-    np.clip(np.round(dsn), -90, 90).astype(np.int8).tofile(OUT / "dsn.bin")
+    np.concatenate([sun, earth], axis=1).astype("<f4").tofile(OUT / f"ephem{suffix}.bin")
+    np.clip(np.round(dsn), -90, 90).astype(np.int8).tofile(OUT / f"dsn{suffix}.bin")
     meta = {
         "start": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "stepHours": 1,
@@ -67,8 +77,11 @@ def main():
         "layout": "float32 [count][sunX, sunY, sunZ, earthX, earthY, earthZ]",
         "dsn": {"layout": "int8 degrees [count][station]", "stations": [{"name": k, "lat": v[0], "lon": v[1]} for k, v in DSN.items()]},
     }
-    (OUT / "ephem.json").write_text(json.dumps(meta, indent=2))
-    print(f"{hours} hours written, sun dist {np.linalg.norm(sun[0]):.4g} km, earth dist {np.linalg.norm(earth[0]):.4g} km")
+    if suffix:
+        # Each replay needs DSN elevations covering the same hours as its vectors.
+        meta["dsn"]["file"] = f"dsn{suffix}.bin"
+    (OUT / f"ephem{suffix}.json").write_text(json.dumps(meta, indent=2))
+    print(f"ephem{suffix}: {hours} hours written, sun dist {np.linalg.norm(sun[0]):.4g} km, earth dist {np.linalg.norm(earth[0]):.4g} km")
 
 
 if __name__ == "__main__":
