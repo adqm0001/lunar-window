@@ -48,7 +48,7 @@ function contactRates(e: Ephemeris, windows: ContactWindow[], fromHour: number) 
     (usedBps < linkBps
       ? `The link itself could carry ≈${(linkBps / 1e9).toPrecision(2)} Gbps, so the lander radio's ${formatMbps(usedBps)} limit sets the rate.`
       : "The link budget, not the radio, sets the rate.") +
-    " The weekly total counts each hour with any station in view once.";
+    " The total for this interval counts each hour with any station in view once.";
   return { passBps, gb: bits / 8e9, title };
 }
 
@@ -94,6 +94,7 @@ export default function SitePanel() {
   const therm = useMemo(() => getThermal(data.ephem, site, thermStart, PANEL_THERMAL_HOURS), [data, site, thermStart, seriesVersion]);
   const tNow = therm ? therm.surface[Math.max(0, Math.min(therm.hours - 1, hourBucket - therm.start))] : 0;
 
+  const contactHours = Math.min(24 * 7, data.ephem.count - hourBucket);
   const contacts = useMemo(() => (series ? contactWindows(data.ephem, series, hourBucket, 24 * 7) : null), [data, series, hourBucket]);
   const rates = useMemo(() => (contacts ? contactRates(data.ephem, contacts.windows, hourBucket) : null), [data, contacts, hourBucket]);
 
@@ -188,14 +189,17 @@ export default function SitePanel() {
       </details>
 
       <details className="site-reading">
-        <summary>Earth contact · next 7 days</summary>
+        <summary>Earth contact · {contactHours === 24 * 7 ? "next 7 days" : `available ${contactHours} h`}</summary>
+        {contactHours < 24 * 7 && (
+          <div className="f-hint">Contact data ends at {formatUtc(hourToDate(data, data.ephem.count - 1))} UTC.</div>
+        )}
         {contacts && rates ? (
           <div className="contacts" title={rates.title}>
             <div className="contacts-sum">
-              {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} passes
+              {Math.round(contacts.totalHours)} h of contact · {contacts.windows.length} {contacts.windows.length === 1 ? "pass" : "passes"}
               {contacts.windows.length > 0 && ` · ≈ ${rates.gb >= 10 ? Math.round(rates.gb) : rates.gb.toFixed(1)} GB`}
             </div>
-            {contacts.windows.length === 0 && <div className="f-hint">Earth stays below this site's horizon all week: a relay satellite would be needed.</div>}
+            {contacts.windows.length === 0 && <div className="f-hint">No Earth/DSN contact in this interval.</div>}
             {contacts.windows.slice(0, 7).map((w, i) => (
               <div key={`${w.station}-${w.start}`} className="contact-row">
                 <span className="c-station">{w.station}</span>
