@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 import { fieldSafePct } from "../data/field";
 import { formatLatLon } from "../lib/astro";
-import { hoursUntilChange, longestRun, percentOn, siteStateAt } from "../lib/visibility";
+import { compareStats, compareWindow, SUN_LIT } from "../lib/compareStats";
+import { hoursUntilChange, siteStateAt } from "../lib/visibility";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { formatDuration, useApp } from "../state/store";
 
-const lit = (v: number) => v >= 128;
-const on = (v: number) => v === 1;
-const dark = (v: number) => v < 128;
+const MONTH = 720;
+const YEAR = 8760;
 
 interface Row {
   label: string;
@@ -32,20 +32,26 @@ export default function ComparePanel() {
     const st = pinned.map((s) => siteStateAt(data.ephem, s, h));
     const se = pinned.map((s) => getSeries(data.ephem, s));
     const pct = (v: number) => `${v.toFixed(1)}%`;
+    // The data ends in 2036: label a clipped window with its real length, as the site panel does.
+    const span = (w: ReturnType<typeof compareWindow>, nominal: string) => (w.truncated ? `available data · ${formatDuration(w.hours)}` : nominal);
+    const wm = compareWindow(day, MONTH, data.ephem.count);
+    const wy = compareWindow(day, YEAR, data.ephem.count);
+    const sm = se.map((x) => x && compareStats(x, wm.start, wm.end));
+    const sy = se.map((x) => x && compareStats(x, wy.start, wy.end));
     return [
       { label: "Sun now", values: st.map((x) => x.sunFraction * 100), format: (v) => (v >= 50 ? `UP ${Math.round(v)}%` : "DOWN"), better: "high" },
       { label: "Earth now", values: st.map((x) => (x.earthUp ? 1 : 0)), format: (v) => (v ? "IN VIEW" : "HIDDEN"), better: "high" },
       { label: "DSN link now", values: st.map((x) => (x.link ? 1 : 0)), format: (v) => (v ? "OPEN" : "DOWN"), better: "high" },
       {
         label: "Sun changes in",
-        values: se.map((x) => x && hoursUntilChange(x.sun, h, lit)),
+        values: se.map((x) => x && hoursUntilChange(x.sun, h, SUN_LIT)),
         format: (v) => formatDuration(v),
         better: null,
       },
-      { label: "Sunlit, next 30 d", values: se.map((x) => x && percentOn(x.sun, day, day + 720, lit)), format: pct, better: "high" },
-      { label: "Power + comms, next 30 d", values: se.map((x) => x && percentOn(x.link, day, day + 720, on)), format: pct, better: "high" },
-      { label: "Sunlit, next 12 mo", values: se.map((x) => x && percentOn(x.sun, day, day + 8760, lit)), format: pct, better: "high" },
-      { label: "Longest night, 12 mo", values: se.map((x) => x && longestRun(x.sun, day, day + 8760, dark)), format: (v) => formatDuration(v), better: "low" },
+      { label: `Sunlit, ${span(wm, "next 30 d")}`, values: sm.map((x) => x && x.sunlit), format: pct, better: "high" },
+      { label: `Power + comms, ${span(wm, "next 30 d")}`, values: sm.map((x) => x && x.powerComms), format: pct, better: "high" },
+      { label: `Sunlit, ${span(wy, "next 12 mo")}`, values: sy.map((x) => x && x.sunlit), format: pct, better: "high" },
+      { label: `Longest night, ${span(wy, "12 mo")}`, values: sy.map((x) => x && x.longestNight), format: (v) => formatDuration(v), better: "low" },
       {
         label: "Flat ground (< 10°)",
         values: pinned.map((s) => (field ? fieldSafePct(field, s.lat, s.lon) : null)),
