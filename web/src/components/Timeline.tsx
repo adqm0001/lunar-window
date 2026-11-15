@@ -3,6 +3,7 @@ import { formatUtc, hourToDate, SPEEDS, useApp } from "../state/store";
 import { useSeries } from "../state/selectors";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { canRecord, startRecording, stopRecording } from "../lib/recorder";
+import { ephemYears } from "../lib/years";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -89,8 +90,13 @@ export default function Timeline() {
     g.strokeRect(x0 + (start / total) * W, 7, Math.max(2, (span / total) * W), OVERVIEW_H - 4);
     g.fillStyle = "#7d889b";
     g.font = "10px JetBrains Mono, monospace";
-    for (let y = 2026; y <= 2028; y++) {
+    // One label per year, or every 2nd / 5th year when the overview is too narrow for them all.
+    const years = ephemYears(data.ephem);
+    const yearPx = ((365.25 * 24) / total) * W;
+    const every = yearPx >= 34 ? 1 : yearPx * 2 >= 34 ? 2 : 5;
+    for (let y = years.first; y <= years.last; y++) {
       const h = (Date.UTC(y, 0, 1) - data.ephem.startMs) / 3600e3;
+      if (h < 0 || h >= total || y % every !== 0) continue;
       g.fillText(String(y), x0 + (h / total) * W + 3, 6 + 0);
     }
 

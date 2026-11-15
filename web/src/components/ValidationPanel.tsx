@@ -3,6 +3,7 @@ import Modal from "./Modal";
 import { percentOn } from "../lib/visibility";
 import { getSeries, getThermal, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
+import { ephemYears } from "../lib/years";
 
 // Results of the offline pipeline run for 2020 (pipeline/validate_illumination.py), same year as
 // the published study. The 2026 column is recomputed live in the browser.
@@ -150,7 +151,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
             <li>Terrain is NASA LOLA: 40 m near the pole, 80 m to 85°S, 474 m elsewhere. Rocks smaller than that are not in the data.</li>
             <li>Small craters you see up close are generated for looks only; they never affect any number.</li>
             <li>Light and heat bounced off surrounding slopes use a single-bounce crater approximation: multiple reflections and walls cooling after sunset are left out.</li>
-            <li>Sun and Earth positions cover 2026–2028.</li>
+            <li>Sun and Earth positions cover {ephemYears(data.ephem).label}.</li>
           </ul>
         </section>
     </Modal>
