@@ -98,7 +98,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           <h3>
             <span className="ok"><Icon name="check" /></span> Ground temperature
           </h3>
-          <p>Our soil heat-flow model against NASA's Diviner thermal instrument on the Lunar Reconnaissance Orbiter:</p>
+          <p>Site temperatures from the CPU soil heat-flow model, compared with NASA's Diviner instrument on the Lunar Reconnaissance Orbiter:</p>
           <table className="vtable">
             <thead>
               <tr>
@@ -138,6 +138,11 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
               ? `Both are hourly heat flow over the ${thermalSpanLabel(thermal.b.hours)} of data available, run in your browser.`
               : "Both are a full year of hourly heat flow, run in your browser."}
           </p>
+            <p className="muted">
+              The temperature and ice maps warm the soil model for up to four lunar days before the displayed period and include every sampled step in
+              that period. Where earlier data is missing, the maps use conditions from twelve lunar days later if available. The site estimates above
+              use a different warm-up, so short-period site and map temperatures can differ.
+            </p>
         </section>
 
         <section>

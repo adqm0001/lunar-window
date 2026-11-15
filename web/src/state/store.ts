@@ -94,7 +94,7 @@ interface AppState {
   selectedId: string;
   setField: (f: FieldData) => void;
   setFieldProgress: (p: number) => void;
-  setFieldError: (e: string) => void;
+  setFieldError: (e: string | null) => void;
   setLayer: (l: LayerId) => void;
   setRangeDays: (d: number) => void;
   setCustomSite: (s: Site) => void;

@@ -52,6 +52,7 @@ export default function LayerControls() {
   const setPalette = useApp((s) => s.setPalette);
   const rangeDays = useApp((s) => s.rangeDays);
   const view = useApp((s) => s.view);
+  const visibleFieldError = view === "2d" ? fieldError : null;
   const poleField = useApp((s) => s.poleField);
   const cutaway = useApp((s) => s.cutaway);
   const regionStatus = useApp((s) => s.regionStatus);
@@ -227,7 +228,7 @@ export default function LayerControls() {
           <Icon name="moon" /> Whole Moon
         </button>
       </nav>
-      {(globalStatus || regionStatus || !field || fieldError || gpuError) && (
+      {(globalStatus || regionStatus || (!field && !fieldError) || visibleFieldError || gpuError) && (
         <div className="glass layer-job" role="status">
           {globalStatus && <div>{globalStatus}</div>}
           {regionStatus && (
@@ -236,7 +237,7 @@ export default function LayerControls() {
             </div>
           )}
           {!field && !fieldError && <div>Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
-          {(fieldError || gpuError) && <div className="error">{fieldError ?? gpuError}</div>}
+          {(visibleFieldError || gpuError) && <div className="error">{visibleFieldError ?? gpuError}</div>}
         </div>
       )}
     </>
