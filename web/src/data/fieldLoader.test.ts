@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { loadField } from "./field";
 import { createFieldLoader, type FieldLoaderStore } from "./fieldLoader";
 
 function fakeStore() {
@@ -57,5 +58,33 @@ describe("createFieldLoader", () => {
     const loader = createFieldLoader(async (onProgress) => { onProgress(0.5); return "F"; }, () => store);
     await loader.start();
     expect(st.progress).toBe(0.5);
+  });
+
+  it("cancels sibling terrain downloads before exposing an error for retry", async () => {
+    const { st, store } = fakeStore();
+    const cancelled: string[] = [];
+    vi.stubGlobal("fetch", (url: string, options?: RequestInit) => {
+      if (url.endsWith("/field_pole.json")) {
+        return Promise.resolve(Response.json({
+          horizon: { file: "horizon.bin" },
+          heights: { file: "heights.bin" },
+          slope: { file: "slope.bin" },
+        }));
+      }
+      if (url.endsWith("/horizon.bin")) return Promise.resolve(new Response(null, { status: 503 }));
+      return new Promise<Response>((_, reject) => {
+        options?.signal?.addEventListener("abort", () => {
+          cancelled.push(url);
+          reject(options.signal?.reason);
+        }, { once: true });
+      });
+    });
+    try {
+      await createFieldLoader(loadField, () => store).start();
+      expect(st.error).toContain("horizon.bin (503)");
+      expect(cancelled.map((url) => url.split("/").pop())).toEqual(["heights.bin", "slope.bin"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
