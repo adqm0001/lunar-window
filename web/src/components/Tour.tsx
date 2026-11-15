@@ -191,6 +191,18 @@ export default function Tour() {
   const setStep = useApp((s) => s.setTourStep);
   const globe = useApp((s) => s.globe);
   const [offer, setOffer] = useState(false);
+  const [card, setCard] = useState<HTMLDivElement | null>(null);
+
+  // The card's height, for styles.css to keep an open window (report, validation) clear of it.
+  useEffect(() => {
+    if (!card) return;
+    const ro = new ResizeObserver(() => document.body.style.setProperty("--tour-h", `${card.offsetHeight}px`));
+    ro.observe(card);
+    return () => {
+      ro.disconnect();
+      document.body.style.removeProperty("--tour-h");
+    };
+  }, [card]);
 
   // first visit (not via a shared link): offer the tour once the Moon has loaded
   useEffect(() => {
@@ -251,7 +263,7 @@ export default function Tour() {
   const s = STEPS[step];
   const last = step === STEPS.length - 1;
   return (
-    <div className="glass tour-card" role="dialog" aria-label="Guided tour">
+    <div ref={setCard} className="glass tour-card" role="dialog" aria-label="Guided tour">
       <div className="tour-count">
         {step + 1} / {STEPS.length}
       </div>
