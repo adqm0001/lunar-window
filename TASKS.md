@@ -88,7 +88,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **4. Video clip: landing finder** (S). Screen-record (OBS / Win+G): ★ Find landing spot → Search (selects result #1 and flies the camera to it). [Verified 10.5-second clip](docs/videos/task-4-landing-finder.md).
 
-- [ ] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay.
+- [x] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay. [Verified 47.5-second clip](docs/videos/task-5-rover.md).
 
 - [ ] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit.
 
