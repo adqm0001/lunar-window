@@ -331,9 +331,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/components/ComparePanel.tsx`, `src/state/store.ts`.
   - **Spec:** "Side by side" toggle when ≥ 2 sites are pinned; left view flies to pin 1, right to pin 2; the shared timeline drives both.
 
-- [ ] **59. IM-2 replay: ephemeris** (S)
-  - **Files:** `pipeline/ephemeris.py`.
-  - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 to 2025-03-31 (same format). Don't change the main ephemeris.
+- [x] **59. IM-2 replay: ephemeris** (S) — taken: malqedra
+  - **Files:** `pipeline/ephemeris.py`, generated `web/public/data/ephem_2025.bin`, `ephem_2025.json`, and `dsn_2025.bin`.
+  - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 through 2025-03-31 inclusive (same format), with a matching `dsn_2025.bin` named in the replay metadata. Don't change the main ephemeris.
+  - **Verify:** 1,080 hourly vector and DSN records, ending 2025-03-31 23:00 UTC; binary lengths match the metadata; original main ephemeris and DSN files remain byte-for-byte identical.
 
 - [ ] **60. IM-2 replay: UI** (M) — Depends on 59
   - **Files:** `pipeline/sites.py` (site `im2-athena` already exists at −84.78°, 29.13°), `src/data/load.ts`, new replay entry in `src/components/SiteList.tsx`.
