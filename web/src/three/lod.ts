@@ -4,6 +4,7 @@ import { globeHeight } from "../data/globe";
 import { R_MOON_KM, toMap } from "../lib/astro";
 import { craterDetailKm, PROCEDURAL_GLSL } from "../lib/procedural";
 import { craterTexture, CRATER_TEX_GLSL, GROUND_GLSL } from "./craterTexture";
+import { LANDER_SHADOW_GLSL, LANDER_SHADOW_H_KM, LANDER_SHADOW_R_KM } from "./landerModel";
 import { POLAR_EXTENT_M } from "../gpu/globalLayers";
 import { MOON_CENTER } from "./globe";
 import { lastMissingGlobal64, onGlobalTile, requestGlobalTile, sampleGlobal64, tileFor } from "../data/globalTiles";
@@ -31,6 +32,11 @@ const FACES: Face[] = [
   { n: new THREE.Vector3(0, 0, 1), u: new THREE.Vector3(1, 0, 0), v: new THREE.Vector3(0, 1, 0) },
   { n: new THREE.Vector3(0, 0, -1), u: new THREE.Vector3(-1, 0, 0), v: new THREE.Vector3(0, 1, 0) },
 ];
+
+// world direction (unit vector) -> planetocentric latitude/longitude in degrees
+function latLonOfWorldDir(d: THREE.Vector3): [number, number] {
+  return [(Math.asin(Math.max(-1, Math.min(1, -d.y))) * 180) / Math.PI, (Math.atan2(d.x, -d.z) * 180) / Math.PI];
+}
 
 function cubeToDir(f: Face, a: number, b: number, out: THREE.Vector3) {
   const ta = Math.tan((a * Math.PI) / 4);
@@ -154,6 +160,11 @@ export class LodTerrain {
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uT64Index: { value: null },
+        uLanderPos: { value: new THREE.Vector3() },
+        uLanderUp: { value: new THREE.Vector3(0, 1, 0) },
+        uLanderR: { value: LANDER_SHADOW_R_KM },
+        uLanderH: { value: LANDER_SHADOW_H_KM },
+        uLanderOn: { value: 0 },
       },
     });
     this.group.name = "lod-terrain";
@@ -194,6 +205,25 @@ export class LodTerrain {
     u.uP80First.value = g.p80First;
     for (const n of this.nodes.values()) if (n.center.y > 0.97) n.dirty = true;
     this.hasWork = true;
+  }
+
+  get polar80Texture(): THREE.DataTexture {
+    return this.material.uniforms.uP80.value as THREE.DataTexture;
+  }
+
+  // A rectangle of the 80 m grid (polar map metres) just got data: rebuild the tiles that cover it.
+  markPolar80Rect(x0: number, y0: number, x1: number, y1: number) {
+    const d = new THREE.Vector3();
+    for (const n of this.nodes.values()) {
+      d.copy(n.center);
+      if (d.y < 0.95) continue;
+      const [lat, lon] = latLonOfWorldDir(d);
+      const [x, y] = toMap(lat, lon);
+      const r = n.sizeKm * 1000 * 0.75;
+      if (x + r < x0 || x - r > x1 || y + r < y0 || y - r > y1) continue;
+      n.dirty = true;
+      this.hasWork = true;
+    }
   }
 
   setQuality(q: Quality) {
@@ -488,6 +518,7 @@ ${PROCEDURAL_GLSL}
 ${TILE_CACHE_GLSL}
 ${CRATER_TEX_GLSL}
 ${GROUND_GLSL}
+${LANDER_SHADOW_GLSL}
 
 // The crater tile projected onto the sphere from three directions, blended by which way the
 // ground faces, so it covers the whole Moon without seams. Returns the 3D slope and halo.
@@ -691,6 +722,7 @@ void main() {
     if (lit > 0.0 && sinR > 0.0) lit *= mix(1.0, rockShadow(m, normalize(sdp + vec2(1e-6, 0.0)), sinR / sqrt(max(1.0 - sinR * sinR, 1e-4))), fd);
     rockAlb = mix(1.0, 1.2, rmask * fd);
   }
+  if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
   vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;

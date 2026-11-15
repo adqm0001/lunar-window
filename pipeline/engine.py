@@ -5,6 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
+from terrain import hemisphere_sign
+
 ROOT = Path(__file__).resolve().parent.parent
 RAW = ROOT / "data" / "raw"
 EXE = ROOT / "engine" / ("horizon.exe" if sys.platform == "win32" else "horizon")
@@ -20,7 +22,8 @@ def build():
     subprocess.run(["g++", *flags, "-o", str(EXE), str(src)], check=True)
 
 
-def horizon(lat_deg, lon_deg, n_az, observer_height_m=2.0, max_dist_m=250_000.0):
+def horizon(lat_deg, lon_deg, n_az, observer_height_m=2.0, max_dist_m=250_000.0, hemisphere="south"):
+    hemisphere_sign(hemisphere)
     build()
     lat = np.atleast_1d(np.asarray(lat_deg, dtype=np.float64))
     lon = np.atleast_1d(np.asarray(lon_deg, dtype=np.float64))
@@ -28,5 +31,5 @@ def horizon(lat_deg, lon_deg, n_az, observer_height_m=2.0, max_dist_m=250_000.0)
         pts = Path(tmp) / "points.f64"
         out = Path(tmp) / "horizon.f32"
         np.stack([lat, lon], axis=1).astype("<f8").tofile(pts)
-        subprocess.run([str(EXE), str(RAW), str(pts), str(out), str(n_az), str(observer_height_m), str(max_dist_m)], check=True)
+        subprocess.run([str(EXE), str(RAW), str(pts), str(out), str(n_az), str(observer_height_m), str(max_dist_m), hemisphere], check=True)
         return np.fromfile(out, dtype="<f4").reshape(lat.size, n_az)
