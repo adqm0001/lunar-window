@@ -98,7 +98,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **9. Edit and upload video** (M). Clips 1–7 + voice-over, ≤ 3:00, upload (unlisted YouTube is fine). **Depends on** 1–8.
 
-- [ ] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
+- [x] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
 
 - [ ] **11. NASA project page** (S). Description, live link, repo link, video, slides. **Depends on** 9, 10.
 
