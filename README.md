@@ -2,7 +2,7 @@
 
 **Where and when to land at the Moon's south pole.**
 
-A browser-based mission planner built for the NASA Space Apps Challenge 2026. It combines NASA's lunar terrain, the real positions of the Sun and Earth for every hour of 2026–2028, and physical models that run on your GPU to show sunlight, radio contact, surface temperature and water ice anywhere on the Moon.
+A browser-based mission planner built for the NASA Space Apps Challenge 2026. It combines NASA's lunar terrain, the real positions of the Sun and Earth for every hour of 2026–2036, and physical models that run on your GPU to show sunlight, radio contact, surface temperature and water ice anywhere on the Moon.
 
 **[Open the live app →](https://adqm0001.github.io/lunar-window/)**
 
@@ -73,7 +73,7 @@ The validation panel in the app recomputes several of these live. Its limits are
 NASA LOLA terrain ─┐
                    ├─► C++ horizon engine (OpenMP) ─► horizon field: 102,400 points × 180 directions
 JPL DE421 ephemeris ┤
-                   └─► Sun / Earth / DSN positions, hourly 2026–2028
+                   └─► Sun / Earth / DSN positions, hourly 2026–2036
                                        │
                                        ▼
             Browser (WebGL2): sunlight, contact, night, heat flow, routes, rendering
