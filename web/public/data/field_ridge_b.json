@@ -1,0 +1,35 @@
+{
+  "extentMeters": 2500.0,
+  "centerX": -11505.0,
+  "centerY": -12495.0,
+  "label": "Connecting ridge B",
+  "source": "LOLA 40 m south polar DEM (240 m distant terrain); 20 m sampling, not 20 m native terrain resolution",
+  "projection": "south polar stereographic, R=1737.4 km, x east, y toward lon 0, row 0 = +y",
+  "horizon": {
+    "file": "field_ridge_b.bin.gz",
+    "encoding": "gzip; byte deltas between consecutive azimuth layers (mod 256); elevations clamped to -8..17.5 deg as in field_pole",
+    "size": 250,
+    "cellMeters": 20.0,
+    "azimuthBins": 180,
+    "observerHeightM": 2.0,
+    "layout": "uint8 [azimuthBin][row][col], azimuth from local north toward east",
+    "decode": {
+      "offsetDeg": -8.0,
+      "stepDeg": 0.1
+    }
+  },
+  "heights": {
+    "file": "heights_ridge_b.bin.gz",
+    "size": 1000,
+    "cellMeters": 5.0,
+    "layout": "int16 meters [row][col]",
+    "min": 1144.814453125,
+    "max": 1957.939453125
+  },
+  "slope": {
+    "file": "slope_ridge_b.bin.gz",
+    "size": 250,
+    "cellMeters": 20.0,
+    "layout": "uint8 [layer][row][col]; layer 0 = mean slope deg * 4, layer 1 = % of cell under 10 deg"
+  }
+}
