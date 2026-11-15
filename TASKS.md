@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Render skyline horizons at their actual angular resolution** ([#207](https://github.com/adqm0001/lunar-window/issues/207)) — taken: malqedra
+  - **Files:** `web/src/components/SkylinePanel.tsx` and regression tests.
+  - **Spec:** sample the drawn terrain at each plotted azimuth using the existing cyclic horizon interpolation. Show 180-bin custom-point horizons once around 360°, retain 720-bin profiles, and preserve Sun/Earth paths and visibility percentages.
+  - **Verify:** a single directional feature occurs once at the correct bearing, interpolation between bins and across north, every vertex of a 720-bin control; TypeScript, tests, build, production custom-point before/after and named-site control without console errors.
+
 - [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
   - **Files:** `web/src/state/share.ts` and regression tests.
   - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
