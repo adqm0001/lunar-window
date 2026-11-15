@@ -33,9 +33,20 @@ export default function TopBar() {
         <span>UTC</span>
       </div>
       <div className="spacer" />
-      <div className="power" title="Graphics power: Saver uses the least GPU">
+      <div className="power">
         {(["saver", "balanced", "high"] as const).map((q) => (
-          <button key={q} className={`chip ${q === quality ? "sel" : ""}`} onClick={() => setQuality(q)}>
+          <button
+            key={q}
+            className={`chip ${q === quality ? "sel" : ""}`}
+            onClick={() => setQuality(q)}
+            title={
+              q === "saver"
+                ? "Saver: lower resolution, simpler shadows and detail, no glow, 30 fps. For laptops on battery"
+                : q === "balanced"
+                  ? "Balanced: full resolution and detail, 60 fps"
+                  : "High: supersampled (sharper edges), finer terrain and shadows, rocks further out. Needs a good GPU"
+            }
+          >
             {q === "saver" ? "Saver" : q === "balanced" ? "Balanced" : "High"}
           </button>
         ))}

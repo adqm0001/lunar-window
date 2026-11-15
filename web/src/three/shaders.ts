@@ -37,6 +37,7 @@ uniform float uMapLight;
 uniform float uCutOn;
 uniform vec3 uCutA;
 uniform vec3 uCutB;
+uniform int uQuality;
 varying vec2 vMap;
 varying vec3 vNormal;
 varying vec3 vWorld;
@@ -115,19 +116,22 @@ void main() {
   float sN = dot(sv, north);
   vec2 sunMap = normalize(sE * vec2(cos(lon), -sin(lon)) + sN * vec2(sin(lon), cos(lon)) + vec2(1e-6, 0.0));
   float halo = 0.0;
-  if (camDist < 60.0) {
+  // Quality: Saver keeps only the near crater detail and no rocks; High draws rocks further out.
+  float detailFar = uQuality == 0 ? 25.0 : 60.0;
+  float rockFar = uQuality == 0 ? 0.0 : uQuality == 1 ? 0.3 : 0.6;
+  if (camDist < detailFar) {
     vec4 cd = craterDetailTex(vMap);
-    float fade = 1.0 - smoothstep(35.0, 60.0, camDist);
+    float fade = 1.0 - smoothstep(detailFar * 0.58, detailFar, camDist);
     n = normalize(n - (cd.x * mxW + cd.y * myW) * 0.85 * fade * uExaggeration);
     halo = cd.w * fade;
-    if (lit > 0.0 && sel > 3.0 && sel < 40.0) {
+    if (lit > 0.0 && sel > 3.0 && sel < 40.0 && uQuality > 0) {
       float cs = craterShadow(vMap, sunMap, tan(radians(sel)), camDist * 1000.0 * 0.0009);
       lit *= mix(1.0, cs, fade * smoothstep(3.0, 6.0, sel));
     }
   }
   float rockAlb = 1.0;
-  if (camDist < 0.3) {
-    float fd = 1.0 - smoothstep(0.12, 0.3, camDist);
+  if (camDist < rockFar) {
+    float fd = 1.0 - smoothstep(rockFar * 0.4, rockFar, camDist);
     float rmask;
     vec2 g = groundDetail(vMap, rmask);
     n = normalize(n - (g.x * mxW + g.y * myW) * fd);
