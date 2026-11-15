@@ -237,10 +237,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** Escape calls `onClose`; focus moves to the close button on open; Tab/Shift+Tab cycle within the modal; focus returns to the opener on close. `role="dialog"`, `aria-modal="true"`, `aria-labelledby` the title.
   - **Verify:** keyboard-only: open each window, cycle focus, Escape closes.
 
-- [ ] **41. Color-blind palette** (M) — taken: malqedra
-  - **Files:** `src/gpu/layers.ts`, `src/state/store.ts`, `src/components/LayerControls.tsx`.
-  - **Spec:** add `palette: "default" | "viridis"` to the store (persist in `localStorage` like `quality`). Add viridis stops for `sun`, `earth`, `link`, `night`, `temp`; use them in `paint`, `paintGlobal` and `gradientCss` when selected. Toggle in the legend.
-  - **Verify:** switch the palette; legend and both patch and whole-Moon overlays change.
+- [x] **41. Color-blind palette** (M) — taken: malqedra
+  - **Files:** `src/gpu/layers.ts`, `src/state/store.ts`, `src/components/LayerControls.tsx`, `src/gpu/overlay.ts`, `src/gpu/globalOverlay.ts`, `src/components/Scene3D.tsx`, `src/styles.css`.
+  - **Spec:** add `palette: "default" | "viridis"` to the store (persist in `localStorage` like `quality`). Add viridis stops for `sun`, `earth`, `link`, `night`, `temp`; use them in `paint`, `paintGlobal` and `gradientCss` when selected. Toggle in the legend. Include the palette in painted-overlay cache keys and scene updates so changing it repaints both maps using cached metrics. On phones, where the legend is hidden, expose the same choice in the layer bar.
+  - **Verify:** switch the palette; legend and both patch and whole-Moon overlays change. Both choices survive reloads, and the phone layer-bar controls work by keyboard.
 ---
 
 ## Act 5: Science upgrades

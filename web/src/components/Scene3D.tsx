@@ -32,6 +32,7 @@ export default function Scene3D() {
   const fieldProgress = useApp((s) => s.fieldProgress);
   const hour = useApp((s) => s.hour);
   const layer = useApp((s) => s.layer);
+  const palette = useApp((s) => s.palette);
   const finder = useApp((s) => s.finder);
   const survival = useApp((s) => s.survival);
   const rover = useApp((s) => s.rover);
@@ -134,13 +135,13 @@ export default function Scene3D() {
     }
     if (playing) return;
     let cancelled = false;
-    computeGlobal(layer, day * 24, rangeDays).then((c) => {
+    computeGlobal(layer, day * 24, rangeDays, palette).then((c) => {
       if (!cancelled) scene.setGlobalOverlay(c);
     });
     return () => {
       cancelled = true;
     };
-  }, [scene, globe, layer, rangeDays, day, playing]);
+  }, [scene, globe, layer, rangeDays, day, playing, palette]);
 
   useEffect(() => {
     scene?.setRoute(rover && "stops" in rover ? rover : null);
@@ -170,8 +171,8 @@ export default function Scene3D() {
   }, [scene, site, st]);
 
   useEffect(() => {
-    scene?.setOverlay(layer === "now" && view === "3d" ? null : overlayCanvas(layer, metrics, field, finder, survival));
-  }, [scene, layer, metrics, field, finder, survival, view]);
+    scene?.setOverlay(layer === "now" && view === "3d" ? null : overlayCanvas(layer, metrics, field, finder, survival, palette));
+  }, [scene, layer, metrics, field, finder, survival, view, palette]);
 
   const onMove = (e: React.PointerEvent) => {
     if (!scene || e.buttons) return;

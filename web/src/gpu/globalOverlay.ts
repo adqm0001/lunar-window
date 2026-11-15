@@ -6,7 +6,7 @@ export interface GlobalOverlay {
   south: HTMLCanvasElement;
   north: HTMLCanvasElement;
 }
-import { paintGlobal, THERMAL_LAYERS, type LayerId } from "./layers";
+import { paintGlobal, THERMAL_LAYERS, type LayerId, type Palette } from "./layers";
 import { useApp } from "../state/store";
 
 // Runs the whole-Moon engine on request and turns the result into an overlay image.
@@ -54,7 +54,7 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
   return m;
 }
 
-export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalOverlay | null> {
+export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number, palette: Palette = "default"): Promise<GlobalOverlay | null> {
   const st = useApp.getState();
   if (!st.globe || !st.data) return null;
   const req = globalRequest(layer, hour, rangeDays);
@@ -86,7 +86,7 @@ export async function computeGlobal(layer: LayerId, hour: number, rangeDays: num
     c.height = grid.h;
     const g = c.getContext("2d")!;
     const img = g.createImageData(grid.w, grid.h);
-    paintGlobal(layer, grid.data, grid.w, grid.h, img);
+    paintGlobal(layer, grid.data, grid.w, grid.h, img, palette);
     g.putImageData(img, 0, 0);
     return c;
   };
