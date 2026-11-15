@@ -16,8 +16,16 @@ export default function MobileNav() {
     if (toolOpen) setPanel("sites");
   }, [toolOpen, setPanel]);
 
-  // Hidden while a sheet or the tour card covers that corner; release both if they hide while one is held.
-  const showLift = panel === "none" && !touring;
+  // The landing dates chart and the compare table take the sheet area on phones and are hidden while a sheet is open
+  // (styles.css), so opening one closes the sheet.
+  const midOpen = useApp((s) => s.porkchopOpen || s.compareOpen);
+  useEffect(() => {
+    if (midOpen) setPanel("none");
+  }, [midOpen, setPanel]);
+
+  // Hidden while a sheet, the chart / compare table or the tour card covers that corner; release both if they hide
+  // while one is held.
+  const showLift = panel === "none" && !touring && !midOpen;
   useEffect(() => {
     if (!showLift) return;
     return () => {
