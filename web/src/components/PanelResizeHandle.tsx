@@ -25,6 +25,8 @@ export default function PanelResizeHandle({ side }: { side: Side }) {
       title="Drag to resize · Double-click to reset"
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.focus({ preventScroll: true });
         event.currentTarget.setPointerCapture(event.pointerId);
         drag.current = { id: event.pointerId, x: event.clientX, width: readWidth() };
       }}

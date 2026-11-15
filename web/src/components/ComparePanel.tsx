@@ -30,6 +30,10 @@ export default function ComparePanel() {
   const { select, togglePin, setCompareOpen, setSplit } = useApp.getState();
   const h = Math.floor(hour);
   const day = Math.floor(hour / 24) * 24;
+  const monthHours = Math.min(720, data.ephem.count - day);
+  const yearHours = Math.min(8760, data.ephem.count - day);
+  const monthLabel = monthHours === 720 ? "next 30 d" : `available ${formatDuration(monthHours)}`;
+  const yearLabel = yearHours === 8760 ? "next 12 mo" : `available ${formatDuration(yearHours)}`;
   const seriesVersion = useSeriesVersion();
 
   const rows = useMemo<Row[]>(() => {
@@ -46,10 +50,10 @@ export default function ComparePanel() {
         format: (v) => formatDuration(v),
         better: null,
       },
-      { label: "Sunlit, next 30 d", values: se.map((x) => x && percentOn(x.sun, day, day + 720, lit)), format: pct, better: "high" },
-      { label: "Power + comms, next 30 d", values: se.map((x) => x && percentOn(x.link, day, day + 720, on)), format: pct, better: "high" },
-      { label: "Sunlit, next 12 mo", values: se.map((x) => x && percentOn(x.sun, day, day + 8760, lit)), format: pct, better: "high" },
-      { label: "Longest night, 12 mo", values: se.map((x) => x && longestRun(x.sun, day, day + 8760, dark)), format: (v) => formatDuration(v), better: "low" },
+      { label: `Sunlit, ${monthLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + monthHours, lit)), format: pct, better: "high" },
+      { label: `DSN contact, ${monthLabel}`, values: se.map((x) => x && percentOn(x.link, day, day + monthHours, on)), format: pct, better: "high" },
+      { label: `Sunlit, ${yearLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + yearHours, lit)), format: pct, better: "high" },
+      { label: `Longest night, ${yearLabel}`, values: se.map((x) => x && longestRun(x.sun, day, day + yearHours, dark)), format: (v) => formatDuration(v), better: "low" },
       {
         label: "Flat ground (< 10°)",
         values: pinned.map((s) => (field ? fieldSafePct(field, s.lat, s.lon) : null)),
@@ -57,7 +61,7 @@ export default function ComparePanel() {
         better: "high",
       },
     ];
-  }, [data, field, pinned, h, day, seriesVersion]);
+  }, [data, field, pinned, h, day, seriesVersion, monthHours, yearHours, monthLabel, yearLabel]);
 
   return (
     <div className={`glass compare${split ? " compact" : ""}`}>

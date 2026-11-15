@@ -1,5 +1,5 @@
 import Icon from "./Icon";
-import { lazy, useMemo, useState } from "react";
+import { lazy, useMemo } from "react";
 import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
@@ -65,7 +65,8 @@ export default function SitePanel() {
     return !inField(field, x, y);
   }, [field, site]);
   const series = useSeries();
-  const [skyline, setSkyline] = useState(false);
+  const skyline = useApp((s) => s.skylineOpen);
+  const setSkyline = useApp((s) => s.setSkylineOpen);
   const lit = (v: number) => v >= 128;
   const on = (v: number) => v === 1;
 
@@ -220,23 +221,23 @@ export default function SitePanel() {
         {therm ? (
           <>
             <dl className="kv">
-            <dt>Right now</dt>
-            <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
-              {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
-            </dd>
-            <dt>Coldest / hottest ({thermalSpanLabel(therm.hours)})</dt>
-            <dd>
-              {Math.round(therm.min)} K / {Math.round(therm.max)} K
-            </dd>
-            <dt>Water ice</dt>
-            {iceVerdictPossible(therm.hours) ? (
-              <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
-                {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
+              <dt>Right now</dt>
+              <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
+                {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
               </dd>
-            ) : (
-              <dd style={{ color: "var(--dim)" }}>needs a full year of data ({thermalSpanLabel(therm.hours)} modelled)</dd>
-            )}
-            </dl>
+              <dt>Coldest / hottest ({thermalSpanLabel(therm.hours)})</dt>
+              <dd>
+                {Math.round(therm.min)} K / {Math.round(therm.max)} K
+              </dd>
+              <dt>Water ice</dt>
+              {iceVerdictPossible(therm.hours) ? (
+                <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
+                  {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
+                </dd>
+              ) : (
+                <dd style={{ color: "var(--dim)" }}>needs a full year of data ({thermalSpanLabel(therm.hours)} modelled)</dd>
+              )}
+              </dl>
             <TempChart t={therm} nowDay={Math.floor((hourBucket - therm.start) / 24)} />
           </>
         ) : (

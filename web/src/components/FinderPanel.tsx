@@ -143,7 +143,7 @@ export default function FinderPanel() {
       {result && (
         <>
           <div className="f-stats">
-{(result.evaluated - result.rejected).toLocaleString()} eligible sites · {result.params.missionDays}-day mission
+            {(result.evaluated - result.rejected).toLocaleString()} eligible sites · {result.params.missionDays}-day mission
           </div>
           {stale.length > 0 && (
             <div className="f-hint warn" role="status">

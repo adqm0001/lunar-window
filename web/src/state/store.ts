@@ -49,6 +49,8 @@ interface AppState {
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
   reportOpen: boolean;
+  skylineOpen: boolean;
+  setSkylineOpen: (open: boolean) => void;
   mobilePanel: "none" | "sites" | "site" | "time";
   setMobilePanel: (p: "none" | "sites" | "site" | "time") => void;
   setReportOpen: (o: boolean) => void;
@@ -177,6 +179,8 @@ export const useApp = create<AppState>((set, get) => ({
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
   reportOpen: false,
+  skylineOpen: false,
+  setSkylineOpen: (skylineOpen) => set({ skylineOpen }),
   mobilePanel: "none",
   setMobilePanel: (mobilePanel) => set({ mobilePanel }),
   setReportOpen: (reportOpen) => set({ reportOpen }),

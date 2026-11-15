@@ -33,6 +33,10 @@ export default function TopBar({ panelAppearance, setPanelAppearance }: {
         </div>
       )}
       <div className="glass view-actions">
+        {!cinema && !touring && (
+          <button className="control-trigger tour-trigger" aria-label="Guided tour"
+            onClick={() => useApp.getState().setTourStep(0)}>Tour</button>
+        )}
         {!cinema && (
           <ControlMenu label="Settings" align="end">
             {(close) => (
@@ -58,11 +62,6 @@ export default function TopBar({ panelAppearance, setPanelAppearance }: {
                 <span className="share-status" role="status">
                   {copied === null ? "" : copied ? "Link copied" : "Link is in the address bar"}
                 </span>
-                {!touring && (
-                  <button className="control-action" onClick={() => { close(); useApp.getState().setTourStep(0); }}>
-                    Guided tour
-                  </button>
-                )}
                 <button className="control-action" onClick={() => { close(); setValidation(true); }}>Validation</button>
                 <details className="shortcut-help">
                   <summary>Keyboard and mouse</summary>
