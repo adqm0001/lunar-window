@@ -2,6 +2,7 @@ import { lazy, useEffect, useState } from "react";
 import { gradientCss, layerDef, LAYERS, PALETTE_LAYERS, type Palette } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { formatUtc, hourToDate, useApp } from "../state/store";
+import { iceCovered } from "../gpu/thermal";
 import LazyPanel from "./LazyPanel";
 
 const RegionReport = lazy(() => import("./RegionReport"));
@@ -148,6 +149,14 @@ export default function LayerControls() {
           <div className="legend-desc mono">
             {formatUtc(hourToDate(data, start)).slice(0, 10)} → {formatUtc(hourToDate(data, start + covered)).slice(0, 10)}
             {covered < hours && ` · data ends: ${covered < 48 ? `${covered} h` : `${Math.round(covered / 24)} d`} of ${Math.round(hours / 24)} d`}
+          </div>
+        )}
+        {layer === "ice" && !iceCovered(data.ephem.count, start) && (
+          <div className="legend-desc warn" role="status">
+            Not shown: ice stability needs a full year of sunlight and the data ends sooner.{" "}
+            {iceCovered(data.ephem.count, 0)
+              ? "Move the timeline back at least a year before the end."
+              : `This dataset covers only ${Math.round(data.ephem.count / 24)} days.`}
           </div>
         )}
         {metrics && (def.ranged || layer === "ice") && (
