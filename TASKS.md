@@ -48,7 +48,7 @@ Everything already built, so you know what exists before adding to it. Feature �
 - [x] Sites: peaks of light, Shackleton floor, missions, Artemis III regions; unlimited custom points (rename, remove)
 - [x] Site panel: Sun/Earth/DSN status with countdowns, 12-month stats, ground temperature now and through the year, ice depth, 7-day DSN contact windows, skyline with Sun and Earth paths
 - [x] Landing spot finder: scores 102,400 spots for a date, mission length, night limit, flat ground, priority; top 10 (`gpu/finder.ts`)
-- [x] Lander simulator: panels, battery, loads, hour by hour; GPU survival map; landing-miss Monte Carlo (10,000 touchdowns); true-scale 3D lander (`lib/lander.ts`, `lib/montecarlo.ts`, `three/landerModel.ts`)
+- [x] Lander simulator: panels, battery, loads, hour by hour; GPU survival map; landing-miss Monte Carlo (4,000 touchdowns); true-scale 3D lander (`lib/lander.ts`, `lib/montecarlo.ts`, `three/landerModel.ts`)
 - [x] Landing dates (porkchop): survival for every site and landing date (`PorkchopPanel.tsx`)
 - [x] Compare: pin sites, side-by-side table, synced timeline rows
 - [x] Rover route planner: hour-by-hour light and link bitmasks on the GPU, time-dependent A*, animated rover (`lib/rover.ts`)
@@ -86,9 +86,9 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each. [Verified layer sequence](docs/videos/task-3-layers.md).
 
-- [ ] **4. Video clip: landing finder** (S). Screen-record (OBS / Win+G): ★ Find landing spot → Search → click result #1.
+- [x] **4. Video clip: landing finder** (S). Screen-record (OBS / Win+G): ★ Find landing spot → Search (selects result #1 and flies the camera to it). [Verified 10.5-second clip](docs/videos/task-4-landing-finder.md).
 
-- [ ] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay.
+- [x] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay. [Verified 47.5-second clip](docs/videos/task-5-rover.md).
 
 - [x] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit. [Verified close-up orbit clip](docs/videos/task-6-lander.md).
 
@@ -112,9 +112,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [x] **14. Firefox** (S).
 
-- [ ] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels.
+- [x] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels. [Android Chrome test report](docs/testing/task-15-android.md); persistent 3D lag recorded in [bug #146](https://github.com/adqm0001/lunar-window/issues/146).
 
-- [ ] **16. iPhone** (S).
+- [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); 3D touch-camera lag/jumping tracked in [#143](https://github.com/adqm0001/lunar-window/issues/143).
 
 - [x] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
 
@@ -275,7 +275,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** set the end to `datetime(2037, 1, 1, tzinfo=timezone.utc)`. Rerun `python ephemeris.py` (needs `data/raw/` from `fetch_data.py`). `ephem.bin` grows ~210 kB/year; the app reads `count` from `ephem.json`, and the GPU textures pack hours in rows of 4096, so no shader change is needed.
   - **Verify:** the timeline reaches 2036; 1-year layers, finder and porkchop work near the end of the range. Landing dates include only missions with full data coverage; check a mission ending exactly at the cutoff and one crossing it, and show an unavailable state when none fit. Finder, including the guided tour, rejects incomplete missions. Year layers report a shortened range at the cutoff.
 
-- [ ] **48. Remove hard-coded years** (S) — Depends on 47
+- [x] **48. Remove hard-coded years** (S) — Depends on 47
   - **Files:** `src/components/Timeline.tsx` (`for (let y = 2026; y <= 2028; y++)` year labels), `src/components/SkylinePanel.tsx`, `src/components/Tour.tsx`, `src/components/ValidationPanel.tsx`, `README.md`.
   - **Spec:** derive the first and last year from `data.ephem.startMs` and `count`; text says "2026–<last year>".
   - **Verify:** `grep -rn "2028" web/src` returns nothing.
@@ -350,3 +350,15 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/three/MoonScene.ts` (`loop`).
   - **Spec:** while presenting, use `renderer.setAnimationLoop` and render the scene directly (skip the composer/bloom). Place the camera rig at the selected site, 1.7 m above the ground, using `sitePosition` and the local up vector.
   - **Verify:** in the emulator, you stand on Connecting ridge B and can look around; time playback moves the Sun.
+
+## Follow-up bug fixes
+
+- [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
+  - **Files:** `web/src/state/share.ts` and regression tests.
+  - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
+  - **Verify:** fresh-tab round trips for the first and another finder result; existing custom points and punctuation in names; built-in/custom selection with finder results present; the 20-point limit; time, camera and supported layer restoration; TypeScript, tests and build; desktop and phone viewport loading without console errors.
+
+- [x] **Guide sustained slow High-quality playback toward Balanced** ([#101](https://github.com/adqm0001/lunar-window/issues/101)) — taken: malqedra
+  - **Files:** `web/src/lib/playbackPerformance.ts` and tests, `web/src/components/PlaybackQualityNotice.tsx`, `web/src/three/MoonScene.ts`, `web/src/App.tsx`, `web/src/styles.css`.
+  - **Spec:** while High quality is playing in a visible tab, observe actual rendered frames. Ignore six seconds of startup, then offer Balanced after an eight-second window below 15 FPS or with three gaps of at least 250 ms. Offer Keep High, reset on pause/quality/visibility changes, and clear after recovery. This implements the issue's guidance option.
+  - **Verify:** frame-history regressions, desktop and phone actions/layout, pause/visibility/recovery guards, production loading/playback, and renderer timing. The reported Iris Xe hardware configuration was not independently reproduced; rendering-speed improvement is not claimed.
