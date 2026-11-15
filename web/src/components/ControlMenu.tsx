@@ -109,4 +109,3 @@ export default function ControlMenu({ label, value, align, placement, children }
     </div>
   );
 }
-

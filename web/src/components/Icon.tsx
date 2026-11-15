@@ -26,4 +26,3 @@ export default function Icon({ name }: { name: keyof typeof paths }) {
     </svg>
   );
 }
-
