@@ -4,7 +4,8 @@ Start here every session:
 
 1. Read [ARCHITECTURE.md](ARCHITECTURE.md): coordinate frames, data formats, engines, conventions, gotchas.
 2. Pick or continue a task from [TASKS.md](TASKS.md). Each task has Files / Spec / Verify. Implement exactly that task, nothing extra.
-3. Work on a branch `task-<number>-<short-name>`, never directly on `main` (every push to `main` deploys the live site).
+   Before starting, check its GitHub issue (`gh issue list --search "Task <number>:" --state all`): if it is closed, assigned to someone else, or has a "taking this" comment from someone else, do not work on it. Otherwise claim it (`gh issue edit <n> --add-assignee @me`, or `gh issue comment <n> --body "taking this"` if you can't be assigned).
+3. Work on a branch `task-<number>-<short-name>`, never directly on `main` (every push to `main` deploys the live site). The PR description must contain `Closes #<issue number>`. PRs must pass the automatic checks (type check, tests, build) before they can be merged.
 
 ## Commands (from `web/`)
 
