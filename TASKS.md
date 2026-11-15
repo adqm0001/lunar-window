@@ -90,7 +90,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay. [Verified 47.5-second clip](docs/videos/task-5-rover.md).
 
-- [ ] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit.
+- [x] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit. [Verified close-up orbit clip](docs/videos/task-6-lander.md).
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
