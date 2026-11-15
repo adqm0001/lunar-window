@@ -92,7 +92,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit.
 
-- [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
+- [x] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation. [Verified 24-second clip](docs/videos/task-7-report-validation.md).
 
 - [x] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
 
