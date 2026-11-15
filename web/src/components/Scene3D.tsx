@@ -258,7 +258,7 @@ export default function Scene3D() {
           {hover.value && <b> · {hover.value}</b>}
         </div>
       )}
-      {splitPair && view === "3d" && (
+      {splitPair && (
         <>
           <div className="split-tag left">{splitPair[0].name}</div>
           <div className="split-tag right">{splitPair[1].name}</div>

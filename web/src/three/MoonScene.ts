@@ -41,6 +41,10 @@ interface ViewSlot {
   orbitMode: boolean;
   upDirty: boolean;
   sunGain: number;
+  mapTarget: THREE.Vector3;
+  mapDist: number;
+  mapPointers: Map<number, { x: number; y: number }>;
+  mapPinch: number;
 }
 
 // Keyboard state seen by the view that isn't being steered.
@@ -165,7 +169,7 @@ export class MoonScene {
     this.controls.target.copy(MOON_CENTER);
     this.configureControls(true);
     this.bindMovement();
-    this.bindMapInput();
+    this.bindMapInput(this.renderer.domElement, false);
 
     this.scene.background = new THREE.Color(0x000000);
     this.stars = this.makeStars();
@@ -557,6 +561,17 @@ export class MoonScene {
   }
 
   private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null) {
+    if (this.mapMode) {
+      // The 2D map stays top-down: going somewhere re-centres it at the distance the 3D view would use
+      // (the globe overview zooms all the way out).
+      if (up) {
+        this.mapTarget.copy(to);
+        this.mapDist = Math.min(3500, Math.max(3, offTo.length()));
+      } else this.mapDist = 3500;
+      this.placeMapCamera();
+      this.dirty = true;
+      return;
+    }
     const from = this.controls.target.clone();
     const camFrom = this.camera.position.clone();
     this.camera.up.copy(up ?? new THREE.Vector3(0, 1, 0));
@@ -595,12 +610,18 @@ export class MoonScene {
   setMapMode(on: boolean) {
     if (on === this.mapMode) return;
     this.mapMode = on;
-    this.flight = null;
-    this.updateSplitEl();
-    this.resize();
     this.dirty = true;
     for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) m.uniforms.uMapLight.value = on ? 1 : 0;
     this.bloom.enabled = !on && this.quality !== "saver";
+    this.mapCamera(on);
+    if (this.split) this.inView(true, () => this.mapCamera(on));
+    this.updateSplitEl();
+    this.resize();
+  }
+
+  // Moves the current view's camera into the top-down map, or back out to the 3D view over the same spot.
+  private mapCamera(on: boolean) {
+    this.flight = null;
     if (on) {
       this.controls.enabled = false;
       const dir = (this.orbitMode ? this.camera.position.clone() : this.controls.target.clone()).sub(MOON_CENTER).normalize();
@@ -696,34 +717,43 @@ export class MoonScene {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
-  private bindMapInput() {
-    const el = this.renderer.domElement;
-    el.addEventListener("pointerdown", (e) => {
-      if (!this.mapMode) return;
-      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.mapPointers.size === 2) this.mapPinch = this.mapPinchSpan();
-    });
-    window.addEventListener("pointermove", (e) => {
-      const prev = this.mapPointers.get(e.pointerId);
-      if (!this.mapMode || !prev) return;
-      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.mapPointers.size >= 2) {
-        // Two fingers: zoom by how much they spread or pinch, and don't pan.
-        const span = this.mapPinchSpan();
-        if (this.mapPinch > 0 && span > 0) {
-          this.mapDist = Math.min(3500, Math.max(0.6, (this.mapDist * this.mapPinch) / span));
-          this.placeMapCamera();
-          this.dirty = true;
-        }
-        this.mapPinch = span;
-        return;
-      }
-      this.mapPan(e.clientX - prev.x, e.clientY - prev.y);
-    });
-    const end = (e: PointerEvent) => {
-      this.mapPointers.delete(e.pointerId);
-      if (this.mapPointers.size < 2) this.mapPinch = 0;
+  // Map drag, pinch and wheel on `el`, for the left (main) view or, on the split overlay, the right one.
+  private bindMapInput(el: HTMLElement, right: boolean) {
+    const inMine = (fn: () => void) => {
+      if (right && !this.split) return;
+      this.inView(right, fn);
     };
+    el.addEventListener("pointerdown", (e) =>
+      inMine(() => {
+        if (!this.mapMode) return;
+        this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.mapPointers.size === 2) this.mapPinch = this.mapPinchSpan();
+      }),
+    );
+    window.addEventListener("pointermove", (e) =>
+      inMine(() => {
+        const prev = this.mapPointers.get(e.pointerId);
+        if (!this.mapMode || !prev) return;
+        this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.mapPointers.size >= 2) {
+          // Two fingers: zoom by how much they spread or pinch, and don't pan.
+          const span = this.mapPinchSpan();
+          if (this.mapPinch > 0 && span > 0) {
+            this.mapDist = Math.min(3500, Math.max(0.6, (this.mapDist * this.mapPinch) / span));
+            this.placeMapCamera();
+            this.dirty = true;
+          }
+          this.mapPinch = span;
+          return;
+        }
+        this.mapPan(e.clientX - prev.x, e.clientY - prev.y);
+      }),
+    );
+    const end = (e: PointerEvent) =>
+      inMine(() => {
+        this.mapPointers.delete(e.pointerId);
+        if (this.mapPointers.size < 2) this.mapPinch = 0;
+      });
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     el.addEventListener(
@@ -731,9 +761,11 @@ export class MoonScene {
       (e) => {
         if (!this.mapMode) return;
         e.preventDefault();
-        this.mapDist = Math.min(3500, Math.max(0.6, this.mapDist * Math.exp(e.deltaY * 0.0015)));
-        this.placeMapCamera();
-        this.dirty = true;
+        inMine(() => {
+          this.mapDist = Math.min(3500, Math.max(0.6, this.mapDist * Math.exp(e.deltaY * 0.0015)));
+          this.placeMapCamera();
+          this.dirty = true;
+        });
       },
       { passive: false },
     );
@@ -1115,7 +1147,7 @@ export class MoonScene {
   // ---- Split screen: two views side by side, sharing the scene, time and layers
 
   private get splitOn() {
-    return !!this.split && !this.mapMode;
+    return !!this.split;
   }
 
   /** Turns the side-by-side view on or off. `insets`: CSS px covered by UI panels on each side. */
@@ -1127,8 +1159,26 @@ export class MoonScene {
       const cam = this.camera.clone();
       const controls = new OrbitControls(cam, el);
       controls.target.copy(this.controls.target);
-      this.split = { camera: cam, controls, controlsEl: el, flight: null, orbitMode: this.orbitMode, upDirty: false, sunGain: this.sunGain };
-      this.inView(true, () => this.configureControls(this.orbitMode));
+      this.split = {
+        camera: cam,
+        controls,
+        controlsEl: el,
+        flight: null,
+        orbitMode: this.orbitMode,
+        upDirty: false,
+        sunGain: this.sunGain,
+        mapTarget: this.mapTarget.clone(),
+        mapDist: this.mapDist,
+        mapPointers: new Map(),
+        mapPinch: 0,
+      };
+      this.inView(true, () => {
+        this.configureControls(this.orbitMode);
+        if (this.mapMode) {
+          this.controls.enabled = false;
+          this.placeMapCamera();
+        }
+      });
     } else if (!on && this.split) {
       this.split.controls.dispose();
       this.split = null;
@@ -1152,6 +1202,7 @@ export class MoonScene {
     this.host.appendChild(el);
     this.bindPicking(el, true);
     this.bindWheel(el, true);
+    this.bindMapInput(el, true);
     this.splitEl = el;
     return el;
   }
@@ -1168,6 +1219,10 @@ export class MoonScene {
     [this.orbitMode, v.orbitMode] = [v.orbitMode, this.orbitMode];
     [this.upDirty, v.upDirty] = [v.upDirty, this.upDirty];
     [this.sunGain, v.sunGain] = [v.sunGain, this.sunGain];
+    [this.mapTarget, v.mapTarget] = [v.mapTarget, this.mapTarget];
+    [this.mapDist, v.mapDist] = [v.mapDist, this.mapDist];
+    [this.mapPointers, v.mapPointers] = [v.mapPointers, this.mapPointers];
+    [this.mapPinch, v.mapPinch] = [v.mapPinch, this.mapPinch];
   }
 
   // Runs fn with the right-hand view swapped in (when `right` and split is on), then swaps back.

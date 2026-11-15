@@ -204,7 +204,7 @@ export const useApp = create<AppState>((set, get) => ({
     }),
   setCompareOpen: (compareOpen) => set({ compareOpen }),
   split: false,
-  setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2, view: on ? "3d" : s.view })),
+  setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,
   setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
   setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
