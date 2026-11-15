@@ -80,9 +80,9 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 ## Act 1: Submission (people, not code)
 
-- [ ] **1. Video clip: whole Moon to pole** (S). On the live site press **● Rec** in the timeline (records the WebGL canvas to WebM, starts playback), drag the Moon, click "Connecting ridge B" in the site list. Press Rec again to save.
+- [x] **1. Video clip: whole Moon to pole** (S). On the live site press **● Rec** in the timeline (records the WebGL canvas to WebM, starts playback), drag the Moon, click "Connecting ridge B" in the site list. Press Rec again to save.
 
-- [ ] **2. Video clip: moving shadows** (S). At the pole, speed 6 h/s, Play, record ~15 s.
+- [x] **2. Video clip: moving shadows** (S). At the pole, speed 6 h/s, Play, record ~15 s. [Verified 15-second clip](docs/videos/task-2-moving-shadows.md).
 
 - [ ] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each.
 
@@ -94,11 +94,11 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
-- [ ] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
+- [x] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
 
 - [ ] **9. Edit and upload video** (M). Clips 1–7 + voice-over, ≤ 3:00, upload (unlisted YouTube is fine). **Depends on** 1–8.
 
-- [ ] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
+- [x] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
 
 - [ ] **11. NASA project page** (S). Description, live link, repo link, video, slides. **Depends on** 9, 10.
 
@@ -106,7 +106,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). File one GitHub issue per problem: device, browser, steps, screenshot, console errors.
 
-- [ ] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar).
+- [x] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar). [Intel Iris Xe test report](docs/testing/task-12-integrated-graphics.md): all modes tested; High playback stalls recorded for follow-up.
 
 - [ ] **13. Mac Safari** (S).
 
