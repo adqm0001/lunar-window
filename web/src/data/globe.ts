@@ -71,9 +71,111 @@ export async function loadGlobe(): Promise<GlobeData> {
 
 export const P80_MISSING = -32768;
 
-let polar80Meta: { file: string; size: number; cellMeters: number; firstCenterMeters: number } | null = null;
+interface Polar80Meta {
+  file: string;
+  size: number;
+  cellMeters: number;
+  firstCenterMeters: number;
+  tiles?: number;
+  tile?: number;
+  tileDir?: string;
+}
 
-// Fills in the 80 m polar terrain on an already-loaded globe (in place).
+let polar80Meta: Polar80Meta | null = null;
+
+/** One 80 m polar tile, already decoded, placed at grid column x0 / row y0 (row 0 = +y). */
+export interface Polar80Tile {
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  data: Int16Array;
+}
+
+export interface Polar80Hooks {
+  /** Polar map position (metres) to load around first, or null to start at the pole. */
+  focus: () => [number, number] | null;
+  /** Called once the full-size (still empty) grid exists on the globe. */
+  onStart: () => void;
+  /** Called after each tile has been copied into the globe's grid. */
+  onTile: (t: Polar80Tile) => void;
+}
+
+const P80_MAX_IN_FLIGHT = 4;
+
+// Streams the 80 m polar terrain tile by tile, nearest to the camera first, into a full-size grid on
+// the globe (missing until its tile arrives). Falls back to the single file if the tiles aren't listed.
+export async function startPolar80(g: GlobeData, hooks: Polar80Hooks): Promise<boolean> {
+  const m = polar80Meta;
+  if (!m) return false;
+  if (!m.tiles || !m.tile || !m.tileDir) {
+    const ok = await loadPolar80(g);
+    if (ok) {
+      hooks.onStart();
+      hooks.onTile({ x0: 0, y0: 0, w: m.size, h: m.size, data: g.p80 });
+    }
+    return ok;
+  }
+  const n = m.size;
+  const per = m.tile;
+  const count = m.tiles;
+  g.p80 = new Int16Array(n * n).fill(P80_MISSING);
+  g.p80Size = n;
+  g.p80Cell = m.cellMeters;
+  g.p80First = m.firstCenterMeters;
+  hooks.onStart();
+
+  const pending = new Set<number>();
+  for (let ty = 0; ty < count; ty++) for (let tx = 0; tx < count; tx++) pending.add(ty * count + tx);
+  const centre = (key: number): [number, number] => {
+    const tx = key % count;
+    const ty = (key - tx) / count;
+    const c = Math.min(n, tx * per + per / 2);
+    const r = Math.min(n, ty * per + per / 2);
+    return [m.firstCenterMeters + c * m.cellMeters, -m.firstCenterMeters - r * m.cellMeters];
+  };
+  const next = (): number | null => {
+    if (!pending.size) return null;
+    const [fx, fy] = hooks.focus() ?? [0, 0];
+    let best = -1;
+    let bestD = Infinity;
+    for (const k of pending) {
+      const [x, y] = centre(k);
+      const d = (x - fx) ** 2 + (y - fy) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    }
+    pending.delete(best);
+    return best;
+  };
+  const fetchTile = async (key: number) => {
+    const tx = key % count;
+    const ty = (key - tx) / count;
+    const x0 = tx * per;
+    const y0 = ty * per;
+    const w = Math.min(per, n - x0);
+    const h = Math.min(per, n - y0);
+    const bytes = await gunzipFetch(`${m.tileDir}/${ty}_${tx}.bin.gz`);
+    const data = undelta(bytes, w);
+    for (let r = 0; r < h; r++) g.p80.set(data.subarray(r * w, (r + 1) * w), (y0 + r) * n + x0);
+    hooks.onTile({ x0, y0, w, h, data });
+  };
+  const worker = async () => {
+    for (let k = next(); k !== null; k = next()) {
+      try {
+        await fetchTile(k);
+      } catch (e) {
+        console.warn(`80 m polar tile ${k} failed to load:`, (e as Error).message);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: P80_MAX_IN_FLIGHT }, worker));
+  return true;
+}
+
+// Fills in the 80 m polar terrain on an already-loaded globe from the single file (in place).
 export async function loadPolar80(g: GlobeData): Promise<boolean> {
   if (!polar80Meta) return false;
   const bytes = await gunzipFetch(polar80Meta.file);

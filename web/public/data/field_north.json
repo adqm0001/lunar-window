@@ -1,0 +1,32 @@
+{
+  "extentMeters": 40000.0,
+  "projection": "north polar stereographic, R=1737.4 km, x east, y away from lon 0, row 0 = +y",
+  "horizon": {
+    "file": "field_north.bin.gz",
+    "encoding": "gzip; byte deltas between consecutive azimuth layers (mod 256)",
+    "size": 320,
+    "cellMeters": 250.0,
+    "azimuthBins": 180,
+    "observerHeightM": 2.0,
+    "layout": "uint8 [azimuthBin][row][col], azimuth from local north toward east",
+    "decode": {
+      "offsetDeg": -8.0,
+      "stepDeg": 0.1
+    }
+  },
+  "heights": {
+    "file": "heights_north.bin.gz",
+    "size": 1280,
+    "cellMeters": 62.5,
+    "layout": "int16 meters [row][col]",
+    "min": -2935.73388671875,
+    "max": 598.9990234375
+  },
+  "slope": {
+    "file": "slope_north.bin.gz",
+    "size": 320,
+    "cellMeters": 250.0,
+    "layout": "uint8 [layer][row][col]; layer 0 = mean slope deg * 4, layer 1 = % of cell under 10 deg"
+  },
+  "hemisphere": "north"
+}

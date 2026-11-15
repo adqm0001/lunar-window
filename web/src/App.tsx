@@ -1,9 +1,9 @@
 import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
-import { loadGlobe, loadPolar80 } from "./data/globe";
+import { loadGlobe, startPolar80 } from "./data/globe";
 import { useApp } from "./state/store";
-import { applyEarly, currentScene, syncUrl } from "./state/share";
+import { applyEarly, currentScene, openedFromLink, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
 import TopBar from "./components/TopBar";
 import SiteList from "./components/SiteList";
@@ -23,6 +23,7 @@ const PorkchopPanel = lazy(() => import("./components/PorkchopPanel"));
 
 let startedField = false;
 let startedData = false;
+let startedReplay = false;
 
 export default function App() {
   const data = useApp((s) => s.data);
@@ -60,6 +61,30 @@ export default function App() {
       .catch((e: Error) => setError(e.message));
   }, [setData]);
 
+  // Opened from a "Replay" entry (not from a shared link, which already says where to look): jump to the replay's
+  // start, select its site, show the lander and play at 1 h/s. The camera flies to the lander once the 3D scene,
+  // terrain and lander are up.
+  useEffect(() => {
+    if (!data?.replay || openedFromLink() || startedReplay) return;
+    startedReplay = true;
+    const r = data.replay;
+    const s = useApp.getState();
+    s.setHour((Date.parse(r.startUtc) - data.ephem.startMs) / 3600e3);
+    s.select(r.siteId);
+    s.setLanderOpen(true);
+    s.setSpeedIndex(0);
+    if (!s.playing) s.togglePlaying();
+    const t0 = Date.now();
+    const id = setInterval(() => {
+      const st = useApp.getState();
+      const scene = currentScene();
+      if (scene && st.field && st.globe && st.landerOpen) {
+        clearInterval(id);
+        setTimeout(() => currentScene()?.viewLander(), 300);
+      } else if (Date.now() - t0 > 30000) clearInterval(id);
+    }, 250);
+  }, [data]);
+
   useEffect(() => {
     if (!data) return;
     applyEarly();
@@ -77,9 +102,11 @@ export default function App() {
     loadGlobe()
       .then((g) => {
         s.setGlobe(g);
-        loadPolar80(g)
-          .then((ok) => ok && currentScene()?.refreshPolar80())
-          .catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
+        startPolar80(g, {
+          focus: () => currentScene()?.polarFocus() ?? null,
+          onStart: () => currentScene()?.beginPolar80(),
+          onTile: (t) => currentScene()?.applyPolar80Tile(t),
+        }).catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
       })
       .catch((e: Error) => console.warn("Globe data failed to load:", e.message));
   }, [data]);
