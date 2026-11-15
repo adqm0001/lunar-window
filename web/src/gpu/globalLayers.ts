@@ -1,7 +1,7 @@
 import type { Ephemeris } from "../data/load";
 import type { GlobeData } from "../data/globe";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
-import { BOUNCE_ABSORBED, NZ, ICE_K } from "./thermal";
+import { BOUNCE_ABSORBED, NZ, ICE_K, STEP_HOUR_GLSL, thermalWarmup } from "./thermal";
 
 // The same sunlight, Earth, link, night, temperature and ice maps as the polar engine, for the
 // whole Moon on a 0.25° grid (1440 x 720, about a million points), all on the GPU.
@@ -217,7 +217,8 @@ void main() {
 }`;
 
 const THERMAL = `${TIME_HEAD}
-uniform int uSpin;
+uniform int uReplay;
+uniform int uHistory;
 const int NZ = ${NZ};
 const float S0 = 1361.0;
 const float EMIS = 0.95;
@@ -271,8 +272,10 @@ void main() {
   float T0 = max(30.0, pow((fluxSum / float(uSteps) + QGEO) / (EMIS * SIGMA), 0.25) * 0.9);
   for (int i = 0; i < NZ; i++) { T[i] = T0; Tmx[i] = 0.0; }
   float tMax = 0.0, tMin = 1e9, tSum = 0.0, nRec = 0.0;
-  for (int k = 0; k < uSteps; k++) {
-    int idx = uStart + k * uStride;
+  // warm up first (see thermalSchedule in gpu/thermal.ts), then record every step of the window
+  int warm = uReplay + uHistory;
+  for (int j = 0; j < warm + uSteps; j++) {
+    int idx = ${STEP_HOUR_GLSL};
     vec3 sv = normalize(texelFetch(uSun, tc(idx), 0).xyz - site);
     float sel = degrees(asin(dot(sv, up)));
     float saz = degrees(atan(dot(sv, east), dot(sv, north)));
@@ -300,7 +303,7 @@ void main() {
       Tn[0] = Ts;
       for (int i = 0; i < NZ; i++) T[i] = Tn[i];
     }
-    if (k >= uSpin) {
+    if (j >= warm) {
       tMax = max(tMax, T[0]); tMin = min(tMin, T[0]); tSum += T[0]; nRec += 1.0;
       for (int i = 0; i < NZ; i++) Tmx[i] = max(Tmx[i], T[i]);
     }
@@ -474,7 +477,12 @@ export class GlobalLayers {
     gl.uniform1i(gl.getUniformLocation(p, "uStart"), start);
     gl.uniform1i(gl.getUniformLocation(p, "uSteps"), steps);
     gl.uniform1i(gl.getUniformLocation(p, "uStride"), stride);
-    if (kind === "thermal") gl.uniform1i(gl.getUniformLocation(p, "uSpin"), Math.min(Math.floor(steps / 4), Math.round(709 / stride)));
+    if (kind === "thermal") {
+      // warm up on the lunar days before the window, then record all of it (see thermalWarmup)
+      const warm = thermalWarmup(start, stride, this.count);
+      gl.uniform1i(gl.getUniformLocation(p, "uReplay"), warm.replay);
+      gl.uniform1i(gl.getUniformLocation(p, "uHistory"), warm.history);
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.outFbo);
     const grids: GridData[] = [];
     for (const grid of GRIDS) {

@@ -33,7 +33,7 @@ export default function PlaybackQualityNotice() {
 
   if (quality !== "high" || !playing || !slow || dismissed) return null;
   return (
-    <div className="quality-notice" role="status">
+    <div className="glass quality-notice" role="status">
       <span>Playback is running slowly. Try Balanced graphics for smoother playback.</span>
       <div className="quality-actions">
         <button className="chip" onClick={() => setQuality("balanced")}>Use Balanced</button>

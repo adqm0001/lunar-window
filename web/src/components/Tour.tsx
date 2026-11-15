@@ -1,11 +1,9 @@
+import Icon from "./Icon";
 import { useEffect, useState } from "react";
-import { fieldCell } from "../data/field";
-import { DEFAULT_WEIGHTS, findBestSpots } from "../gpu/finder";
+import { DEFAULT_WEIGHTS, findBestSpots, fitsFinderMission } from "../gpu/finder";
 import { getEngine } from "../gpu/useFieldMetrics";
-import { isRoute } from "../lib/rover";
-import { planRouteInWorker } from "../workers/client";
 import { currentScene, openedFromLink } from "../state/share";
-import { SPEEDS, useApp } from "../state/store";
+import { useApp } from "../state/store";
 import { ephemYears } from "../lib/years";
 
 interface Step {
@@ -27,13 +25,15 @@ function closePanels() {
   s.setRoverOpen(false);
   s.setValidationOpen(false);
   s.setReportOpen(false);
+  s.setSkylineOpen(false);
+  s.setCompareOpen(false);
   s.setPorkchopOpen(false);
   // On phones and tablets a tool opens the Sites sheet; close it too, so it doesn't linger under later steps.
   s.setMobilePanel("none");
   if (s.playing) s.togglePlaying();
 }
 
-// Steps 3–5 show a layer with nothing else open, also when reached with ← Back from a later step.
+// Keep every step independent when reached with Back or Next.
 function clearTools() {
   closePanels();
   st().setRover(null);
@@ -46,113 +46,91 @@ function poleView() {
 
 const STEPS: Step[] = [
   {
-    title: "This is the real Moon, right now",
-    text: "Lit by the Sun where it really is today (NASA JPL ephemeris) and shaped by NASA's laser altimeter (LOLA). Drag to spin it, scroll to zoom, WASD to fly.",
-    enter: () => {
-      closePanels();
-      st().setView("3d");
-      st().setLayer("terrain");
-      st().requestOrbit();
-    },
-  },
-  {
-    title: "The south pole: where Artemis is landing",
-    text: "Here the Sun never climbs more than 1.6° above the horizon. Mountains cast shadows tens of kilometres long, and some crater floors have not seen sunlight in billions of years. Every shadow you see is computed from the real terrain.",
-    enter: () => {
-      closePanels();
-      st().setLayer("terrain");
-      poleView();
-    },
-  },
-  {
-    title: "Where is the light?",
-    text: "Share of the next year that each 250 m spot is in sunlight. Your GPU works it out from 102,400 terrain horizons in a few milliseconds. Bright rims are the 'peaks of light'; black discs never see the Sun.",
+    title: "Choose where and when to land",
+    text: "A useful landing site needs sunlight for power, a clear view of Earth for communication, and suitable terrain. This tour follows that decision using NASA terrain and the selected UTC date.",
     enter: () => {
       clearTools();
-      st().setRangeDays(365);
-      st().setLayer("sun");
+      const s = st();
+      if (s.poleField) s.setActiveField(s.poleField);
+      // Keep enough data ahead for the example mission and annual layers.
+      if (s.data && s.hour + 395 * 24 >= s.data.ephem.count) s.setHour(Math.max(0, Math.min(90 * 24, s.data.ephem.count - 395 * 24)));
+      s.setView("3d");
+      s.setLayer("terrain");
+      s.requestOrbit();
     },
   },
   {
-    title: "Cold traps hold water ice",
-    text: "A heat-flow model of the soil runs for every point: sunlight on the real slope, heat soaking into the ground, glowing back to space. Blue is where water ice survives, the main reason everyone is going to the pole.",
-    enter: () => {
-      clearTools();
-      st().setLayer("ice");
-    },
-  },
-  {
-    title: "A peak of light",
-    text: "Connecting ridge: sunlit about 89% of the year. The right panel counts down to the next sunset, Earth-set and Deep Space Network pass, and shows the ground temperature hour by hour.",
+    title: "Read a site's power and communications",
+    text: "Connecting ridge B is one candidate near the south pole. Sun and Earth elevations, time to the next visibility change, and Deep Space Network contact are shown in Site. On a phone, use the Site tab to return here.",
     enter: () => {
       clearTools();
       st().setLayer("terrain");
       st().select("connecting-ridge-b");
+      st().setMobilePanel("site");
+      poleView();
     },
   },
   {
-    title: "Find the best landing spot",
-    text: "Pick a landing date and how long the mission lasts. The GPU scores every spot for sunlight, contact with Earth, darkness and flat ground, and ranks the top 10.",
+    title: "See what the terrain blocks",
+    text: "The horizon chart plots the Sun and Earth against this site's terrain skyline. Faded dots are hidden behind terrain. At the pole, small changes in elevation can decide whether a site has power or a direct view of Earth.",
+    enter: () => {
+      closePanels();
+      st().select("connecting-ridge-b");
+      st().setSkylineOpen(true);
+    },
+  },
+  {
+    title: "Compare possible landing dates",
+    text: "Each row is a site and each column is a landing time. Colors show how much of the mission the selected lander's battery survives. Tap a date to select it. These are model estimates for this lander, not guaranteed landing windows.",
+    enter: () => {
+      closePanels();
+      st().setPorkchopOpen(true);
+    },
+  },
+  {
+    title: "Find a site for your mission",
+    text: "Set the UTC landing time, mission length, night tolerance and terrain limits. Rank landing sites searches the loaded area. The score balances your chosen priorities; it does not certify that a location is safe to land on.",
     enter: () => {
       closePanels();
       const s = st();
       s.setRover(null);
-      s.setFinderOpen(true);
-      if (s.field) {
-        const r = findBestSpots(s.field, { startHour: Math.floor(s.hour), missionDays: 14, maxNightHours: 50, minSafePct: 50, weights: DEFAULT_WEIGHTS });
-        s.setFinder(r);
+      if (s.field && s.data && getEngine() && fitsFinderMission(Math.floor(s.hour), 14, s.data.ephem.count)) {
+        s.setFinder(findBestSpots(s.field, { startHour: Math.floor(s.hour), missionDays: 14, maxNightHours: 50, minSafePct: 50, weights: DEFAULT_WEIGHTS }));
       }
+      s.setFinderOpen(true);
+      s.setMobilePanel("sites");
     },
   },
   {
-    title: "Drive a rover through moving shadows",
-    text: "Shadows move every hour, so the best path depends on when you drive. The planner keeps the rover in sunlight on gentle slopes, waiting out shadows when it must. Watch it drive.",
+    title: "Compare sites at the same time",
+    text: "Compare sites puts candidates on the same UTC timeline, with separate Sun, Earth and DSN signals for each one. Add site changes the shortlist. Side by side opens two 3D views. On a phone, switch between the comparison table and Time.",
     enter: () => {
       closePanels();
       const s = st();
+      for (const site of [...s.pinned]) s.togglePin(site);
       s.setFinder(null);
+      s.setLayer("terrain");
       s.select("connecting-ridge-b");
-      s.setRoverOpen(true);
-      const f = s.field;
-      const data = s.data;
-      const e = getEngine();
-      const a = data?.sites.find((x) => x.id === "connecting-ridge-b");
-      const b = data?.sites.find((x) => x.id === "shackleton-a");
-      if (!f || !e || !a || !b) return;
-      const A = fieldCell(f, a.lat, a.lon);
-      const B = fieldCell(f, b.lat, b.lon);
-      if (!A || !B) return;
-      const bits = e.visibilityBits(Math.floor(s.hour), 14 * 24);
-      const gpuMillis = bits.millis;
-      const visit = stepVisit;
-      planRouteInWorker(f, bits, { start: A, goal: B, speedKmh: 0.4, maxSlopeDeg: 20, needLink: false })
-        .then((r) => {
-          // The search runs in the worker; ignore it if this visit to the step has ended meanwhile, even if the
-          // tour has since come back to the same step.
-          if (visit !== stepVisit) return;
-          const now = st();
-          if (isRoute(r)) r.gpuMillis = gpuMillis;
-          now.setRover(r);
-          if (isRoute(r)) {
-            now.setSpeedIndex(Math.max(0, SPEEDS.findIndex((x) => x.hoursPerSecond === 6)));
-            if (!now.playing) now.togglePlaying();
-          }
-        })
-        .catch((err: Error) => console.error(err));
-      // Selecting the site above makes the scene fly to it, but only once React has run Scene3D's effect, which is
-      // after this one. Start the overview of the route after that, or the site flight replaces it.
-      const t0 = performance.now();
-      const overview = () => {
-        if (visit !== stepVisit) return;
-        if (currentScene()?.selectedSiteId === a.id || performance.now() - t0 > 2000) currentScene()?.flyToLatLon(-89.55, -150, 28);
-        else setTimeout(overview, 30);
-      };
-      overview();
+      for (const id of ["connecting-ridge-b", "shackleton-a"]) {
+        const site = s.data?.sites.find((candidate) => candidate.id === id);
+        if (site) s.togglePin(site);
+      }
+      s.setCompareOpen(true);
     },
   },
   {
-    title: "Rank NASA's Artemis III regions",
-    text: "The same models run for the whole Moon, so all nine candidate regions can be compared for your dates: sunlight and Earth contact at each region's best spot, the longest night there, and how much ground can hold ice. Light and ice pull in opposite directions; this shows the trade-off.",
+    title: "Explore the power and ice tradeoff",
+    text: "Layers shows sunlight, Earth visibility, terrain slope and modeled ice stability. Sunlit ridges can provide power while shadowed floors may retain ice. Ice estimates require a full year of data. Advanced mission tools are available in Tools.",
+    enter: () => {
+      clearTools();
+      st().setRangeDays(365);
+      st().setLayer("ice");
+      poleView();
+    },
+  },
+  {
+    title: "Evaluate Artemis III candidate regions",
+    text: "This report compares NASA's candidate regions for the selected dates. It shows the same power, communication, night and ice tradeoffs at a wider scale. Analyze area loads a more detailed terrain field for a region.",
     enter: () => {
       closePanels();
       st().setRover(null);
@@ -161,8 +139,8 @@ const STEPS: Step[] = [
     },
   },
   {
-    title: "Checked against NASA",
-    text: "Sun positions match JPL Horizons to 0.00003°. Sunlight at the five peaks of light is 3.7 points from published research on average, and temperatures are checked against NASA's Diviner at the Apollo 11 site and Shackleton's floor. Use Share view to send anyone this exact scene.",
+    title: "Check the evidence and model limits",
+    text: "Validation lists the data sources, comparisons with JPL Horizons and published sunlight research, temperature checks, and model limits. Settings also has Share view. Finish the tour, then try your own site, date and mission constraints.",
     enter: () => {
       closePanels();
       st().setRover(null);
@@ -225,7 +203,7 @@ export default function Tour() {
   useEffect(() => {
     if (step === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setStep(null);
+      if (e.key === "Escape" && !e.defaultPrevented) setStep(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -238,7 +216,7 @@ export default function Tour() {
         <div className="tour-title">Plan a landing at the Moon's south pole</div>
         <div className="tour-text">
           Real NASA terrain, the real Sun and Earth for any hour of {years}, and GPU models of sunlight, radio contact, temperature and ice. New here? The
-          one-minute tour shows what it can do.
+          guided tour walks through the landing decision.
         </div>
         <div className="tour-nav">
           <button
@@ -259,7 +237,7 @@ export default function Tour() {
               setStep(0);
             }}
           >
-            ▶ Take the tour
+            <Icon name="play" /> Take the tour
           </button>
         </div>
       </div>
