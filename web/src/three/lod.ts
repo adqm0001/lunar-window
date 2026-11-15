@@ -688,7 +688,11 @@ void main() {
     vec3 north = cross(u, east);
     vec3 sdir = normalize(sv - u * dot(sv, u));
     float hs = h0 + 2.0;
-    float best = -1.5;
+    // The horizon is tracked as a slope (rise over run) instead of an angle. atan is monotonic and the run is
+    // positive, so the steepest slope is the highest angle and the loop needs no atan at all.
+    float bestT = tan(-1.5);
+    float selT = tan(min(sel + 0.02, 1.5));
+    float lowT = tan(max(sel - radians(0.27), -1.5));
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
     float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.45), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
@@ -703,8 +707,8 @@ void main() {
       float r2;
       float dh = demH(q, r2) - hs;
       if (camDist < 25.0 && i < detailSteps) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.45)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
-      best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
-      if (best > sel + 0.02) break;
+      bestT = max(bestT, (dh - 2.0 * R_M * sh * sh) / (R_M * sin(delta)));
+      if (bestT > selT) break;
       d *= grow;
       if (d > 220000.0) break;
       // Nothing on the Moon stands more than ~10.8 km above the 1737.4 km sphere (LOLA: Smith et al. 2010,
@@ -712,9 +716,9 @@ void main() {
       // sample could neither raise the horizon found so far nor reach the Sun's lower edge, the answer is final.
       float dn = d / R_M;
       float shn = sin(0.5 * dn);
-      float bound = atan(11100.0 - hs - 2.0 * R_M * shn * shn, R_M * sin(dn));
-      if (bound < max(best, sel - radians(0.27))) break;
+      if ((11100.0 - hs - 2.0 * R_M * shn * shn) / (R_M * sin(dn)) < max(bestT, lowT)) break;
     }
+    float best = atan(bestT);
     lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);
   }
 
