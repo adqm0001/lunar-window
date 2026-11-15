@@ -29,6 +29,37 @@ import { dirFromLatLon } from "./globe";
 
 export const EXAGGERATION = 1.0;
 
+type Flight = {
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  camFrom: THREE.Vector3;
+  camTo: THREE.Vector3;
+  upTo: THREE.Vector3 | null;
+  rollAim: THREE.Vector3 | null;
+  t: number;
+  dur: number;
+  orbit: boolean;
+};
+
+// Per-view camera state. The scene's own fields hold the view being updated or drawn; split screen keeps
+// the other view here and swaps it in (swapView), so movement, flight and drawing code serve both views.
+interface ViewSlot {
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  controlsEl: HTMLElement;
+  flight: Flight | null;
+  orbitMode: boolean;
+  upDirty: boolean;
+  sunGain: number;
+  mapTarget: THREE.Vector3;
+  mapDist: number;
+  mapPointers: Map<number, { x: number; y: number }>;
+  mapPinch: number;
+}
+
+// Keyboard state seen by the view that isn't being steered.
+const NO_KEYS = new Set<string>();
+
 export interface ViewState {
   orbit: boolean;
   t: [number, number];
@@ -58,17 +89,7 @@ export class MoonScene {
   private sunRay: THREE.Line;
   private earthRay: THREE.Line;
   private selected: string | null = null;
-  private flight: {
-    from: THREE.Vector3;
-    to: THREE.Vector3;
-    camFrom: THREE.Vector3;
-    camTo: THREE.Vector3;
-    upTo: THREE.Vector3 | null;
-    rollAim: THREE.Vector3 | null;
-    t: number;
-    dur: number;
-    orbit: boolean;
-  } | null = null;
+  private flight: Flight | null = null;
   private globeMats: THREE.ShaderMaterial[] = [];
   private lod: LodTerrain | null = null;
   private terrainMesh!: THREE.Mesh;
@@ -83,7 +104,18 @@ export class MoonScene {
   private lastRender = 0;
   private orbitMode = true;
   private keys = new Set<string>();
-  private dragging = false;
+  private draggingCtl = new WeakSet<OrbitControls>();
+  private get dragging() {
+    return this.draggingCtl.has(this.controls);
+  }
+  private controlsEl!: HTMLElement;
+  private renderPass!: RenderPass;
+  // Split screen: the right-hand view, the transparent element over the right half that takes its mouse
+  // and touch input, how much of each side the UI panels cover, and which view the keyboard steers.
+  private split: ViewSlot | null = null;
+  private splitEl: HTMLDivElement | null = null;
+  private splitInsets = { left: 0, right: 0 };
+  private activeRight = false;
   private upDirty = false;
   private sunGain = 1;
   private lander = new LanderModel();
@@ -103,7 +135,7 @@ export class MoonScene {
   private cutaway = new Cutaway();
   private cutOn = false;
   private cutPending = false;
-  private scatter: THREE.Points | null = null;
+  private scatter: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
   private routeGroup = new THREE.Group();
   private route: RoverRoute | null = null;
   private rover: THREE.Group | null = null;
@@ -140,13 +172,14 @@ export class MoonScene {
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20000);
     this.camera.position.copy(MOON_CENTER).add(new THREE.Vector3(0, 0.62, 1).normalize().multiplyScalar(R_MOON_KM + 3600));
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controlsEl = this.renderer.domElement;
+    this.controls = new OrbitControls(this.camera, this.controlsEl);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(MOON_CENTER);
     this.configureControls(true);
     this.bindMovement();
-    this.bindMapInput();
+    this.bindMapInput(this.renderer.domElement, false);
 
     this.scene.background = new THREE.Color(0x000000);
     this.stars = this.makeStars();
@@ -221,7 +254,8 @@ export class MoonScene {
     this.scene.add(this.sunRay, this.earthRay);
 
     this.composer = new EffectComposer(this.renderer);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.renderPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.55, 0.5, 1.6);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -231,7 +265,7 @@ export class MoonScene {
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
     this.resize();
-    this.bindPicking();
+    this.bindPicking(this.renderer.domElement, false);
     this.loop();
     if (import.meta.env.DEV) (window as unknown as { __moon: MoonScene }).__moon = this;
   }
@@ -441,21 +475,25 @@ export class MoonScene {
       this.pendingIntro = site;
       return;
     }
-    const up = p.clone().sub(MOON_CENTER).normalize();
-    let offset = this.camera.position.clone().sub(this.controls.target);
-    let dur = 1.8;
     if (!this.introDone) {
       this.introDone = true;
+      const up = p.clone().sub(MOON_CENTER).normalize();
       const s = this.sunDir.clone().projectOnPlane(up).normalize();
-      offset = s.multiplyScalar(-9).add(up.clone().multiplyScalar(3.2)).applyAxisAngle(up, 0.5);
-      dur = 7.5;
-    } else {
-      const tangent = offset.clone().projectOnPlane(up);
-      if (tangent.lengthSq() < 1e-6) tangent.set(1, 0, 0).projectOnPlane(up);
-      const dist = Math.min(Math.max(offset.length(), 6), 14);
-      offset = tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38));
+      const offset = s.multiplyScalar(-9).add(up.clone().multiplyScalar(3.2)).applyAxisAngle(up, 0.5);
+      this.startFlight(p, offset, 7.5, up);
+      return;
     }
-    this.startFlight(p, offset, dur, up);
+    this.flyToPoint(p);
+  }
+
+  // Flies the current view to look at a ground point, keeping roughly the current viewing direction.
+  private flyToPoint(p: THREE.Vector3) {
+    const up = p.clone().sub(MOON_CENTER).normalize();
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const tangent = offset.clone().projectOnPlane(up);
+    if (tangent.lengthSq() < 1e-6) tangent.set(1, 0, 0).projectOnPlane(up);
+    const dist = Math.min(Math.max(offset.length(), 6), 14);
+    this.startFlight(p, tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38)), 1.8, up);
   }
 
   get canvas(): HTMLCanvasElement {
@@ -551,6 +589,17 @@ export class MoonScene {
 
   // `up`: the destination's vertical for a surface view (null = orbit). `orbitUp`: optional screen-up to end an orbit flight with.
   private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null, orbitUp: THREE.Vector3 | null = null) {
+    if (this.mapMode) {
+      // The 2D map stays top-down: going somewhere re-centres it at the distance the 3D view would use
+      // (the globe overview zooms all the way out).
+      if (up) {
+        this.mapTarget.copy(to);
+        this.mapDist = Math.min(3500, Math.max(3, offTo.length()));
+      } else this.mapDist = 3500;
+      this.placeMapCamera();
+      this.dirty = true;
+      return;
+    }
     const from = this.controls.target.clone();
     const camFrom = this.camera.position.clone();
     this.controls.enabled = false;
@@ -561,13 +610,14 @@ export class MoonScene {
   private configureControls(orbit: boolean) {
     const target = this.controls ? this.controls.target.clone() : MOON_CENTER.clone();
     this.controls?.dispose();
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = new OrbitControls(this.camera, this.controlsEl);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(target);
     this.orbitMode = orbit;
-    this.controls.addEventListener("start", () => (this.dragging = true));
-    this.controls.addEventListener("end", () => (this.dragging = false));
+    const c = this.controls;
+    c.addEventListener("start", () => this.draggingCtl.add(c));
+    c.addEventListener("end", () => this.draggingCtl.delete(c));
     if (orbit) {
       this.controls.minDistance = R_MOON_KM + 120;
       this.controls.maxDistance = R_MOON_KM + 14000;
@@ -591,10 +641,18 @@ export class MoonScene {
   setMapMode(on: boolean) {
     if (on === this.mapMode) return;
     this.mapMode = on;
-    this.flight = null;
     this.dirty = true;
     for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) m.uniforms.uMapLight.value = on ? 1 : 0;
     this.bloom.enabled = !on && this.quality !== "saver";
+    this.mapCamera(on);
+    if (this.split) this.inView(true, () => this.mapCamera(on));
+    this.updateSplitEl();
+    this.resize();
+  }
+
+  // Moves the current view's camera into the top-down map, or back out to the 3D view over the same spot.
+  private mapCamera(on: boolean) {
+    this.flight = null;
     if (on) {
       this.controls.enabled = false;
       const dir = (this.orbitMode ? this.camera.position.clone() : this.controls.target.clone()).sub(MOON_CENTER).normalize();
@@ -724,34 +782,43 @@ export class MoonScene {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
-  private bindMapInput() {
-    const el = this.renderer.domElement;
-    el.addEventListener("pointerdown", (e) => {
-      if (!this.mapMode) return;
-      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.mapPointers.size === 2) this.mapPinch = this.mapPinchSpan();
-    });
-    window.addEventListener("pointermove", (e) => {
-      const prev = this.mapPointers.get(e.pointerId);
-      if (!this.mapMode || !prev) return;
-      this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (this.mapPointers.size >= 2) {
-        // Two fingers: zoom by how much they spread or pinch, and don't pan.
-        const span = this.mapPinchSpan();
-        if (this.mapPinch > 0 && span > 0) {
-          this.mapDist = Math.min(3500, Math.max(0.6, (this.mapDist * this.mapPinch) / span));
-          this.placeMapCamera();
-          this.dirty = true;
-        }
-        this.mapPinch = span;
-        return;
-      }
-      this.mapPan(e.clientX - prev.x, e.clientY - prev.y);
-    });
-    const end = (e: PointerEvent) => {
-      this.mapPointers.delete(e.pointerId);
-      if (this.mapPointers.size < 2) this.mapPinch = 0;
+  // Map drag, pinch and wheel on `el`, for the left (main) view or, on the split overlay, the right one.
+  private bindMapInput(el: HTMLElement, right: boolean) {
+    const inMine = (fn: () => void) => {
+      if (right && !this.split) return;
+      this.inView(right, fn);
     };
+    el.addEventListener("pointerdown", (e) =>
+      inMine(() => {
+        if (!this.mapMode) return;
+        this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.mapPointers.size === 2) this.mapPinch = this.mapPinchSpan();
+      }),
+    );
+    window.addEventListener("pointermove", (e) =>
+      inMine(() => {
+        const prev = this.mapPointers.get(e.pointerId);
+        if (!this.mapMode || !prev) return;
+        this.mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.mapPointers.size >= 2) {
+          // Two fingers: zoom by how much they spread or pinch, and don't pan.
+          const span = this.mapPinchSpan();
+          if (this.mapPinch > 0 && span > 0) {
+            this.mapDist = Math.min(3500, Math.max(0.6, (this.mapDist * this.mapPinch) / span));
+            this.placeMapCamera();
+            this.dirty = true;
+          }
+          this.mapPinch = span;
+          return;
+        }
+        this.mapPan(e.clientX - prev.x, e.clientY - prev.y);
+      }),
+    );
+    const end = (e: PointerEvent) =>
+      inMine(() => {
+        this.mapPointers.delete(e.pointerId);
+        if (this.mapPointers.size < 2) this.mapPinch = 0;
+      });
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     el.addEventListener(
@@ -759,9 +826,11 @@ export class MoonScene {
       (e) => {
         if (!this.mapMode) return;
         e.preventDefault();
-        this.mapDist = Math.min(3500, Math.max(0.6, this.mapDist * Math.exp(e.deltaY * 0.0015)));
-        this.placeMapCamera();
-        this.dirty = true;
+        inMine(() => {
+          this.mapDist = Math.min(3500, Math.max(0.6, this.mapDist * Math.exp(e.deltaY * 0.0015)));
+          this.placeMapCamera();
+          this.dirty = true;
+        });
       },
       { passive: false },
     );
@@ -769,16 +838,23 @@ export class MoonScene {
 
   // Ground point under a screen position, for hover readouts
   pickAt(clientX: number, clientY: number): { lat: number; lon: number; heightM: number; inPatch: boolean } | null {
-    const el = this.renderer.domElement;
-    const rect = el.getBoundingClientRect();
+    const right = this.splitOn && clientX >= this.viewRect(true).left;
+    return this.inView(right, () => {
+      const hit = this.rayHit(right, clientX, clientY);
+      if (!hit) return null;
+      const [lat, lon] = latLonFromWorld(hit.point);
+      const heightM = (hit.point.distanceTo(MOON_CENTER) - R_MOON_KM) * 1000;
+      return { lat, lon, heightM, inPatch: hit.object === this.terrainMesh };
+    });
+  }
+
+  // First terrain hit under a screen point, in the current view (call inside inView for the right one).
+  private rayHit(right: boolean, clientX: number, clientY: number) {
+    const rect = this.viewRect(right);
     const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
-    const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
-    if (!hit) return null;
-    const [lat, lon] = latLonFromWorld(hit.point);
-    const heightM = (hit.point.distanceTo(MOON_CENTER) - R_MOON_KM) * 1000;
-    return { lat, lon, heightM, inPatch: hit.object === this.terrainMesh };
+    return ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0] ?? null;
   }
 
   private groundRadius(dir: THREE.Vector3, spacingKm: number) {
@@ -867,9 +943,13 @@ export class MoonScene {
     const next = this.sunGain + (target - this.sunGain) * Math.min(1, dt * 2.5);
     const changed = Math.abs(next - this.sunGain) > 0.0015;
     this.sunGain = Math.abs(target - next) < 0.0015 ? target : next;
+    this.applySunPower();
+    return changed;
+  }
+
+  private applySunPower() {
     const power = 10.5 * this.sunGain;
     for (const m of [this.terrainMat, ...(this.lod ? [this.lod.material] : [])]) m.uniforms.uSunPower.value = power;
-    return changed;
   }
 
   private keepAboveGround(): boolean {
@@ -885,27 +965,7 @@ export class MoonScene {
   }
 
   private bindMovement() {
-    const el = this.renderer.domElement;
-    el.addEventListener(
-      "wheel",
-      (e) => {
-        if (this.flight || this.mapMode) return;
-        const d = this.camera.position.distanceTo(this.controls.target);
-        if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
-          this.flyToOrbit(1.8, false);
-          return;
-        }
-        if (this.orbitMode && e.deltaY < 0 && d < this.controls.minDistance * 1.01 + 30) {
-          const rect = el.getBoundingClientRect();
-          const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-          const ray = new THREE.Raycaster();
-          ray.setFromCamera(ndc, this.camera);
-          const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
-          if (hit) this.diveTo(hit.point);
-        }
-      },
-      { passive: true },
-    );
+    this.bindWheel(this.renderer.domElement, false);
     const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
     window.addEventListener("keydown", (e) => {
       if (typing(e) || e.ctrlKey || e.metaKey) return;
@@ -915,6 +975,27 @@ export class MoonScene {
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
     window.addEventListener("blur", () => this.keys.clear());
+  }
+
+  // Wheel past the zoom limits: out of a surface view jumps to the globe, into the globe dives to the ground.
+  private bindWheel(el: HTMLElement, right: boolean) {
+    el.addEventListener(
+      "wheel",
+      (e) =>
+        this.inView(right, () => {
+          if (this.flight || this.mapMode) return;
+          const d = this.camera.position.distanceTo(this.controls.target);
+          if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
+            this.flyToOrbit(1.8, false);
+            return;
+          }
+          if (this.orbitMode && e.deltaY < 0 && d < this.controls.minDistance * 1.01 + 30) {
+            const hit = this.rayHit(right, e.clientX, e.clientY);
+            if (hit) this.diveTo(hit.point);
+          }
+        }),
+      { passive: true },
+    );
   }
 
   /** Holds or releases R / F (camera up / down) as if the key were pressed, for on-screen buttons. */
@@ -996,8 +1077,7 @@ export class MoonScene {
     for (const [k, b] of this.beacons) b.label.classList.toggle("active", k === id);
   }
 
-  private bindPicking() {
-    const el = this.renderer.domElement;
+  private bindPicking(el: HTMLElement, right: boolean) {
     // A pick is one pointer pressed and released without moving away: never more than 4 px for a mouse, or
     // 10 px for a finger (taps always wobble a little). Once a second pointer goes down (a pinch or other
     // multi-touch gesture), nothing in that gesture picks, until every pointer is up again.
@@ -1005,6 +1085,7 @@ export class MoonScene {
     let multi = false;
     let down: { id: number; x: number; y: number; slop: number } | null = null;
     el.addEventListener("pointerdown", (e) => {
+      this.activeRight = right;
       active.add(e.pointerId);
       if (active.size > 1) multi = true;
       down = !multi && e.button === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY, slop: e.pointerType === "touch" ? 10 : 4 } : null;
@@ -1025,11 +1106,7 @@ export class MoonScene {
       const tap = down !== null && !multi && down.id === e.pointerId && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= down.slop;
       down = null;
       if (!tap) return;
-      const rect = el.getBoundingClientRect();
-      const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-      const ray = new THREE.Raycaster();
-      ray.setFromCamera(ndc, this.camera);
-      const hit = ray.intersectObjects([this.terrainMesh, ...(this.lod?.meshes ?? [])])[0];
+      const hit = this.inView(right, () => this.rayHit(right, e.clientX, e.clientY));
       if (!hit) return;
       if (hit.object === this.terrainMesh) {
         const [plat, plon] = latLonFromWorld(hit.point);
@@ -1046,32 +1123,94 @@ export class MoonScene {
     const h = this.host.clientHeight;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
+    if (this.split && this.splitOn) {
+      // Two half-width views; the post-processing chain is sized for one half and run once per half.
+      // Site labels only follow the left view.
+      const half = Math.floor(w / 2);
+      this.labels.setSize(half, h);
+      this.composer.setSize(half, h);
+      this.fitView(this.camera, 0, half, w, h);
+      this.fitView(this.split.camera, half, half, w, h);
+      return;
+    }
     this.labels.setSize(w, h);
     this.composer.setSize(w, h);
+    this.camera.clearViewOffset();
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Sizes a camera for a viewport starting at x0 (CSS px) and shifts its centre of view to the middle of
+  // the part the side panels don't cover, so a site in focus isn't hidden behind them.
+  private fitView(cam: THREE.PerspectiveCamera, x0: number, width: number, totalW: number, h: number) {
+    let visL = Math.min(width, Math.max(0, this.splitInsets.left - x0));
+    let visR = Math.min(width, Math.max(0, totalW - this.splitInsets.right - x0));
+    if (visR - visL < 120) [visL, visR] = [0, width];
+    const shift = (visL + visR) / 2 - width / 2;
+    const fullW = width + 2 * Math.abs(shift);
+    cam.aspect = fullW / h;
+    cam.setViewOffset(fullW, h, shift >= 0 ? 0 : 2 * Math.abs(shift), 0, width, h);
+    cam.updateProjectionMatrix();
   }
 
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Flights keep to their duration even when frames are slow (a region analysis busy on the GPU), up to 1/4 s
+    // per frame so a tab that was hidden doesn't skip the whole flight.
+    const flightDt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
+    const keys = this.keys;
+    if (this.splitOn && this.activeRight) this.keys = NO_KEYS;
+    this.stepCamera(dt, flightDt);
+    this.keys = keys;
+    if (this.splitOn)
+      this.inView(true, () => {
+        if (!this.activeRight) this.keys = NO_KEYS;
+        this.stepCamera(dt, flightDt);
+        this.keys = keys;
+      });
+    this.updateDepthAndSky();
+    if (this.lod?.update(this.split && this.splitOn ? [this.camera, this.split.camera] : this.camera)) this.dirty = true;
+    if (!this.dirty) return;
+    const fps = this.quality === "saver" ? 30 : this.quality === "balanced" ? 60 : 0;
+    if (fps) {
+      const gap = 1000 / fps;
+      const since = now - this.lastRender;
+      if (since < gap - 2) return;
+      this.lastRender = now - Math.min(Math.max(since - gap, 0), gap);
+    } else this.lastRender = now;
+    this.dirty = false;
+    this.adaptResolution(dt, now);
+    if (this.splitOn) this.renderSplit();
+    else {
+      this.renderPass.camera = this.camera;
+      this.composer.render();
+    }
+    this.labels.render(this.scene, this.camera);
+  };
+
+  // Moves the current view's camera one frame: flight, 2D map keys, or orbit/surface controls.
+  private stepCamera(dt: number, flightDt: number) {
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / f.dur);
+      f.t = Math.min(1, f.t + flightDt / f.dur);
       const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
       this.controls.target.lerpVectors(f.from, f.to, k);
       const a = f.camFrom.clone().sub(MOON_CENTER);
       const b = f.camTo.clone().sub(MOON_CENTER);
-      const altA = Math.max(0.05, a.length() - R_MOON_KM);
-      const altB = Math.max(0.05, b.length() - R_MOON_KM);
+      // Altitudes are measured from just below the lower end of the flight, not from the reference sphere:
+      // mare sites such as Apollo 11 lie ~2 km below it, and clamping there left the camera 2 km up.
+      const base = Math.min(a.length(), b.length()) - 0.05;
+      const altA = a.length() - base;
+      const altB = b.length() - base;
       const arc = a.angleTo(b);
       const hop = arc * R_MOON_KM * 0.7 * Math.sin(Math.PI * k);
       const alt = Math.exp(Math.log(altA) + (Math.log(altB) - Math.log(altA)) * k) + hop;
       const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
       if (dir.lengthSq() < 1e-8) dir.copy(b);
-      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
+      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(base + alt));
       // Roll: carry last frame's screen-up (never parallel to the view, so it can't flip), then turn it
       // about the view axis only, gently and faster near the end, toward the wanted up. Where the wanted up
       // points almost along the view (looking straight down) it is ignored.
@@ -1112,22 +1251,139 @@ export class MoonScene {
       if (this.controls.update() || this.keys.size) this.dirty = true;
       if (this.keepAboveGround()) this.dirty = true;
     }
-    this.updateDepthAndSky();
     if (this.autoExposure(dt)) this.dirty = true;
-    if (this.lod?.update(this.camera)) this.dirty = true;
-    if (!this.dirty) return;
-    const fps = this.quality === "saver" ? 30 : this.quality === "balanced" ? 60 : 0;
-    if (fps) {
-      const gap = 1000 / fps;
-      const since = now - this.lastRender;
-      if (since < gap - 2) return;
-      this.lastRender = now - Math.min(Math.max(since - gap, 0), gap);
-    } else this.lastRender = now;
-    this.dirty = false;
-    this.adaptResolution(dt, now);
+  }
+
+  // ---- Split screen: two views side by side, sharing the scene, time and layers
+
+  private get splitOn() {
+    return !!this.split;
+  }
+
+  /** Turns the side-by-side view on or off. `insets`: CSS px covered by UI panels on each side. */
+  setSplit(on: boolean, insets = { left: 0, right: 0 }) {
+    this.splitInsets = insets;
+    this.dirty = true;
+    if (on && !this.split) {
+      const el = this.ensureSplitEl();
+      const cam = this.camera.clone();
+      const controls = new OrbitControls(cam, el);
+      controls.target.copy(this.controls.target);
+      this.split = {
+        camera: cam,
+        controls,
+        controlsEl: el,
+        flight: null,
+        orbitMode: this.orbitMode,
+        upDirty: false,
+        sunGain: this.sunGain,
+        mapTarget: this.mapTarget.clone(),
+        mapDist: this.mapDist,
+        mapPointers: new Map(),
+        mapPinch: 0,
+      };
+      this.inView(true, () => {
+        this.configureControls(this.orbitMode);
+        if (this.mapMode) {
+          this.controls.enabled = false;
+          this.placeMapCamera();
+        }
+      });
+    } else if (!on && this.split) {
+      this.split.controls.dispose();
+      this.split = null;
+      this.activeRight = false;
+      this.lod?.useView(0);
+    }
+    this.updateSplitEl();
+    this.resize();
+  }
+
+  /** Flies the right-hand view to a site. */
+  flySplitTo(site: Site) {
+    const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
+    if (this.split && p) this.inView(true, () => this.flyToPoint(p));
+  }
+
+  private ensureSplitEl() {
+    if (this.splitEl) return this.splitEl;
+    const el = document.createElement("div");
+    el.className = "split-view";
+    this.host.appendChild(el);
+    this.bindPicking(el, true);
+    this.bindWheel(el, true);
+    this.bindMapInput(el, true);
+    this.splitEl = el;
+    return el;
+  }
+
+  private updateSplitEl() {
+    if (this.splitEl) this.splitEl.style.display = this.splitOn ? "block" : "none";
+  }
+
+  private swapView(v: ViewSlot) {
+    [this.camera, v.camera] = [v.camera, this.camera];
+    [this.controls, v.controls] = [v.controls, this.controls];
+    [this.controlsEl, v.controlsEl] = [v.controlsEl, this.controlsEl];
+    [this.flight, v.flight] = [v.flight, this.flight];
+    [this.orbitMode, v.orbitMode] = [v.orbitMode, this.orbitMode];
+    [this.upDirty, v.upDirty] = [v.upDirty, this.upDirty];
+    [this.sunGain, v.sunGain] = [v.sunGain, this.sunGain];
+    [this.mapTarget, v.mapTarget] = [v.mapTarget, this.mapTarget];
+    [this.mapDist, v.mapDist] = [v.mapDist, this.mapDist];
+    [this.mapPointers, v.mapPointers] = [v.mapPointers, this.mapPointers];
+    [this.mapPinch, v.mapPinch] = [v.mapPinch, this.mapPinch];
+  }
+
+  // Runs fn with the right-hand view swapped in (when `right` and split is on), then swaps back.
+  private inView<T>(right: boolean, fn: () => T): T {
+    const v = right ? this.split : null;
+    if (!v) return fn();
+    this.swapView(v);
+    this.lod?.useView(1);
+    try {
+      return fn();
+    } finally {
+      this.swapView(v);
+      this.lod?.useView(0);
+    }
+  }
+
+  // Screen rectangle of the left (main) or right view, in client coordinates.
+  private viewRect(right: boolean) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    if (!this.splitOn) return { left: r.left, top: r.top, width: r.width, height: r.height };
+    const half = Math.floor(r.width / 2);
+    return { left: r.left + (right ? half : 0), top: r.top, width: half, height: r.height };
+  }
+
+  // Draws the right view, then the left, each through the post-processing chain into its half.
+  // The left goes last so the scene is left positioned for the main view (labels, picking).
+  private renderSplit() {
+    const r = this.renderer;
+    const w = this.host.clientWidth;
+    const h = this.host.clientHeight;
+    const half = Math.floor(w / 2);
+    r.setScissorTest(true);
+    this.inView(true, () => {
+      this.updateDepthAndSky();
+      this.applySunPower();
+      this.drawInto(half, half, h);
+    });
+    this.updateDepthAndSky();
+    this.applySunPower();
+    this.drawInto(0, half, h);
+    r.setScissorTest(false);
+    r.setViewport(0, 0, w, h);
+    r.setScissor(0, 0, w, h);
+  }
+
+  private drawInto(x: number, width: number, h: number) {
+    this.renderer.setViewport(x, 0, width, h);
+    this.renderer.setScissor(x, 0, width, h);
+    this.renderPass.camera = this.camera;
     this.composer.render();
-    this.labels.render(this.scene, this.camera);
-  };
+  }
 
   setGlobe(g: GlobeData) {
     this.dirty = true;
@@ -1337,6 +1593,7 @@ export class MoonScene {
     if (this.scatter) {
       this.scene.remove(this.scatter);
       this.scatter.geometry.dispose();
+      this.scatter.material.dispose();
       this.scatter = null;
     }
     if (!points || points.length === 0) return;
@@ -1492,6 +1749,8 @@ export class MoonScene {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     this.controls.dispose();
+    this.split?.controls.dispose();
+    this.splitEl?.remove();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();

@@ -39,6 +39,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
+      // Space presses a focused button, link, select or chip; it only plays/pauses from the page or the 3D view.
+      if (e.key === " " && e.target instanceof Element && e.target.closest("button, a, select, textarea, [role=button], [contenteditable=true]")) return;
       const s = useApp.getState();
       if (e.key === "h" || e.key === "H") s.toggleCinema();
       else if (e.key === " ") {

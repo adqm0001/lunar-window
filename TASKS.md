@@ -80,11 +80,11 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 ## Act 1: Submission (people, not code)
 
-- [ ] **1. Video clip: whole Moon to pole** (S). On the live site press **● Rec** in the timeline (records the WebGL canvas to WebM, starts playback), drag the Moon, click "Connecting ridge B" in the site list. Press Rec again to save.
+- [x] **1. Video clip: whole Moon to pole** (S). On the live site press **● Rec** in the timeline (records the WebGL canvas to WebM, starts playback), drag the Moon, click "Connecting ridge B" in the site list. Press Rec again to save.
 
-- [ ] **2. Video clip: moving shadows** (S). At the pole, speed 6 h/s, Play, record ~15 s.
+- [x] **2. Video clip: moving shadows** (S). At the pole, speed 6 h/s, Play, record ~15 s. [Verified 15-second clip](docs/videos/task-2-moving-shadows.md).
 
-- [ ] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each.
+- [x] **3. Video clip: layers** (S). Record Sun % (range 1y) → ❄ Ice → Temp, a few seconds each. [Verified layer sequence](docs/videos/task-3-layers.md).
 
 - [ ] **4. Video clip: landing finder** (S). Screen-record (OBS / Win+G): ★ Find landing spot → Search → click result #1.
 
@@ -94,11 +94,11 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
-- [ ] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
+- [x] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
 
 - [ ] **9. Edit and upload video** (M). Clips 1–7 + voice-over, ≤ 3:00, upload (unlisted YouTube is fine). **Depends on** 1–8.
 
-- [ ] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
+- [x] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
 
 - [ ] **11. NASA project page** (S). Description, live link, repo link, video, slides. **Depends on** 9, 10.
 
@@ -106,17 +106,17 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). File one GitHub issue per problem: device, browser, steps, screenshot, console errors.
 
-- [ ] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar).
+- [x] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar). [Intel Iris Xe test report](docs/testing/task-12-integrated-graphics.md): all modes tested; High playback stalls recorded for follow-up.
 
 - [ ] **13. Mac Safari** (S).
 
-- [ ] **14. Firefox** (S).
+- [x] **14. Firefox** (S).
 
 - [ ] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels.
 
 - [ ] **16. iPhone** (S).
 
-- [ ] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
+- [x] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
 
 - [x] **18. Tour** (S). ▶ Tour, all 9 steps.
 
@@ -322,12 +322,12 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** uniforms `uLanderPos` (world km), `uLanderUp`, `uLanderR = 0.0025` km, `uLanderH = 0.0045` km, `uLanderOn`. In both terrain fragment shaders, within 0.2 km of the lander, project the pixel into the lander's local tangent plane and test it against the shadow of a vertical cylinder of radius R, height H, cast away from the Sun (length `H / tan(sunElevation)`). Same idea as `rockShadow` in `src/three/craterTexture.ts`.
   - **Verify:** "See the lander on the ground" shows a long shadow pointing away from the Sun that rotates as time plays.
 
-- [ ] **57. Split screen: rendering** (L)
+- [x] **57. Split screen: rendering** (L)
   - **Files:** `src/three/MoonScene.ts`.
   - **Spec:** optional second `PerspectiveCamera` + controls. When split is on, render twice per frame with `renderer.setScissorTest(true)`, `setViewport`/`setScissor` for each half (the composer/bloom: render the second view without post-processing, or give it its own composer). Each camera keeps its own target.
   - **Verify:** two independent views, each orbitable, no flicker; GPU time roughly doubles but stays < 12 ms at 1600×900.
 
-- [ ] **58. Split screen: UI** (M) — Depends on 57
+- [x] **58. Split screen: UI** (M) — Depends on 57
   - **Files:** `src/components/ComparePanel.tsx`, `src/state/store.ts`.
   - **Spec:** "Side by side" toggle when ≥ 2 sites are pinned; left view flies to pin 1, right to pin 2; the shared timeline drives both.
 
