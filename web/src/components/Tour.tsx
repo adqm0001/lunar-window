@@ -123,7 +123,15 @@ const STEPS: Step[] = [
           }
         })
         .catch((err: Error) => console.error(err));
-      currentScene()?.flyToLatLon(-89.55, -150, 28);
+      // Selecting the site above makes the scene fly to it, but only once React has run Scene3D's effect, which is
+      // after this one. Start the overview of the route after that, or the site flight replaces it.
+      const t0 = performance.now();
+      const overview = () => {
+        if (visit !== stepVisit) return;
+        if (currentScene()?.selectedSiteId === a.id || performance.now() - t0 > 2000) currentScene()?.flyToLatLon(-89.55, -150, 28);
+        else setTimeout(overview, 30);
+      };
+      overview();
     },
   },
   {
