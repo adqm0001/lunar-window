@@ -1,6 +1,6 @@
 import { LAYERS, type LayerId } from "../gpu/layers";
 import { addPointAt } from "../lib/points";
-import { linkPoints, parseLinkPoints } from "../lib/shareLink";
+import { fix, linkPoints, parseLinkPoints } from "../lib/shareLink";
 import type { MoonScene, ViewState } from "../three/MoonScene";
 import { useApp } from "./store";
 
@@ -25,8 +25,6 @@ export function registerScene(s: MoonScene | null) {
 export function currentScene() {
   return scene;
 }
-
-const fix = (n: number, d: number) => Number(n.toFixed(d));
 
 function parse(hash: string): Shared | null {
   const q = new URLSearchParams(hash.replace(/^#/, ""));
@@ -93,8 +91,9 @@ export function applyLate() {
   applied = true;
   const ids: string[] = [];
   for (const p of pending.p ?? []) {
-    const s = addPointAt(p.lat, p.lon, p.name || undefined);
-    if (s) ids.push(s.id);
+    // A shared point landing on one of this browser's own points keeps that point's name.
+    const s = addPointAt(p.lat, p.lon, p.name || undefined, true);
+    ids.push(s?.id ?? ""); // keep indexes lined up with the link even if a point fails to load
   }
   const st = useApp.getState();
   const m = pending.s?.match(/^p(\d+)$/);

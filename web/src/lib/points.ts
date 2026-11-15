@@ -10,7 +10,8 @@ let globalEngine: GlobalHorizon | null = null;
 
 // Adds a custom point at a latitude/longitude. Inside a loaded horizon field the point reads the
 // precomputed horizon; anywhere else the GPU computes a fresh 720-direction horizon from the globe.
-export function addPointAt(lat: number, lon: number, name?: string): Site | null {
+// With keepOwnName, a point that is already in the list keeps its current name.
+export function addPointAt(lat: number, lon: number, name?: string, keepOwnName = false): Site | null {
   const st = useApp.getState();
   const g = st.globe;
   if (!g) return null;
@@ -39,8 +40,9 @@ export function addPointAt(lat: number, lon: number, name?: string): Site | null
     };
   }
   if (!site) return null;
+  const existed = st.customSites.some((c) => c.id === site!.id);
   st.setCustomSite(site);
-  if (name) useApp.getState().renameCustomSite(site.id, name);
+  if (name && !(keepOwnName && existed)) useApp.getState().renameCustomSite(site.id, name);
   if (lat < -75 && !(st.field && inField(st.field, x, y))) analyzeArea(name ?? "Custom point", lat, lon);
   return useApp.getState().customSites.find((c) => c.id === site!.id) ?? site;
 }

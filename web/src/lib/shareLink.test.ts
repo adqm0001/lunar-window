@@ -23,13 +23,18 @@ describe("share link points", () => {
     ]);
   });
 
-  it("keeps the finder spot when the link already has the 20 custom points the app holds", () => {
+  it("drops the oldest custom point for the finder spot when the app's 20 are full, as the receiving page would", () => {
     const custom = Array.from({ length: 20 }, (_, i) => pt(`custom:${i}`, -80 - i / 10, i, `P${i}`));
     const link = linkPoints(custom, "best:3", pt("best:3", -88.5, -67.7, "Best spot #3"));
     const points = roundTrip(link.p);
-    expect(link.s).toBe("p20");
-    expect(points).toHaveLength(21);
-    expect(points[20].name).toBe("Best spot #3");
+    expect(points).toHaveLength(20);
+    expect(points[0].name).toBe("P1");
+    expect(link.s).toBe("p19");
+    expect(points[19].name).toBe("Best spot #3");
+  });
+
+  it("reads a link cut off in the middle of an escaped name without throwing", () => {
+    expect(parseLinkPoints("-89.4634,-136.8677,Best%20spot%2")).toEqual([{ lat: -89.4634, lon: -136.8677, name: "Best%20spot%2" }]);
   });
 
   it("caps the points read from a link", () => {
