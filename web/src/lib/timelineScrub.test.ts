@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scrubHour, viewStart } from "./timelineScrub";
+import { resolveStart, scrubHour, viewStart } from "./timelineScrub";
 
 const total = 20000;
 const span = 30 * 24;
@@ -31,5 +31,20 @@ describe("timeline scrubbing", () => {
     expect(scrubHour(0.5, "overview", 123, span, total)).toBe(total / 2);
     expect(scrubHour(-1, "main", 100, span, total)).toBe(100);
     expect(scrubHour(2, "overview", 100, span, total)).toBe(total);
+  });
+
+  describe("resolveStart", () => {
+    const held = { start: 7000, hour: 7100, span };
+    it("anchors to the hour when nothing is held (overview drags, first render)", () => {
+      expect(resolveStart(null, 7100, span, total)).toBe(viewStart(7100, span, total));
+    });
+    it("keeps the held view while the hour is the one the scrub set, including after release", () => {
+      expect(resolveStart(held, 7100, span, total)).toBe(7000);
+    });
+    it("re-anchors when the hour changes externally, leaves the view, or the window length changes", () => {
+      expect(resolveStart(held, 7101, span, total)).toBe(viewStart(7101, span, total));
+      expect(resolveStart({ ...held, hour: 9000 }, 9000, span, total)).toBe(viewStart(9000, span, total));
+      expect(resolveStart(held, 7100, 7 * 24, total)).toBe(viewStart(7100, 7 * 24, total));
+    });
   });
 });

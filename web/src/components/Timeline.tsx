@@ -4,7 +4,7 @@ import { useSeries } from "../state/selectors";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { canRecord, startRecording, stopRecording } from "../lib/recorder";
 import { ephemYears } from "../lib/years";
-import { scrubHour, viewStart } from "../lib/timelineScrub";
+import { resolveStart, scrubHour, type HeldView } from "../lib/timelineScrub";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -31,8 +31,9 @@ export default function Timeline() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [windowDays, setWindowDays] = useState(30);
   const scrubbing = useRef<"main" | "overview" | null>(null);
-  // View start frozen at pointerdown so the pointer-to-hour mapping stays linear for the whole drag.
-  const [frozenStart, setFrozenStart] = useState<number | null>(null);
+  // View held by a main-track scrub (frozen at pointerdown so the mapping stays linear, kept after release until the
+  // hour changes some other way). Overview drags leave it null so the view follows the hour live.
+  const [held, setHeld] = useState<HeldView | null>(null);
   const view = useApp((s) => s.view);
   const [recStart, setRecStart] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -55,7 +56,7 @@ export default function Timeline() {
 
   const total = data.ephem.count;
   const span = windowDays * 24;
-  const start = frozenStart ?? viewStart(hour, span, total);
+  const start = resolveStart(held, hour, span, total);
 
   useEffect(() => {
     const el = wrapRef.current!;
@@ -169,9 +170,14 @@ export default function Timeline() {
     const W = size.w - LABEL_W - 12;
     return scrubHour((e.clientX - rect.left - LABEL_W) / W, mode, start, span, total);
   };
+  const scrubTo = (e: React.PointerEvent, mode: "main" | "overview") => {
+    setHour(hourFromEvent(e, mode));
+    // Hold the view that was on screen at pointerdown (start does not change while held); read the stored hour back
+    // because setHour clamps it.
+    setHeld(mode === "main" ? { start, hour: useApp.getState().hour, span } : null);
+  };
   const endScrub = () => {
     scrubbing.current = null;
-    setFrozenStart(null);
   };
 
   return (
@@ -216,12 +222,10 @@ export default function Timeline() {
           (e.target as Element).setPointerCapture(e.pointerId);
           const rect = canvasRef.current!.getBoundingClientRect();
           scrubbing.current = e.clientY - rect.top < OVERVIEW_H + 8 ? "overview" : "main";
-          // The mapping uses the view as it was before this press; the render then keeps it frozen until release.
-          setHour(hourFromEvent(e, scrubbing.current));
-          setFrozenStart(start);
+          scrubTo(e, scrubbing.current);
         }}
         onPointerMove={(e) => {
-          if (scrubbing.current) setHour(hourFromEvent(e, scrubbing.current));
+          if (scrubbing.current) scrubTo(e, scrubbing.current);
         }}
         onPointerUp={endScrub}
         onPointerCancel={endScrub}
