@@ -140,6 +140,46 @@ describe("planRoute shadow during a long move", () => {
   });
 });
 
+describe("planRoute destination slope", () => {
+  const adjacent: RoverParams = { ...params, start: { col: 0, row: 1 }, goal: { col: 1, row: 1 } };
+  const allLit = () => makeBits(() => true, undefined, 3);
+  const destinationField = (slopeDeg: number) => makeField((col, row) => col === 1 && row === 1 ? slopeDeg : 0, 3);
+
+  it("rejects the reported 50-degree destination with a 20-degree limit", () => {
+    const r = planRoute(destinationField(50), allLit(), adjacent);
+    expect(isRoute(r)).toBe(false);
+    if (!isRoute(r)) expect(r.reason).toMatch(/destination.*steep/i);
+  });
+
+  it.each([15, 20, 25])("rejects a destination one encoded step above the %s-degree limit", (limit) => {
+    const r = planRoute(destinationField(limit + 0.25), allLit(), { ...adjacent, maxSlopeDeg: limit });
+    expect(isRoute(r)).toBe(false);
+  });
+
+  it.each([15, 20, 25])("allows a destination exactly at the %s-degree limit", (limit) => {
+    const r = planRoute(destinationField(limit), allLit(), { ...adjacent, maxSlopeDeg: limit });
+    expect(isRoute(r)).toBe(true);
+    if (!isRoute(r)) return;
+    expect(r.distanceKm).toBe(0.25);
+    expect(r.arriveHour).toBe(0.625);
+  });
+
+  it("allows a previously rejected destination after the user raises the limit enough", () => {
+    const field = destinationField(20.25);
+    expect(isRoute(planRoute(field, allLit(), { ...adjacent, maxSlopeDeg: 20 }))).toBe(false);
+    expect(isRoute(planRoute(field, allLit(), { ...adjacent, maxSlopeDeg: 25 }))).toBe(true);
+  });
+
+  it("allows a zero-distance result on steep ground because no drive is needed", () => {
+    const r = planRoute(destinationField(50), allLit(), { ...adjacent, start: adjacent.goal });
+    expect(isRoute(r)).toBe(true);
+    if (!isRoute(r)) return;
+    expect(r.distanceKm).toBe(0);
+    expect(r.driveHours).toBe(0);
+    expect(r.arriveHour).toBe(0);
+  });
+});
+
 describe("planRoute Earth-link rule", () => {
   // The issue's flat 3×3 field: a 250 m drive at 0.1 km/h takes 2.5 hours.
   const slow: RoverParams = { ...params, start: { col: 0, row: 1 }, goal: { col: 1, row: 1 }, speedKmh: 0.1, needLink: true };

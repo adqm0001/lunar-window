@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Apply the rover slope limit to the destination** ([#203](https://github.com/adqm0001/lunar-window/issues/203)) — taken: malqedra
+  - **Files:** `web/src/lib/rover.ts` and regression tests.
+  - **Spec:** entering the destination obeys the same slope limit as entering other terrain cells. Reject too-steep targets with an actionable reason, preserve exact-limit destinations, and allow a zero-distance start=goal result because it requires no driving. Keep the existing slope data and model.
+  - **Verify:** a 50° destination with a 20° limit is rejected; 15°/20°/25° thresholds and the next encoded 0.25° step; raising the limit; zero-distance and existing transit-slope controls; TypeScript, tests, build and production tool loading without console errors.
+
 - [x] **Enforce rover Earth/DSN contact throughout each drive** ([#200](https://github.com/adqm0001/lunar-window/issues/200)) — taken: malqedra
   - **Files:** `web/src/lib/rover.ts` and regression tests.
   - **Spec:** when the Earth-link rule is enabled, require contact at both endpoint cells for every sampled hour spanned by a move, using the existing conservative sunlight convention. Waiting can remain without contact; routes with the rule disabled remain unrestricted by contact.

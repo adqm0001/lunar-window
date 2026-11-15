@@ -116,6 +116,15 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
   };
   const startCell = p.start.row * n + p.start.col;
   const goalCell = p.goal.row * n + p.goal.col;
+  // Already being at the destination requires no driving. Otherwise it is subject to the terrain limit too.
+  const goalSlope = slopeAt(p.goal.col, p.goal.row);
+  if (startCell !== goalCell && goalSlope > p.maxSlopeDeg) {
+    return {
+      reason: `The destination cell is too steep (${goalSlope.toFixed(1)}°; limit ${p.maxSlopeDeg}°). Choose a gentler destination.`,
+      expanded: 0,
+      millis: performance.now() - t0,
+    };
+  }
   const arrive = new Float64Array(n * n).fill(Infinity);
   const departFrom = new Float64Array(n * n);
   const parent = new Int32Array(n * n).fill(-1);
@@ -145,7 +154,7 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
       if (nc < 0 || nr < 0 || nc >= n || nr >= n) continue;
       const next = nr * n + nc;
       if (closed[next]) continue;
-      if (next !== goalCell && slopeAt(nc, nr) > p.maxSlopeDeg) continue;
+      if (slopeAt(nc, nr) > p.maxSlopeDeg) continue;
       const moveH = (Math.hypot(dc, dr) * cellKm) / p.speedKmh;
       // earliest departure: wait (in sunlight, or anywhere at the start) until the move is possible
       let td = tc;
