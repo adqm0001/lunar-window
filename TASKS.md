@@ -336,7 +336,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** a second output `ephem_2025.bin` / `.json` covering 2025-02-15 through 2025-03-31 inclusive (same format), with a matching `dsn_2025.bin` named in the replay metadata. Don't change the main ephemeris.
   - **Verify:** 1,080 hourly vector and DSN records, ending 2025-03-31 23:00 UTC; binary lengths match the metadata; original main ephemeris and DSN files remain byte-for-byte identical.
 
-- [ ] **60. IM-2 replay: UI** (M) — Depends on 59
+- [x] **60. IM-2 replay: UI** (M) — Depends on 59
   - **Files:** `pipeline/sites.py` (site `im2-athena` already exists at −84.78°, 29.13°), `src/data/load.ts`, new replay entry in `src/components/SiteList.tsx`.
   - **Spec:** "Replay IM-2" loads the 2025 ephemeris, jumps to the landing time (from Intuitive Machines / NASA public reports; cite it in a comment), selects the site, shows the 3D lander, starts playback.
   - **Verify:** lighting at the site around the landing date matches public reports of the conditions.
