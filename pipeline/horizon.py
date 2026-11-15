@@ -1,6 +1,6 @@
 import numpy as np
 
-from terrain import R_MOON
+from terrain import R_MOON, hemisphere_sign
 
 SUN_RADIUS_DEG = 0.2665
 
@@ -22,6 +22,7 @@ def ray_distances(max_m=250_000.0, first_m=40.0, growth=0.035):
 
 
 def horizon(terrain, lat_deg, lon_deg, n_az, observer_height_m=2.0, chunk=48, progress=None):
+    pole = hemisphere_sign(getattr(terrain, "hemisphere", "south"))
     lat_deg = np.atleast_1d(np.asarray(lat_deg, dtype=np.float64))
     lon_deg = np.atleast_1d(np.asarray(lon_deg, dtype=np.float64))
     n = lat_deg.size
@@ -41,8 +42,8 @@ def horizon(terrain, lat_deg, lon_deg, n_az, observer_height_m=2.0, chunk=48, pr
         u = up[s][:, None, :]
         t = ca * north[s][:, None, :] + sa * east[s][:, None, :]
         d = cd[None, None, :, None] * u[:, :, None, :] + sd[None, None, :, None] * t[:, :, None, :]
-        k = 2 * R_MOON / (1 - d[..., 2])
-        h = terrain.height_xy(k * d[..., 1], k * d[..., 0])
+        k = 2 * R_MOON / (1 + pole * d[..., 2])
+        h = terrain.height_xy(k * d[..., 1], -pole * k * d[..., 0])
         r = R_MOON + h
         r0 = r0_all[s][:, None, None]
         num = r * cd - r0
