@@ -16,6 +16,7 @@ import Tour from "./components/Tour";
 import MobileNav from "./components/MobileNav";
 import PlaybackQualityNotice from "./components/PlaybackQualityNotice";
 import LazyPanel from "./components/LazyPanel";
+import { shouldHandleShortcut } from "./lib/shortcuts";
 
 const FinderPanel = lazy(() => import("./components/FinderPanel"));
 const ComparePanel = lazy(() => import("./components/ComparePanel"));
@@ -52,9 +53,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof Element && e.target.closest("input, select, textarea, [contenteditable=true]")) return;
-      // Space presses a focused button, link, select or chip; it only plays/pauses from the page or the 3D view.
-      if (e.key === " " && e.target instanceof Element && e.target.closest("button, a, select, textarea, [role=button], [contenteditable=true]")) return;
+      if (!shouldHandleShortcut(e)) return;
       const s = useApp.getState();
       if (e.key === "h" || e.key === "H") s.toggleCinema();
       else if (e.key === " ") {
