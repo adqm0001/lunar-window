@@ -304,10 +304,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** add the north-pole counterparts of the south polar LOLA products used (same PDS directory, `…_n_…` names) to `FILES`, with sizes.
   - **Verify:** `python fetch_data.py` downloads them.
 
-- [ ] **54. North polar projection in the pipeline** (M) — Depends on 53
-  - **Files:** `pipeline/terrain.py`, `pipeline/geo.py`, `pipeline/build_field.py`.
-  - **Spec:** parameterise the polar projection by hemisphere (north: `k = 2R·tan(π/4 − lat/2)`, `x = k·sin(lon)`, `y = −k·cos(lon)`), build `field_north.*` like `field_pole`.
-  - **Verify:** a sunlit-fraction map of the north pole shows Peary crater's rim as one of the brightest areas.
+- [x] **54. North polar projection in the pipeline** (M) — Depends on 53 — taken: malqedra
+  - **Files:** `pipeline/terrain.py`, `pipeline/build_field.py`, `pipeline/engine.py`, `pipeline/horizon.py`, `engine/horizon.cpp`, generated `field_north.json`, `field_north.bin.gz`, `heights_north.bin.gz`, `slope_north.bin.gz`, projection/loader tests. `pipeline/geo.py` already works in geographic lat/lon for both hemispheres and is covered by tests.
+  - **Spec:** parameterise the polar projection by hemisphere (north: `k = 2R·tan(π/4 − lat/2)`, `x = k·sin(lon)`, `y = −k·cos(lon)`), build `field_north.*` like `field_pole` with `python pipeline/build_field.py --hemisphere north`. The Python terrain/horizon APIs and the C++ CLI accept a hemisphere; existing calls default to south. North metadata carries `hemisphere: "north"`; 320² horizon/slope cells at 250 m, 180 azimuths, 2 m observer, 1280² mesh heights at 62.5 m. The app switch is task 55.
+  - **Verify:** an hourly sunlit-fraction map of the north pole shows Peary crater's rim as one of the brightest areas. Run `python -m unittest discover -s pipeline -p 'test_*.py'` and `npm test`; compare north horizons to independent rays and old/new south builders and native horizon output for regressions.
 
 - [ ] **55. North pole in the app** (L) — Depends on 54
   - **Files:** `src/lib/astro.ts` (`toMap`/`toLatLon` take a hemisphere), `src/data/field.ts`, `src/three/MoonScene.ts` (`mapToWorld`), `src/three/shaders.ts` (patch shader lat/lon from `vMap`), `src/gpu/engine.ts` (cell lat/lon).
