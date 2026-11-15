@@ -1486,7 +1486,11 @@ export class MoonScene {
     const e = this.field.meta.extentMeters;
     const show = !this.field.meta.label || this.overlayOn;
     if (this.terrainMesh) this.terrainMesh.visible = show;
-    this.lod?.material.uniforms.uHole.value.set(cx, cy, show ? e : 0);
+    // The area's vertices sit at cell centres, so its mesh stops half a cell short of ±e. Cutting the globe
+    // at ±e left a see-through line all round the area (31 m at the pole, 125 m around 250 m areas); cut
+    // three quarters of a cell inside instead, so the globe tucks just under the area's edge.
+    const inset = this.field.meta.heights.cellMeters * 0.75;
+    this.lod?.material.uniforms.uHole.value.set(cx, cy, show ? e - inset : 0);
   }
 
   // Removing a parent group does not delete child label elements from the page, so do it by hand.
