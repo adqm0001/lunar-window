@@ -115,13 +115,14 @@ export function sunTrack(e: Ephemeris, site: Site): SunTrack {
   return t;
 }
 
+/** NaN means the requested hourly mission is not fully covered by the track. */
 export function survivedFraction(t: SunTrack, lander: Lander, start: number, hours: number): number {
-  const n = Math.min(hours, t.frac.length - start);
-  if (n <= 0) return 0;
+  const available = Math.min(t.frac.length, t.az.length, t.el.length);
+  if (!Number.isInteger(start) || !Number.isInteger(hours) || start < 0 || hours <= 0 || start + hours > available) return NaN;
   const panelAz = lander.panel === "vertical" && lander.panelAz < 0 ? t.az[start] : lander.panelAz;
   let wh = lander.batteryWh;
   const floor = (lander.minSocPct / 100) * lander.batteryWh;
-  for (let k = 0; k < n; k++) {
+  for (let k = 0; k < hours; k++) {
     const i = start + k;
     const f = t.frac[i];
     const p = lander.panelW * f * panelFactor(lander.panel, t.az[i], t.el[i], panelAz);

@@ -271,9 +271,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** replace "leaves out bounced light… ~25 K vs 30–50 K" with the new behaviour and numbers.
 
 - [x] **47. Extend the ephemeris to 2036** (S) — taken: malqedra
-  - **Files:** `pipeline/ephemeris.py`, generated `web/public/data/ephem.bin`, `ephem.json`, and `dsn.bin`.
+  - **Files:** `pipeline/ephemeris.py`, generated `web/public/data/ephem.bin`, `ephem.json`, and `dsn.bin`; cutoff handling in `src/components/PorkchopPanel.tsx`, `src/lib/lander.ts`, and `src/lib/lander.test.ts`.
   - **Spec:** set the end to `datetime(2037, 1, 1, tzinfo=timezone.utc)`. Rerun `python ephemeris.py` (needs `data/raw/` from `fetch_data.py`). `ephem.bin` grows ~210 kB/year; the app reads `count` from `ephem.json`, and the GPU textures pack hours in rows of 4096, so no shader change is needed.
-  - **Verify:** the timeline reaches 2036; 1-year layers, finder and porkchop work near the end of the range.
+  - **Verify:** the timeline reaches 2036; 1-year layers, finder and porkchop work near the end of the range. Landing dates include only missions with full data coverage; check a mission ending exactly at the cutoff and one crossing it, and show an unavailable state when none fit.
 
 - [ ] **48. Remove hard-coded years** (S) — Depends on 47
   - **Files:** `src/components/Timeline.tsx` (`for (let y = 2026; y <= 2028; y++)` year labels), `src/components/SkylinePanel.tsx`, `src/components/Tour.tsx`, `src/components/ValidationPanel.tsx`, `README.md`.
