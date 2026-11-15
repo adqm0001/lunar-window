@@ -200,7 +200,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `visibilityBits` stays on the main thread (WebGL). Transfer copies of `bits.sun`, `bits.link` and `field.slope` (the field keeps using its slope, and the originals allow a main-thread fallback if the worker can't load) and the needed `meta` fields to the worker; run `planRoute` there.
   - **Verify:** Plan route keeps the UI responsive; route identical to before for Connecting ridge B → Shackleton ridge A.
 
-- [ ] **34. Tile the 80 m polar file** (M)
+- [x] **34. Tile the 80 m polar file** (M)
   - **Files:** `pipeline/build_globe.py` (writes `polar_80m.bin.gz`), new output folder `web/public/data/polar80/`, `web/public/data/globe.json`.
   - **Spec:** split the 6250² grid into 8×8 tiles (782² each; last row/col may be smaller), each `int16` metres with row deltas, gzip, named `ty_tx.bin.gz`. Record `tile`, `tiles`, `size`, `cellMeters`, `firstCenterMeters` in `globe.json` under `polar80`. Keep `−32768` for missing.
   - **Verify:** reassembling the tiles in Python equals the old array exactly.
