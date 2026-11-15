@@ -30,6 +30,13 @@ function closePanels() {
   if (s.playing) s.togglePlaying();
 }
 
+// Steps 3–5 show a layer with nothing else open, also when reached with ← Back from a later step.
+function clearTools() {
+  closePanels();
+  st().setRover(null);
+  st().setFinder(null);
+}
+
 function poleView() {
   currentScene()?.flyToLatLon(-89.45, -140, 55);
 }
@@ -58,6 +65,7 @@ const STEPS: Step[] = [
     title: "Where is the light?",
     text: "Share of the next year that each 250 m spot is in sunlight. Your GPU works it out from 102,400 terrain horizons in a few milliseconds. Bright rims are the 'peaks of light'; black discs never see the Sun.",
     enter: () => {
+      clearTools();
       st().setRangeDays(365);
       st().setLayer("sun");
     },
@@ -65,12 +73,16 @@ const STEPS: Step[] = [
   {
     title: "Cold traps hold water ice",
     text: "A heat-flow model of the soil runs for every point: sunlight on the real slope, heat soaking into the ground, glowing back to space. Blue is where water ice survives, the main reason everyone is going to the pole.",
-    enter: () => st().setLayer("ice"),
+    enter: () => {
+      clearTools();
+      st().setLayer("ice");
+    },
   },
   {
     title: "A peak of light",
     text: "Connecting ridge: sunlit about 89% of the year. The right panel counts down to the next sunset, Earth-set and Deep Space Network pass, and shows the ground temperature hour by hour.",
     enter: () => {
+      clearTools();
       st().setLayer("terrain");
       st().select("connecting-ridge-b");
     },
@@ -79,8 +91,9 @@ const STEPS: Step[] = [
     title: "Find the best landing spot",
     text: "Pick a landing date and how long the mission lasts. The GPU scores every spot for sunlight, contact with Earth, darkness and flat ground, and ranks the top 10.",
     enter: () => {
+      closePanels();
       const s = st();
-      s.setRoverOpen(false);
+      s.setRover(null);
       s.setFinderOpen(true);
       if (s.field) {
         const r = findBestSpots(s.field, { startHour: Math.floor(s.hour), missionDays: 14, maxNightHours: 50, minSafePct: 50, weights: DEFAULT_WEIGHTS });
@@ -92,9 +105,9 @@ const STEPS: Step[] = [
     title: "Drive a rover through moving shadows",
     text: "Shadows move every hour, so the best path depends on when you drive. The planner keeps the rover in sunlight on gentle slopes, waiting out shadows when it must. Watch it drive.",
     enter: () => {
+      closePanels();
       const s = st();
       s.setFinder(null);
-      s.setFinderOpen(false);
       s.select("connecting-ridge-b");
       s.setRoverOpen(true);
       const f = s.field;
@@ -123,7 +136,15 @@ const STEPS: Step[] = [
           }
         })
         .catch((err: Error) => console.error(err));
-      currentScene()?.flyToLatLon(-89.55, -150, 28);
+      // Selecting the site above makes the scene fly to it, but only once React has run Scene3D's effect, which is
+      // after this one. Start the overview of the route after that, or the site flight replaces it.
+      const t0 = performance.now();
+      const overview = () => {
+        if (visit !== stepVisit) return;
+        if (currentScene()?.selectedSiteId === a.id || performance.now() - t0 > 2000) currentScene()?.flyToLatLon(-89.55, -150, 28);
+        else setTimeout(overview, 30);
+      };
+      overview();
     },
   },
   {
