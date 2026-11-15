@@ -312,6 +312,7 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
 @media (min-width: 1101px) and (max-width: 1500px) {
   .layer-bar { right: 354px; }
   .map-legend { top: calc(84px + var(--layer-bar-h, 52px)); max-height: calc(100vh - 286px - var(--layer-bar-h, 52px)); overflow-y: auto; }
+  .app:has(> .compare, > .porkchop) .map-legend { max-height: calc(100vh - 414px - var(--layer-bar-h, 52px)); }
   .porkchop { max-height: max(150px, min(330px, calc(100vh - 264px - var(--layer-bar-h, 52px) - var(--legend-h, 112px)))); }
   .compare { max-height: max(150px, min(300px, calc(100vh - 264px - var(--layer-bar-h, 52px) - var(--legend-h, 112px)))); }
   /* during the tour, the legend scrolls in the space above the tour card instead of going under it */

@@ -9,12 +9,12 @@ export default function MobileNav() {
   const panel = useApp((s) => s.mobilePanel);
   const setPanel = useApp((s) => s.setMobilePanel);
   const playing = useApp((s) => s.playing);
-  const toolOpen = useApp((s) => s.finderOpen || s.landerOpen || s.roverOpen);
+  const tool = useApp((s) => s.finderOpen ? "finder" : s.landerOpen ? "lander" : s.roverOpen ? "rover" : null);
   const touring = useApp((s) => s.tourStep !== null);
 
   useEffect(() => {
-    if (toolOpen) setPanel("sites");
-  }, [toolOpen, setPanel]);
+    if (tool) setPanel("sites");
+  }, [tool, setPanel]);
 
   // The landing dates chart and the compare table take the sheet area on phones and are hidden while a sheet is open
   // (styles.css), so opening one closes the sheet.
@@ -72,7 +72,7 @@ export default function MobileNav() {
         </div>
       )}
       <nav className="glass mobile-nav" aria-label="Panels">
-        {tab("sites", toolOpen ? "Tools" : "Sites")}
+        {tab("sites", tool ? "Tools" : "Sites")}
         {tab("site", "Site")}
         {tab("time", "Time")}
         <button className="m-tab play" onClick={() => useApp.getState().togglePlaying()}>

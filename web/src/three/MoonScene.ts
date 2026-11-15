@@ -103,7 +103,7 @@ export class MoonScene {
   private cutaway = new Cutaway();
   private cutOn = false;
   private cutPending = false;
-  private scatter: THREE.Points | null = null;
+  private scatter: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
   private routeGroup = new THREE.Group();
   private route: RoverRoute | null = null;
   private rover: THREE.Group | null = null;
@@ -1343,6 +1343,7 @@ export class MoonScene {
     if (this.scatter) {
       this.scene.remove(this.scatter);
       this.scatter.geometry.dispose();
+      this.scatter.material.dispose();
       this.scatter = null;
     }
     if (!points || points.length === 0) return;
