@@ -6,11 +6,24 @@
 //  - heat capacity is the temperature-dependent polynomial from the same paper
 //  - albedo rises at low Sun (Keihm 1984), emissivity 0.95, interior heat flow 0.018 W/m2
 // Sunlight on each cell uses the real horizon (partial Sun disk) and the ground's own slope.
-// What it leaves out: sunlight and infrared bounced from nearby slopes, so the coldest
-// permanently shadowed floors come out colder than Diviner measures (~25 K vs ~30-50 K).
+// Light and heat bounced off surrounding terrain use the bowl-crater result of Ingersoll,
+// Svitek & Murray 1992 (Icarus 100, "Stability of polar frosts in spherical bowl-shaped craters
+// on the Moon, Mercury, and Mars"): sunlight entering the crater's opening (flux S0 sin e per unit
+// area, e = Sun elevation above the flat horizon) is either reflected by the walls (fraction A) or
+// absorbed and re-emitted as infrared; a point inside receives the fraction F of it, where F is
+// the share of its sky covered by terrain (from the horizon). Absorbed by the point:
+//   scattered sunlight  F * S0 sin e * A (1 - A)
+//   infrared            F * S0 sin e * (1 - A) * emissivity
+// Multiple reflections (a 1/(1 - A F) factor, ~2 %) and walls cooling after sunset are left out.
 
 export const NZ = 14;
 export const ICE_K = 110;
+
+// Normal-incidence albedo of the surrounding terrain and emissivity, as in the direct-sunlight terms.
+export const WALL_ALBEDO = 0.12;
+export const EMISSIVITY = 0.95;
+// Fraction of the light entering a crater's opening that a shadowed point inside absorbs per unit F.
+export const BOUNCE_ABSORBED = WALL_ALBEDO * (1 - WALL_ALBEDO) + (1 - WALL_ALBEDO) * EMISSIVITY;
 
 export const THERMAL_MAIN = `
 uniform highp sampler2D uHeights;
@@ -23,6 +36,7 @@ const float S0 = 1361.0;
 const float EMIS = 0.95;
 const float SIGMA = 5.670374e-8;
 const float QGEO = 0.018;
+const float BOUNCE = ${BOUNCE_ABSORBED.toFixed(6)};
 
 float cpOf(float T) {
   return -3.6125 + T * (2.7431 + T * (2.3616e-3 + T * (-1.2340e-5 + T * 8.9093e-9)));
@@ -101,7 +115,7 @@ void main() {
     if (saz < 0.0) saz += 360.0;
     float d = clamp((sel - horizonAt(col, row, saz)) / SUN_R, -1.0, 1.0);
     float frac = (acos(-d) + d * sqrt(1.0 - d * d)) / PI;
-    fluxSum += S0 * frac * max(0.0, dot(nrm, sv)) * 0.88;
+    fluxSum += S0 * frac * max(0.0, dot(nrm, sv)) * 0.88 + F * S0 * max(0.0, sin(radians(sel))) * BOUNCE;
   }
   float T0 = max(30.0, pow((fluxSum / float(uSteps) + QGEO) / (EMIS * SIGMA), 0.25) * 0.9);
   for (int i = 0; i < NZ; i++) { T[i] = T0; Tmx[i] = 0.0; }
@@ -122,6 +136,8 @@ void main() {
     float inc = degrees(acos(clamp(mu, 0.0, 1.0)));
     float albedo = 0.12 + 0.06 * pow(inc / 45.0, 3.0) + 0.25 * pow(inc / 90.0, 8.0);
     float absorbed = (1.0 - albedo) * S0 * frac * mu;
+    // light and heat bounced off the surrounding terrain (see the header comment)
+    absorbed += F * S0 * max(0.0, sin(radians(sel))) * BOUNCE;
 
     for (int s = 0; s < nsub; s++) {
       float Tn[NZ];
