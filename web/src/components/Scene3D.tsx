@@ -17,10 +17,27 @@ import { applyLate, registerScene, sharedCamera } from "../state/share";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
 
+// How far the side panels reach into the 3D view on each side, in CSS px (0 where there are none).
+// Only the side columns count (the <aside> panels); a phone sheet spanning the width is not a side panel.
+function panelInsets(host: HTMLElement, panels: Iterable<Element>) {
+  const h = host.getBoundingClientRect();
+  let left = 0;
+  let right = 0;
+  for (const el of panels) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0 || r.width > h.width * 0.45) continue;
+    if (r.left + r.width / 2 < h.left + h.width / 2) left = Math.max(left, r.right - h.left);
+    else right = Math.max(right, h.right - r.left);
+  }
+  return { left, right };
+}
+
 export default function Scene3D() {
   const host = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<MoonScene | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Top of the split-view site names: just under the layer bar, which wraps to more rows on narrow screens.
+  const [tagTop, setTagTop] = useState(84);
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const globe = useApp((s) => s.globe);
@@ -48,6 +65,9 @@ export default function Scene3D() {
   const lastSelected = useRef<string | null>(null);
   const displayedGlobal = useRef<GlobalPaintSource | null>(null);
   const view = useApp((s) => s.view);
+  const split = useApp((s) => s.split);
+  const pinned = useApp((s) => s.pinned);
+  const splitPair = split && pinned.length >= 2 ? [pinned[0], pinned[1]] : null;
   const [hover, setHover] = useState<{ x: number; y: number; text: string; value: string | null } | null>(null);
   const hoverAt = useRef(0);
 
@@ -121,6 +141,57 @@ export default function Scene3D() {
   useEffect(() => {
     if (scene && flyRequest) scene.flyToLatLon(flyRequest.lat, flyRequest.lon, flyRequest.altKm);
   }, [scene, flyRequest]);
+
+  // Side by side: left view goes to the first pinned site (and selects it), right view to the second.
+  const leftId = splitPair?.[0].id;
+  const rightId = splitPair?.[1].id;
+  useEffect(() => {
+    const viewport = host.current;
+    const app = viewport?.closest(".app");
+    if (!scene || !viewport || !app) return;
+    if (!leftId || !rightId) {
+      scene.setSplit(false);
+      return;
+    }
+
+    const panelSelector = ":scope > aside.left, :scope > aside.right";
+    const toolbarSelector = ":scope > .layer-bar";
+    let lastInsets: ReturnType<typeof panelInsets> | undefined;
+    const fit = () => {
+      const insets = panelInsets(viewport, app.querySelectorAll(panelSelector));
+      if (!lastInsets || insets.left !== lastInsets.left || insets.right !== lastInsets.right) {
+        scene.setSplit(true, insets);
+        lastInsets = insets;
+      }
+      const bar = app.querySelector(toolbarSelector);
+      if (bar) setTagTop(Math.round(bar.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top) + 8);
+    };
+    fit();
+    const { pinned, selectedId, select } = useApp.getState();
+    const [a, b] = [pinned.find((p) => p.id === leftId), pinned.find((p) => p.id === rightId)];
+    if (a) {
+      if (selectedId === a.id) scene.select(a, true);
+      else select(a.id);
+    }
+    if (b) scene.flySplitTo(b);
+    // Lazy tool panels can appear after the state change. Watch their DOM nodes once they mount.
+    const sizes = new ResizeObserver(fit);
+    const watchLayout = () => {
+      sizes.disconnect();
+      sizes.observe(viewport);
+      app.querySelectorAll(panelSelector + ", " + toolbarSelector).forEach((el) => sizes.observe(el));
+      fit();
+    };
+    const layout = new MutationObserver(watchLayout);
+    layout.observe(app, { childList: true, attributes: true, attributeFilter: ["class"] });
+    watchLayout();
+    window.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      layout.disconnect();
+      sizes.disconnect();
+    };
+  }, [scene, leftId, rightId]);
 
   useEffect(() => {
     scene?.setScatter(mc && landerOpen ? mc.points : null);
@@ -217,6 +288,12 @@ export default function Scene3D() {
           {hover.text}
           {hover.value && <b> · {hover.value}</b>}
         </div>
+      )}
+      {splitPair && (
+        <>
+          <div className="split-tag split-tag-l" style={{ top: tagTop }}>{splitPair[0].name}</div>
+          <div className="split-tag split-tag-r" style={{ top: tagTop }}>{splitPair[1].name}</div>
+        </>
       )}
       {!field && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
       {error && <div className="stage-msg error">{error}</div>}

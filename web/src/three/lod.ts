@@ -190,7 +190,10 @@ export class LodTerrain {
     return n;
   }
 
-  private lastCam = new THREE.Vector3(1e9, 0, 0);
+  private lastCams: THREE.Vector3[] = [];
+  // One visible set per camera (split screen renders two views of the same tiles); useView picks one.
+  private viewSets: Set<Node>[] = [];
+  private viewCams: THREE.Camera[] = [];
   private hasWork = true;
   private changedFlag = false;
 
@@ -230,19 +233,62 @@ export class LodTerrain {
     this.material.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
   }
 
-  update(camera: THREE.Camera): boolean {
-    if (!this.hasWork && camera.position.distanceToSquared(this.lastCam) < 1e-10) return false;
-    this.lastCam.copy(camera.position);
+  /** Refines the terrain for one or more cameras (split screen passes two), then shows the first camera's tiles. */
+  update(cameras: THREE.Camera | THREE.Camera[]): boolean {
+    const cams = Array.isArray(cameras) ? cameras : [cameras];
+    const moved = cams.length !== this.lastCams.length || cams.some((c, i) => c.position.distanceToSquared(this.lastCams[i]) >= 1e-10);
+    if (!this.hasWork && !moved) return false;
+    this.lastCams = cams.map((c) => c.position.clone());
     this.changedFlag = false;
     this.frame++;
+    this.queue = [];
+    const sets = cams.map((c) => this.collect(c));
+    for (const set of sets) for (const n of set) if (n.dirty) this.queue.push(n);
+    const seen = new Set<string>();
+    this.queue = this.queue.filter((n) => (seen.has(n.key) ? false : (seen.add(n.key), true)));
+    const dirs = cams.map((c) => c.position.clone().sub(MOON_CENTER).normalize());
+    const near = (n: Node) => Math.min(...dirs.map((d) => this.tmp.copy(n.center).distanceTo(d)));
+    this.queue.sort((a, b) => a.level - b.level || near(a) - near(b));
+    const t0 = performance.now();
+    for (const n of this.queue) {
+      if (performance.now() - t0 > BUILD_BUDGET_MS && n.level > 1) break;
+      this.build(n);
+      this.changedFlag = true;
+    }
+    this.hasWork = this.changedFlag || this.queue.some((n) => !n.mesh || n.dirty);
+
+    const same = (a: Set<Node>, b: Set<Node> | undefined) => !!b && a.size === b.size && [...a].every((n) => b.has(n));
+    if (sets.some((s, i) => !same(s, this.viewSets[i])) || sets.length !== this.viewSets.length) this.changedFlag = true;
+    this.viewSets = sets;
+    this.viewCams = cams;
+    for (const set of sets) for (const n of set) n.lastUsed = this.frame;
+    this.useView(0);
+    if (this.nodes.size > MAX_CACHED) this.evict();
+    return this.changedFlag;
+  }
+
+  /** Shows the tiles chosen for camera `i` of the last update (and points the detail fade at that camera). */
+  useView(i: number) {
+    const set = this.viewSets[i] ?? this.viewSets[0];
+    const cam = this.viewCams[i] ?? this.viewCams[0];
+    if (!set) return;
+    this.meshes = [];
+    for (const n of this.nodes.values()) {
+      if (!n.mesh) continue;
+      const on = set.has(n);
+      n.mesh.visible = on;
+      if (on) this.meshes.push(n.mesh);
+    }
+    if (cam) this.material.uniforms.uCamPos.value.copy(cam.position);
+  }
+
+  // Quadtree walk for one camera: queues tiles that need building and returns the ones to draw.
+  private collect(camera: THREE.Camera): Set<Node> {
     const cam = camera.position.clone().sub(MOON_CENTER);
     const camDist = cam.length();
     const camDir = cam.clone().normalize();
     const horizon = Math.acos(Math.min(1, R_MOON_KM / Math.max(camDist, R_MOON_KM + 0.01))) + 0.08;
-    this.material.uniforms.uCamPos.value.copy(camera.position);
     const visible = new Set<Node>();
-    this.queue = [];
-
     const visit = (n: Node) => {
       const ang = (n.sizeKm / R_MOON_KM) * 0.75;
       if (camDir.dot(n.center) < Math.cos(Math.min(Math.PI, horizon + ang))) return;
@@ -267,32 +313,7 @@ export class LodTerrain {
       if (n.mesh) visible.add(n);
     };
     for (let f = 0; f < 6; f++) visit(this.node(f, 0, 0, 0));
-
-    for (const n of visible) if (n.dirty) this.queue.push(n);
-    const seen = new Set<string>();
-    this.queue = this.queue.filter((n) => (seen.has(n.key) ? false : (seen.add(n.key), true)));
-    this.queue.sort((a, b) => a.level - b.level || this.tmp.copy(a.center).distanceTo(camDir) - this.tmp.copy(b.center).distanceTo(camDir));
-    const t0 = performance.now();
-    for (const n of this.queue) {
-      if (performance.now() - t0 > BUILD_BUDGET_MS && n.level > 1) break;
-      this.build(n);
-      this.changedFlag = true;
-    }
-    this.hasWork = this.changedFlag || this.queue.some((n) => !n.mesh || n.dirty);
-
-    this.meshes = [];
-    for (const n of this.nodes.values()) {
-      if (!n.mesh) continue;
-      const on = visible.has(n);
-      if (n.mesh.visible !== on) this.changedFlag = true;
-      n.mesh.visible = on;
-      if (on) {
-        n.lastUsed = this.frame;
-        this.meshes.push(n.mesh);
-      }
-    }
-    if (this.nodes.size > MAX_CACHED) this.evict();
-    return this.changedFlag;
+    return visible;
   }
 
   private evict() {
