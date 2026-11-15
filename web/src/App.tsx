@@ -13,6 +13,7 @@ import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
 import Tour from "./components/Tour";
 import MobileNav from "./components/MobileNav";
+import PlaybackQualityNotice from "./components/PlaybackQualityNotice";
 import LazyPanel from "./components/LazyPanel";
 
 const FinderPanel = lazy(() => import("./components/FinderPanel"));
@@ -183,6 +184,7 @@ export default function App() {
       <Timeline />
       <Tour />
       <MobileNav />
+      <PlaybackQualityNotice />
       <div className="kbd-hint">WASD move · R F up/down · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
     </div>
   );
