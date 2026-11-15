@@ -269,8 +269,8 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/components/ValidationPanel.tsx`, `README.md`, `src/components/LayerControls.tsx` (thermal note text).
   - **Spec:** replace "leaves out bounced light… ~25 K vs 30–50 K" with the new behaviour and numbers.
 
-- [ ] **47. Extend the ephemeris to 2036** (S) — taken: malqedra
-  - **Files:** `pipeline/ephemeris.py` (lines with `datetime(2026, 1, 1, …)` and `datetime(2029, 1, 1, …)`).
+- [x] **47. Extend the ephemeris to 2036** (S) — taken: malqedra
+  - **Files:** `pipeline/ephemeris.py`, generated `web/public/data/ephem.bin`, `ephem.json`, and `dsn.bin`.
   - **Spec:** set the end to `datetime(2037, 1, 1, tzinfo=timezone.utc)`. Rerun `python ephemeris.py` (needs `data/raw/` from `fetch_data.py`). `ephem.bin` grows ~210 kB/year; the app reads `count` from `ephem.json`, and the GPU textures pack hours in rows of 4096, so no shader change is needed.
   - **Verify:** the timeline reaches 2036; 1-year layers, finder and porkchop work near the end of the range.
 

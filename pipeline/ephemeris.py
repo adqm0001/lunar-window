@@ -49,7 +49,7 @@ class Ephemeris:
 
 def main():
     start = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    end = datetime(2029, 1, 1, tzinfo=timezone.utc)
+    end = datetime(2037, 1, 1, tzinfo=timezone.utc)
     hours = int((end - start).total_seconds() // 3600)
     e = Ephemeris()
     t = e.hourly(start, hours)

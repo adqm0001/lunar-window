@@ -1,7 +1,7 @@
 {
   "start": "2026-01-01T00:00:00Z",
   "stepHours": 1,
-  "count": 26304,
+  "count": 96432,
   "frame": "MOON_ME_DE421",
   "units": "km, Moon center to body, apparent",
   "layout": "float32 [count][sunX, sunY, sunZ, earthX, earthY, earthZ]",
