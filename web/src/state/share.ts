@@ -1,5 +1,6 @@
 import { LAYERS, type LayerId } from "../gpu/layers";
 import { addPointAt } from "../lib/points";
+import { linkPoints, parseLinkPoints } from "../lib/shareLink";
 import type { MoonScene, ViewState } from "../three/MoonScene";
 import { useApp } from "./store";
 
@@ -41,13 +42,7 @@ function parse(hash: string): Shared | null {
   const v = q.get("v");
   if (v === "2d" || v === "3d") out.v = v;
   const p = q.get("p");
-  if (p)
-    out.p = p
-      .split(";")
-      .map((e) => e.split(","))
-      .filter((a) => a.length >= 2 && Number.isFinite(Number(a[0])) && Number.isFinite(Number(a[1])))
-      .slice(0, 20)
-      .map((a) => ({ lat: Number(a[0]), lon: Number(a[1]), name: decodeURIComponent(a.slice(2).join(",") || "") }));
+  if (p) out.p = parseLinkPoints(p);
   const c = q.get("c")?.split(",").map(Number);
   if (c && c.length === 6 && c.every(Number.isFinite)) out.c = { orbit: c[0] === 1, t: [c[1], c[2]], c: [c[3], c[4], c[5]] };
   return out;
@@ -68,13 +63,13 @@ export function encodeState(): string {
   const st = useApp.getState();
   const q = new URLSearchParams();
   q.set("t", String(st.hour));
-  const pi = st.customSites.findIndex((c) => c.id === st.selectedId);
-  q.set("s", pi >= 0 ? `p${pi}` : st.selectedId);
+  const spot = st.finder?.candidates.find((c) => c.site.id === st.selectedId)?.site ?? null;
+  const pts = linkPoints(st.customSites, st.selectedId, spot);
+  q.set("s", pts.s);
   q.set("l", st.layer);
   q.set("r", String(st.rangeDays));
   q.set("v", st.view);
-  if (st.customSites.length)
-    q.set("p", st.customSites.map((c) => `${fix(c.lat, 4)},${fix(c.lon, 4)},${encodeURIComponent(c.name)}`).join(";"));
+  if (pts.p) q.set("p", pts.p);
   const cam = scene?.getView();
   if (cam && st.view === "3d")
     q.set("c", [cam.orbit ? 1 : 0, fix(cam.t[0], 4), fix(cam.t[1], 4), fix(cam.c[0], 4), fix(cam.c[1], 4), fix(cam.c[2], 3)].join(","));
