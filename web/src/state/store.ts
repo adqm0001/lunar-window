@@ -8,7 +8,7 @@ import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
 import { LANDER_PRESETS, type Lander, type SurvivalInputs } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
-import type { RoverFailure, RoverRoute } from "../lib/rover";
+import { isRoute, type RoverFailure, type RoverRoute } from "../lib/rover";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -56,8 +56,9 @@ interface AppState {
   setReportOpen: (o: boolean) => void;
   setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
+  roverDestination: Pick<Site, "id" | "name" | "lat" | "lon"> | null;
   setRoverOpen: (o: boolean) => void;
-  setRover: (r: RoverRoute | RoverFailure | null) => void;
+  setRover: (r: RoverRoute | RoverFailure | null, destination?: Site | null) => void;
   lander: Lander;
   survival: FieldMetrics | null;
   /** The settings `survival` was simulated with. */
@@ -93,7 +94,7 @@ interface AppState {
   selectedId: string;
   setField: (f: FieldData) => void;
   setFieldProgress: (p: number) => void;
-  setFieldError: (e: string) => void;
+  setFieldError: (e: string | null) => void;
   setLayer: (l: LayerId) => void;
   setRangeDays: (d: number) => void;
   setCustomSite: (s: Site) => void;
@@ -167,6 +168,7 @@ export const useApp = create<AppState>((set, get) => ({
       survivalFor: null,
       mc: null,
       rover: null,
+      roverDestination: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
     })),
   landerOpen: false,
@@ -186,8 +188,14 @@ export const useApp = create<AppState>((set, get) => ({
   setReportOpen: (reportOpen) => set({ reportOpen }),
   setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,
+  roverDestination: null,
   setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
-  setRover: (rover) => set({ rover }),
+  setRover: (rover, destination = null) => set({
+    rover,
+    roverDestination: isRoute(rover) && destination
+      ? { id: destination.id, name: destination.name, lat: destination.lat, lon: destination.lon }
+      : null,
+  }),
   lander: LANDER_PRESETS[0],
   survival: null,
   survivalFor: null,

@@ -16,6 +16,7 @@ export default function RoverPanel() {
   const field = useApp((s) => s.field);
   const hour = useApp((s) => s.hour);
   const result = useApp((s) => s.rover);
+  const destination = useApp((s) => s.roverDestination);
   const { setRover, setRoverOpen, setHour, select } = useApp.getState();
   const from = useSelectedSite();
   const sites = useSites();
@@ -59,7 +60,7 @@ export default function RoverPanel() {
         );
         if (!current()) return;
         if (isRoute(r)) r.gpuMillis = gpuMillis;
-        setRover(r);
+        setRover(r, to);
       } finally {
         if (mounted.current && search === searchSeq.current) setBusy(false);
       }
@@ -75,6 +76,8 @@ export default function RoverPanel() {
   };
 
   const route = isRoute(result) ? result : null;
+  // Finder ids can be reused by a later search; an id alone does not identify the old route's endpoint.
+  const routeDestination = destination && sites.find((s) => s.id === destination.id && s.lat === destination.lat && s.lon === destination.lon);
   const done = route ? hour >= route.arriveHour : false;
 
   return (
@@ -161,13 +164,14 @@ export default function RoverPanel() {
             <button className="btn primary" onClick={replay}>
               <Icon name="play" /> Replay drive
             </button>
-            <button className="btn" onClick={() => to && select(to.id)}>
-              Go to destination
+            <button className="btn" disabled={!routeDestination} onClick={() => routeDestination && select(routeDestination.id)}>
+              Go to {routeDestination?.name ?? destination?.name ?? "destination"}
             </button>
             <button className="btn" onClick={() => setRover(null)}>
               Clear
             </button>
           </div>
+          {!routeDestination && <div className="f-hint">This route's destination is no longer available. Plan a new route to choose another site.</div>}
           {done && <div className="f-hint">Arrived. Rewind the timeline to watch it again.</div>}
         </>
       )}
