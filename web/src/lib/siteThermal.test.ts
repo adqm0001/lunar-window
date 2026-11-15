@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { siteThermal, terrainViewFactor } from "./siteThermal";
+import { ICE_HOURS, iceCovered, iceVerdictPossible } from "../gpu/thermal";
+import { PANEL_THERMAL_HOURS, siteThermal, terrainViewFactor, thermalSpanLabel } from "./siteThermal";
 import { loadTestEphemeris, loadTestSites } from "./testData";
 
 const ephem = loadTestEphemeris();
@@ -44,5 +45,41 @@ describe("siteThermal against Diviner", () => {
 
   it("leaves open ground without terrain above the horizon unaffected", () => {
     expect(terrainViewFactor(site("apollo-11").horizon)).toBeLessThan(0.01);
+  });
+});
+
+// Ice stability means the warmest temperature over a whole year stays below 110 K, so a shorter run can't decide it.
+describe("thermal coverage", () => {
+  it("allows an ice verdict only for a full year of modelled temperatures", () => {
+    expect(iceVerdictPossible(ICE_HOURS)).toBe(true);
+    expect(iceVerdictPossible(24 * 395)).toBe(true);
+    expect(iceVerdictPossible(ICE_HOURS - 1)).toBe(false);
+    expect(iceVerdictPossible(24)).toBe(false);
+  });
+
+  it("can't give an ice verdict on the last day of the data", () => {
+    const t = siteThermal(ephem, site("shackleton-floor"), ephem.count - 1, 24 * 395);
+    expect(t.hours).toBeLessThanOrEqual(24);
+    expect(iceVerdictPossible(t.hours)).toBe(false);
+  });
+
+  it("names the span the temperatures cover", () => {
+    expect(thermalSpanLabel(24 * 395)).toBe("13 months");
+    expect(thermalSpanLabel(24 * 30)).toBe("30 d");
+    expect(thermalSpanLabel(24)).toBe("24 h");
+    expect(thermalSpanLabel(47)).toBe("47 h");
+  });
+});
+
+describe("ice coverage from a start hour", () => {
+  it("needs a full year between the start and the end of the data", () => {
+    expect(iceCovered(96432, 96432 - 8760)).toBe(true);
+    expect(iceCovered(96432, 96432 - 8759)).toBe(false);
+    expect(iceCovered(1080, 0)).toBe(false);
+  });
+
+  it("labels the panel's full window as 13 months and one day less in days", () => {
+    expect(thermalSpanLabel(PANEL_THERMAL_HOURS)).toBe("13 months");
+    expect(thermalSpanLabel(PANEL_THERMAL_HOURS - 24)).toBe("394 d");
   });
 });
