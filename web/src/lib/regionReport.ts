@@ -30,9 +30,10 @@ function fromPolar(x: number, y: number): [number, number] {
   return [-(90 - (colat * 180) / Math.PI), (Math.atan2(x, y) * 180) / Math.PI];
 }
 
-export function regionReport(light: GlobalMetrics, thermal: GlobalMetrics): RegionRow[] {
+/** `thermal` is null when the data can't cover the full year an ice verdict needs: ice is then left out (NaN). */
+export function regionReport(light: GlobalMetrics, thermal: GlobalMetrics | null): RegionRow[] {
   const L = light.grids.find((g) => g.id === "south")!;
-  const T = thermal.grids.find((g) => g.id === "south")!;
+  const T = thermal?.grids.find((g) => g.id === "south") ?? null;
   const n = L.w;
   const cell = (2 * POLAR_EXTENT_M) / n;
   const rows: RegionRow[] = [];
@@ -60,7 +61,7 @@ export function regionReport(light: GlobalMetrics, thermal: GlobalMetrics): Regi
         sun += L.data[i];
         earth += L.data[i + 1];
         link += L.data[i + 2];
-        if (T.data[i + 3] >= 0) ice++;
+        if (T && T.data[i + 3] >= 0) ice++;
         const s = 0.6 * L.data[i] + 0.4 * L.data[i + 2];
         if (s > bestScore) {
           bestScore = s;
@@ -82,12 +83,15 @@ export function regionReport(light: GlobalMetrics, thermal: GlobalMetrics): Regi
       linkAvg: link / count,
       linkBest: L.data[bi + 2],
       nightBestH: L.data[bi + 3],
-      iceArea: ice / count,
+      iceArea: T ? ice / count : NaN,
       best: { lat: blat, lon: blon },
       score: 0,
     };
-    // landing quality at the best spot, plus a little credit for nearby ice (the reason to go)
-    row.score = 0.5 * row.sunBest + 0.3 * row.linkBest + 0.1 * Math.min(1, row.iceArea * 4) + 0.1 * (1 - Math.min(1, row.nightBestH / (24 * 15)));
+    // landing quality at the best spot, plus a little credit for nearby ice (the reason to go); without ice the
+    // other weights are scaled up so scores stay on the same 0–1 scale
+    const night = 0.1 * (1 - Math.min(1, row.nightBestH / (24 * 15)));
+    const base = 0.5 * row.sunBest + 0.3 * row.linkBest + night;
+    row.score = T ? base + 0.1 * Math.min(1, row.iceArea * 4) : base / 0.9;
     rows.push(row);
   }
   rows.sort((a, b) => b.score - a.score);

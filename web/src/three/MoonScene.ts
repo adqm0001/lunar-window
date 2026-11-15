@@ -1382,13 +1382,29 @@ export class MoonScene {
     this.composer.render();
   }
 
-  setGlobe(g: GlobeData) {
-    this.dirty = true;
-    this.globe = g;
-    const tex = new THREE.Texture(g.color);
+  private colorTexture(img: HTMLImageElement) {
+    const tex = new THREE.Texture(img);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
+    return tex;
+  }
+
+  /** Swaps the globe's colour map (the full-size map arriving after the preview it started with). */
+  setColorMap(img: HTMLImageElement) {
+    if (!this.globe || !this.lod) return;
+    this.globe.color = img;
+    const u = this.lod.material.uniforms.uColor;
+    const old = u.value as THREE.Texture;
+    u.value = this.colorTexture(img);
+    old.dispose();
+    this.dirty = true;
+  }
+
+  setGlobe(g: GlobeData) {
+    this.dirty = true;
+    this.globe = g;
+    const tex = this.colorTexture(g.color);
     if (this.lod) {
       this.scene.remove(this.lod.group);
       this.lod.dispose();

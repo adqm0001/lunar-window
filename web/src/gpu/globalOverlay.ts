@@ -8,6 +8,7 @@ export interface GlobalOverlay {
 }
 import { paintGlobal, THERMAL_LAYERS, type LayerId, type Palette } from "./layers";
 import { useApp } from "../state/store";
+import { ICE_HOURS, iceCovered } from "./thermal";
 
 // Runs the whole-Moon engine on request and turns the result into an overlay image.
 // Results are cached per (kind, start, hours) so switching layers back and forth is instant.
@@ -25,7 +26,7 @@ let lastMetrics: GlobalPaintSource | null = null;
 export function globalRequest(layer: LayerId, hour: number, rangeDays: number) {
   const kind: "light" | "thermal" = THERMAL_LAYERS.includes(layer) ? "thermal" : "light";
   const start = Math.floor(hour / 24) * 24;
-  const hours = layer === "ice" ? 365 * 24 : rangeDays * 24;
+  const hours = layer === "ice" ? ICE_HOURS : rangeDays * 24;
   return { kind, start, hours, key: `${kind}:${start}:${hours}` };
 }
 
@@ -61,6 +62,12 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
 
 export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalPaintSource | null> {
   const req = globalRequest(layer, hour, rangeDays);
+  const count = useApp.getState().data?.ephem.count ?? 0;
+  if (layer === "ice" && !iceCovered(count, req.start)) {
+    lastMetrics = null; // no stale ice values in hover readouts either
+    useApp.getState().setGlobalInfo(null);
+    return null;
+  }
   const m = await getGlobalMetrics(req.kind, req.start, req.hours);
   return m ? { layer, m } : null;
 }
