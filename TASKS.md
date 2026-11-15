@@ -245,7 +245,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 5: Science upgrades
 
-- [ ] **42. Terrain view factor per cell** (M) — taken: malqedra
+- [x] **42. Terrain view factor per cell** (M) — taken: malqedra
   - **Files:** `src/gpu/thermal.ts`.
   - **Spec:** in `THERMAL_MAIN`, before the time loop, compute the fraction of the (cosine-weighted) sky covered by terrain from the horizon field: `F = (1/N) Σ_az sin²(max(h(az), 0))` over the `uAzBins` directions, using the existing `horizonAt(col, row, az)` (degrees). This is the radiative view factor from the cell to surrounding terrain.
   - **Verify:** temporarily output `F` in a channel: flat plains ≈ 0, crater floors (Shackleton floor) ≈ 0.05–0.15. Revert the debug output.
