@@ -10,6 +10,8 @@ NAIF = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
 FILES = {
     "ldem_85s_40m.img": (f"{PDS}/ldem_85s_40m.img", 115034112),
     "ldem_75s_240m.img": (f"{PDS}/ldem_75s_240m.img", 29062688),
+    "ldem_85n_40m.img": (f"{PDS}/ldem_85n_40m.img", 115034112),
+    "ldem_75n_240m.img": (f"{PDS}/ldem_75n_240m.img", 29062688),
     "de421.bsp": (f"{NAIF}/spk/planets/a_old_versions/de421.bsp", 16790528),
     "moon_pa_de421_1900-2050.bpc": (f"{NAIF}/pck/moon_pa_de421_1900-2050.bpc", 1770496),
     "moon_080317.tf": (f"{NAIF}/fk/satellites/moon_080317.tf", None),

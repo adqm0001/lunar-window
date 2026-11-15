@@ -280,7 +280,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** derive the first and last year from `data.ephem.startMs` and `count`; text says "2026–<last year>".
   - **Verify:** `grep -rn "2028" web/src` returns nothing.
 
-- [ ] **49. Link budget model** (M)
+- [x] **49. Link budget model** (M) — taken: malqedra
   - **Files:** `src/lib/contacts.ts`.
   - **Spec:** add `estimateRateBps(earthDistanceKm: number, opts?)`. Free-space path loss `L = (4πd/λ)²`, antenna gain `G = η(πD/λ)²`, `λ = c/f`. Defaults: X-band `f = 8.4 GHz`, `Pt = 20 W`, lander dish `D = 0.5 m, η = 0.55`, DSN `D = 34 m, η = 0.6`, `Tsys = 30 K`, required `Eb/N0 = 2 dB`, margin 3 dB, other losses 2 dB. `Pr = Pt·Gt·Gr/L/losses`, link capacity `C = Pr / (k·Tsys·(Eb/N0)·margin)`. Return `min(C, radioMaxBps)` with `radioMaxBps = 2e6` by default, because a small lander's radio, not the link, is the limit. Earth distance = norm of the Earth vector in `ephem.data` at that hour.
   - **Verify:** with the defaults at 384 400 km, `C` is about 3 Gbps (Gt ≈ 30 dBi, Gr ≈ 67 dBi, L ≈ 223 dB, Pr ≈ 4e-12 W), so the function returns the 2 Mbps radio cap. With `radioMaxBps: Infinity` it returns `C`. Document all assumptions in the function comment.
@@ -299,7 +299,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** if the Monte Carlo target lies inside a loaded fine field, sample horizons from it instead of the active field.
   - **Verify:** success odds at Connecting ridge B differ from the coarse result, and the panel says which resolution was used.
 
-- [ ] **53. North pole data** (S)
+- [x] **53. North pole data** (S) — taken: malqedra
   - **Files:** `pipeline/fetch_data.py`.
   - **Spec:** add the north-pole counterparts of the south polar LOLA products used (same PDS directory, `…_n_…` names) to `FILES`, with sizes.
   - **Verify:** `python fetch_data.py` downloads them.
