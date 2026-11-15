@@ -19,11 +19,11 @@ import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
 // How far the side panels reach into the 3D view on each side, in CSS px (0 where there are none).
 // Only the side columns count (the <aside> panels); a phone sheet spanning the width is not a side panel.
-function panelInsets(host: HTMLElement) {
+function panelInsets(host: HTMLElement, panels: Iterable<Element>) {
   const h = host.getBoundingClientRect();
   let left = 0;
   let right = 0;
-  for (const el of document.querySelectorAll<HTMLElement>("aside.left, aside.right")) {
+  for (const el of panels) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0 || r.width > h.width * 0.45) continue;
     if (r.left + r.width / 2 < h.left + h.width / 2) left = Math.max(left, r.right - h.left);
@@ -146,16 +146,25 @@ export default function Scene3D() {
   const leftId = splitPair?.[0].id;
   const rightId = splitPair?.[1].id;
   useEffect(() => {
-    if (!scene) return;
-    const insets = () => (host.current ? panelInsets(host.current) : { left: 0, right: 0 });
+    const viewport = host.current;
+    const app = viewport?.closest(".app");
+    if (!scene || !viewport || !app) return;
     if (!leftId || !rightId) {
       scene.setSplit(false);
       return;
     }
+
+    const panelSelector = ":scope > aside.left, :scope > aside.right";
+    const toolbarSelector = ":scope > .layer-bar";
+    let lastInsets: ReturnType<typeof panelInsets> | undefined;
     const fit = () => {
-      scene.setSplit(true, insets());
-      const bar = document.querySelector(".layer-bar");
-      if (bar && host.current) setTagTop(Math.round(bar.getBoundingClientRect().bottom - host.current.getBoundingClientRect().top) + 8);
+      const insets = panelInsets(viewport, app.querySelectorAll(panelSelector));
+      if (!lastInsets || insets.left !== lastInsets.left || insets.right !== lastInsets.right) {
+        scene.setSplit(true, insets);
+        lastInsets = insets;
+      }
+      const bar = app.querySelector(toolbarSelector);
+      if (bar) setTagTop(Math.round(bar.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top) + 8);
     };
     fit();
     const { pinned, selectedId, select } = useApp.getState();
@@ -165,24 +174,22 @@ export default function Scene3D() {
       else select(a.id);
     }
     if (b) scene.flySplitTo(b);
-    // Re-measure when anything that frames the two views changes size without a window resize: the layer bar
-    // (switching to a layer with range buttons adds a row) and the tool panels that replace the site list.
+    // Lazy tool panels can appear after the state change. Watch their DOM nodes once they mount.
+    const sizes = new ResizeObserver(fit);
+    const watchLayout = () => {
+      sizes.disconnect();
+      sizes.observe(viewport);
+      app.querySelectorAll(panelSelector + ", " + toolbarSelector).forEach((el) => sizes.observe(el));
+      fit();
+    };
+    const layout = new MutationObserver(watchLayout);
+    layout.observe(app, { childList: true, attributes: true, attributeFilter: ["class"] });
+    watchLayout();
     window.addEventListener("resize", fit);
-    const bar = document.querySelector(".layer-bar");
-    const ro = new ResizeObserver(() => fit());
-    if (bar) ro.observe(bar);
-    let timer = 0;
-    const unsub = useApp.subscribe((s, prev) => {
-      if (s.layer !== prev.layer || s.finderOpen !== prev.finderOpen || s.landerOpen !== prev.landerOpen || s.roverOpen !== prev.roverOpen || s.view !== prev.view) {
-        clearTimeout(timer);
-        timer = window.setTimeout(fit, 60);
-      }
-    });
     return () => {
       window.removeEventListener("resize", fit);
-      ro.disconnect();
-      unsub();
-      clearTimeout(timer);
+      layout.disconnect();
+      sizes.disconnect();
     };
   }, [scene, leftId, rightId]);
 
