@@ -299,7 +299,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** if the Monte Carlo target lies inside a loaded fine field, sample horizons from it instead of the active field.
   - **Verify:** success odds at Connecting ridge B differ from the coarse result, and the panel says which resolution was used.
 
-- [ ] **53. North pole data** (S)
+- [x] **53. North pole data** (S) — taken: malqedra
   - **Files:** `pipeline/fetch_data.py`.
   - **Spec:** add the north-pole counterparts of the south polar LOLA products used (same PDS directory, `…_n_…` names) to `FILES`, with sizes.
   - **Verify:** `python fetch_data.py` downloads them.
