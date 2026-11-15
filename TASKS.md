@@ -200,7 +200,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** `visibilityBits` stays on the main thread (WebGL). Transfer copies of `bits.sun`, `bits.link` and `field.slope` (the field keeps using its slope, and the originals allow a main-thread fallback if the worker can't load) and the needed `meta` fields to the worker; run `planRoute` there.
   - **Verify:** Plan route keeps the UI responsive; route identical to before for Connecting ridge B → Shackleton ridge A.
 
-- [ ] **34. Tile the 80 m polar file** (M)
+- [x] **34. Tile the 80 m polar file** (M)
   - **Files:** `pipeline/build_globe.py` (writes `polar_80m.bin.gz`), new output folder `web/public/data/polar80/`, `web/public/data/globe.json`.
   - **Spec:** split the 6250² grid into 8×8 tiles (782² each; last row/col may be smaller), each `int16` metres with row deltas, gzip, named `ty_tx.bin.gz`. Record `tile`, `tiles`, `size`, `cellMeters`, `firstCenterMeters` in `globe.json` under `polar80`. Keep `−32768` for missing.
   - **Verify:** reassembling the tiles in Python equals the old array exactly.
@@ -228,7 +228,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Spec:** currently `pointerdown` records only `button === 0` and `pointerup` checks movement < 4 px. Make it work for touch (`pointerType === "touch"`): use a 10 px threshold and ignore if a second pointer went down in between (pinch).
   - **Verify:** on a phone viewport, a tap adds a point; a drag or pinch doesn't.
 
-- [ ] **39. Focus outlines** (S)
+- [x] **39. Focus outlines** (S)
   - **Files:** `src/styles.css`.
   - **Spec:** `:focus-visible` outline (2 px, `rgba(139,156,255,0.9)`, offset 2 px) for `.btn`, `.chip`, `.icon-btn`, `.m-tab`, `.result`, list rows; don't remove outlines anywhere.
   - **Verify:** Tab through the page; every control shows the outline.
@@ -246,7 +246,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 5: Science upgrades
 
-- [ ] **42. Terrain view factor per cell** (M)
+- [x] **42. Terrain view factor per cell** (M)
   - **Files:** `src/gpu/thermal.ts`.
   - **Spec:** in `THERMAL_MAIN`, before the time loop, compute the fraction of the (cosine-weighted) sky covered by terrain from the horizon field: `F = (1/N) Σ_az sin²(max(h(az), 0))` over the `uAzBins` directions, using the existing `horizonAt(col, row, az)` (degrees). This is the radiative view factor from the cell to surrounding terrain.
   - **Verify:** temporarily output `F` in a channel: flat plains ≈ 0, crater floors (Shackleton floor) ≈ 0.05–0.15. Revert the debug output.
