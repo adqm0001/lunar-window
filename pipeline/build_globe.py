@@ -13,6 +13,7 @@ POLAR_EXTENT_M = 200_000.0
 POLAR_CELL_M = 240.0
 P80_EXTENT_M = 250_000.0
 P80_CELL_M = 80.0
+P80_TILES = 8
 MISSING = -32768
 
 
@@ -54,17 +55,50 @@ def build_polar80():
     xx, yy = np.meshgrid(coords, -coords)
     q = np.round(a).astype(np.int32)
     q[np.hypot(xx, yy) > 300_000] = MISSING
-    d = np.diff(q, axis=1, prepend=0)
-    d = ((d + 32768) % 65536 - 32768).astype("<i2")
-    (OUT / "polar_80m.bin.gz").write_bytes(gzip.compress(d.tobytes(), 6))
-    return 2 * half, first
+    (OUT / "polar_80m.bin.gz").write_bytes(gzip.compress(wrapped_deltas(q).tobytes(), 6))
+    tile = write_polar80_tiles(q)
+    return 2 * half, first, tile
+
+
+def wrapped_deltas(q):
+    d = np.diff(q.astype(np.int32), axis=1, prepend=0)
+    return ((d + 32768) % 65536 - 32768).astype("<i2")
+
+
+def write_polar80_tiles(q):
+    """The 80 m grid again as P80_TILES x P80_TILES tiles in polar80/ty_tx.bin.gz (same encoding, deltas restart
+    at each tile's first column), so the app can fetch the tiles near the camera first. The last row and column
+    of tiles are smaller."""
+    tile = -(-q.shape[0] // P80_TILES)
+    out = OUT / "polar80"
+    out.mkdir(parents=True, exist_ok=True)
+    for ty in range(P80_TILES):
+        for tx in range(P80_TILES):
+            t = q[ty * tile : (ty + 1) * tile, tx * tile : (tx + 1) * tile]
+            (out / f"{ty}_{tx}.bin.gz").write_bytes(gzip.compress(wrapped_deltas(t).tobytes(), 6))
+    return tile
+
+
+def polar80_meta(size, first, tile):
+    return {
+        "file": "polar_80m.bin.gz",
+        "size": size,
+        "cellMeters": P80_CELL_M,
+        "firstCenterMeters": first,
+        "missing": MISSING,
+        "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip",
+        "tiles": P80_TILES,
+        "tile": tile,
+        "tileDir": "polar80",
+        "tileLayout": "polar80/ty_tx.bin.gz: rows ty*tile.., cols tx*tile.. of the grid above (last row/column of tiles smaller), same encoding with deltas restarting at each tile's first column",
+    }
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     gshape = build_globe()
     psize, first = build_polar()
-    p80size, p80first = build_polar80()
+    p80size, p80first, p80tile = build_polar80()
     meta = {
         "globe": {
             "file": "globe_16ppd.bin.gz",
@@ -81,14 +115,7 @@ def main():
             "firstCenterMeters": first,
             "layout": "int16 meters [row][col], south polar stereographic like the field (row 0 = +y); deltas along each row; gzip",
         },
-        "polar80": {
-            "file": "polar_80m.bin.gz",
-            "size": p80size,
-            "cellMeters": P80_CELL_M,
-            "firstCenterMeters": p80first,
-            "missing": MISSING,
-            "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip",
-        },
+        "polar80": polar80_meta(p80size, p80first, p80tile),
         "color": {"file": "moon_color_8k.jpg", "preview": "moon_color_1k.jpg", "layout": "equirectangular, left edge = lon -180, NASA SVS CGI Moon Kit (LRO LROC)"},
     }
     (OUT / "globe.json").write_text(json.dumps(meta, indent=2))

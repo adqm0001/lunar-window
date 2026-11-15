@@ -20,7 +20,11 @@
     "cellMeters": 80.0,
     "firstCenterMeters": -249960.0,
     "missing": -32768,
-    "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip"
+    "layout": "int16 meters [row][col] (LDEM_80S_40M averaged 2x2), south polar stereographic, row 0 = +y; deltas along rows (wrapping int16); gzip",
+    "tiles": 8,
+    "tile": 782,
+    "tileDir": "polar80",
+    "tileLayout": "polar80/ty_tx.bin.gz: rows ty*tile.., cols tx*tile.. of the grid above (last row/column of tiles smaller), same encoding with deltas restarting at each tile's first column"
   },
   "color": {
     "file": "moon_color_8k.jpg",

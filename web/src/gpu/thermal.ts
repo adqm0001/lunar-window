@@ -59,6 +59,17 @@ void main() {
   float dE = dot(g, vec2(cos(lon), -sin(lon)));
   vec3 nrm = normalize(up - dE * east - dN * north);
 
+  // Horizontal-surface approximation: 1 - F_sky in HORAYZON (2022), Eq. (5).
+  // https://doi.org/10.5194/gmd-15-6817-2022
+  // Negative horizons leave the upper hemisphere unobstructed.
+  float F = 0.0;
+  for (int a = 0; a < uAzBins; a++) {
+    float az = float(a) * 360.0 / float(uAzBins);
+    float sinH = sin(radians(max(horizonAt(col, row, az), 0.0)));
+    F += sinH * sinH;
+  }
+  F /= float(uAzBins);
+
   // layer thicknesses grow with depth; node i sits at depth z[i]
   float dz[NZ];
   float z[NZ];
