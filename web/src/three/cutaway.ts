@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { R_MOON_KM } from "../lib/astro";
 import { MOON_CENTER } from "./globe";
+import { spreadLabels } from "./labelLayout";
 
 export const LAYERS = [
   { name: "Solid inner core", detail: "iron-rich, ~240 km radius", r0: 0, r1: 240 },
@@ -54,6 +55,16 @@ export class Cutaway {
   b = new THREE.Vector3(0, 0, 1);
   private faces: THREE.Mesh[] = [];
   private labels: CSS2DObject[] = [];
+  private boxes: HTMLElement[] = [];
+  private lines: HTMLElement[] = [];
+  private heights: number[] = [];
+  private widths: number[] = [];
+  private scratch = new THREE.Vector3();
+  // Box sizes come from a ResizeObserver: it reports each box once it is in the page (CSS2DRenderer adds it on the
+  // first render) and again if fonts load late or the text size changes; the scene only renders on demand, so
+  // onResize asks it for another frame to lay the labels out with the real sizes.
+  private sizes: ResizeObserver | null = null;
+  onResize: (() => void) | null = null;
 
   constructor() {
     for (let k = 0; k < 2; k++) {
@@ -70,14 +81,36 @@ export class Cutaway {
       this.group.add(mesh);
     }
     for (const l of LAYERS) {
+      // a zero-size anchor on the layer: a dot, a leader line and the text box, which layout() may move up or down
       const el = document.createElement("div");
       el.className = "layer-label";
-      el.innerHTML = `<b>${l.name}</b><span>${l.detail}</span>`;
+      el.innerHTML = `<span class="ll-dot" aria-hidden="true"></span><span class="ll-line" aria-hidden="true"></span><div class="ll-box"><b>${l.name}</b><span>${l.detail}</span></div>`;
       const obj = new CSS2DObject(el);
       this.labels.push(obj);
+      this.boxes.push(el.querySelector(".ll-box") as HTMLElement);
+      this.lines.push(el.querySelector(".ll-line") as HTMLElement);
+      this.heights.push(0);
+      this.widths.push(0);
       this.group.add(obj);
     }
     this.group.visible = false;
+    if (typeof ResizeObserver !== "undefined") {
+      this.sizes = new ResizeObserver(() => {
+        let changed = false;
+        this.boxes.forEach((b, i) => {
+          if (!b.isConnected) return;
+          if (b.offsetHeight !== this.heights[i] || b.offsetWidth !== this.widths[i]) changed = true;
+          this.heights[i] = b.offsetHeight;
+          this.widths[i] = b.offsetWidth;
+        });
+        if (changed) this.onResize?.();
+      });
+      for (const b of this.boxes) this.sizes.observe(b);
+    }
+  }
+
+  dispose() {
+    this.sizes?.disconnect();
   }
 
   orient(camera: THREE.Camera) {
@@ -101,6 +134,45 @@ export class Cutaway {
       const r = l.r1 === R_MOON_KM ? R_MOON_KM - 8 : (l.r0 + l.r1) / 2;
       const dir = along.clone().multiplyScalar(Math.cos(0.5 + i * 0.12)).add(up.clone().multiplyScalar(Math.sin(0.5 + i * 0.12) * 0.25)).normalize();
       this.labels[i].position.copy(MOON_CENTER).addScaledVector(dir, r);
+    });
+  }
+
+  /**
+   * The inner layers are only ~120 km apart, a few pixels on screen from orbit, so their boxes would overlap. Each
+   * box sits to the right of its layer's dot with a leader line; boxes that would collide are spread apart
+   * vertically and lined up in one column right of the group's dots, so no box covers a dot. Call before the labels
+   * are rendered, with the size of the label layer in CSS pixels.
+   */
+  layout(camera: THREE.Camera, width: number, height: number) {
+    if (!this.group.visible) return;
+    if (!(width > 0 && height > 0)) return;
+    // where CSS2DRenderer puts each label; one it hides (outside the depth range, e.g. behind the camera) gets NaN
+    // so it doesn't push the visible ones around
+    const pts = this.labels.map((o) => {
+      const v = o.getWorldPosition(this.scratch).project(camera);
+      return v.z < -1 || v.z > 1 ? [NaN, NaN] : [(v.x + 1) * 0.5 * width, (1 - v.y) * 0.5 * height];
+    });
+    // until the observer has measured a box (before its first render) use typical sizes; it then re-renders
+    const hs = this.heights.map((h) => h || 37);
+    const ws = this.widths.map((w) => w || 160);
+    const { dy, group } = spreadLabels(
+      pts.map((q) => q[1]),
+      hs,
+      4,
+    );
+    const colX = new Map<number, number>();
+    pts.forEach((q, i) => colX.set(group[i], Math.max(colX.get(group[i]) ?? -Infinity, q[0])));
+    pts.forEach((q, i) => {
+      if (!Number.isFinite(q[0]) || !Number.isFinite(q[1])) return;
+      // keep the box on screen (on a phone the Moon's rim can be wider than the screen); boxes are already apart
+      // vertically, so this can't make them overlap
+      const left = Math.max(8, Math.min(width - ws[i] - 8, colX.get(group[i])! + 14));
+      const dx = left - q[0];
+      this.boxes[i].style.transform = `translate(${dx.toFixed(1)}px, calc(-50% + ${dy[i].toFixed(1)}px))`;
+      // leader line from the dot to the middle of the box's left edge
+      const line = this.lines[i].style;
+      line.width = `${Math.hypot(dx, dy[i]).toFixed(1)}px`;
+      line.transform = `rotate(${Math.atan2(dy[i], dx).toFixed(4)}rad)`;
     });
   }
 

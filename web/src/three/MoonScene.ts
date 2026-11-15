@@ -186,6 +186,7 @@ export class MoonScene {
     this.stars = this.makeStars();
     this.scene.add(this.stars);
     this.scene.add(this.cutaway.group);
+    this.cutaway.onResize = () => (this.dirty = true);
     this.scene.add(this.lander.group, this.lander.lights);
 
     const { geometry } = this.makeTerrain();
@@ -1186,6 +1187,10 @@ export class MoonScene {
       this.renderPass.camera = this.camera;
       this.composer.render();
     }
+    if (this.cutOn && !this.cutPending) {
+      const size = this.labels.getSize();
+      this.cutaway.layout(this.camera, size.width, size.height);
+    }
     this.labels.render(this.scene, this.camera);
     recordRenderedFrame(now);
   };
@@ -1796,6 +1801,7 @@ export class MoonScene {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
+    this.cutaway.dispose();
     this.controls.dispose();
     this.split?.controls.dispose();
     this.splitEl?.remove();
