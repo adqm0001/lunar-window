@@ -78,7 +78,7 @@ describe("site contact data coverage", () => {
     const html = contacts(data, 1079);
     expect(html).toContain("Earth contact · available 1 h");
     expect(html).toContain("2025-03-31 23:00 UTC");
-    expect(html).toContain("1 h of contact · 1 passes");
+    expect(html).toMatch(/1 h of contact · 1 pass\b/);
     expect(html).toContain("0.9 GB");
   });
 
