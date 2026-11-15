@@ -5,6 +5,7 @@ import { useSites } from "../state/selectors";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { ARTEMIS_REGIONS, ARTEMIS_SOURCE } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
+import { REPLAYS } from "../data/load";
 
 const WINDOW_HOURS = 24 * 30;
 
@@ -75,6 +76,23 @@ export default function SiteList() {
           ))}
         </div>
       ))}
+      {/* A replay reloads the page with its own ephemeris (see REPLAYS in data/load.ts); exiting reloads without it. */}
+      <div className="section-label">{data.replay ? `Replaying ${data.replay.name}` : "Mission replays"}</div>
+      {data.replay ? (
+        <button className="site-row" onClick={() => location.assign(location.pathname)} title="Reload with the 2026–2028 Sun and Earth positions">
+          <span className="name">Exit the {data.replay.name} replay</span>
+          <span className="meta">↩</span>
+        </button>
+      ) : (
+        <button
+          className="site-row"
+          onClick={() => location.assign(`${location.pathname}?replay=${REPLAYS.im2.id}`)}
+          title="Reloads with the Sun and Earth positions of February–March 2025, jumps to Athena's landing on 6 March 2025, shows the lander and plays"
+        >
+          <span className="name">Replay {REPLAYS.im2.name} (Athena, 6 Mar 2025)</span>
+          <span className="meta">▶</span>
+        </button>
+      )}
       <div className="section-label" title={ARTEMIS_SOURCE}>
         Artemis III candidate regions
       </div>
