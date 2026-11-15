@@ -12,7 +12,7 @@ import type { Site } from "../data/load";
 import type { Vec3 } from "../lib/astro";
 import { toLatLon, toMap } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
-import type { GlobeData } from "../data/globe";
+import type { GlobeData, Polar80Tile } from "../data/globe";
 import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
@@ -591,6 +591,40 @@ export class MoonScene {
 
   refreshPolar80() {
     this.lod?.refreshPolar80();
+    this.dirty = true;
+  }
+
+  // Where to load 80 m polar terrain first: the point the camera looks at, if it's near the pole.
+  polarFocus(): [number, number] | null {
+    const [lat, lon] = latLonFromWorld(this.orbitMode ? this.camera.position : this.controls.target);
+    return lat < -80 ? toMap(lat, lon) : null;
+  }
+
+  // The full-size 80 m grid now exists (still mostly empty): give the terrain a texture that size.
+  beginPolar80() {
+    this.refreshPolar80();
+  }
+
+  // One 80 m tile arrived: upload just its square to the GPU and rebuild the terrain over it.
+  applyPolar80Tile(t: Polar80Tile) {
+    const g = this.globe;
+    if (!this.lod || !g) return;
+    const dst = this.lod.polar80Texture;
+    if (dst.image.width !== g.p80Size) {
+      this.lod.refreshPolar80();
+    } else {
+      const src = new THREE.DataTexture(t.data, t.w, t.h, THREE.RedIntegerFormat, THREE.ShortType);
+      src.internalFormat = "R16I";
+      src.unpackAlignment = 1;
+      src.flipY = false;
+      this.renderer.copyTextureToTexture(src, dst, null, new THREE.Vector2(t.x0, t.y0));
+      src.dispose();
+    }
+    const x0 = g.p80First + t.x0 * g.p80Cell;
+    const x1 = g.p80First + (t.x0 + t.w) * g.p80Cell;
+    const y1 = -g.p80First - t.y0 * g.p80Cell;
+    const y0 = -g.p80First - (t.y0 + t.h) * g.p80Cell;
+    this.lod.markPolar80Rect(x0, y0, x1, y1);
     this.dirty = true;
   }
 
