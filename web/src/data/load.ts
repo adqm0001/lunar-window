@@ -31,6 +31,40 @@ export interface Ephemeris {
 export interface AppData {
   ephem: Ephemeris;
   sites: Site[];
+  /** Set when the app was opened as a historical replay (`?replay=<id>`): the ephemeris is that replay's. */
+  replay: Replay | null;
+}
+
+/** A historical replay: its own ephemeris files (pipeline/ephemeris.py), the moment it starts at and its site. */
+export interface Replay {
+  id: string;
+  name: string;
+  /** ephem<suffix>.json / .bin, with the DSN file named in that metadata */
+  suffix: string;
+  startUtc: string;
+  siteId: string;
+}
+
+export const REPLAYS: Record<string, Replay> = {
+  im2: {
+    id: "im2",
+    name: "IM-2",
+    suffix: "_2025",
+    // Athena touched down at about 11:30 a.m. CST (17:30 UTC) on 6 March 2025: Intuitive Machines, "Intuitive
+    // Machines Lands and Operates Second Mission on the Moon", 6 March 2025,
+    // https://investors.intuitivemachines.com/news-releases/news-release-details/intuitive-machines-lands-and-operates-second-mission-moon
+    // (NASA's coverage advisory listed landing at 12:30 p.m. EST, the same time). It came down on its side in a
+    // crater about 250 m from this target, and with "the direction of the Sun, the orientation of the solar panels,
+    // and extreme cold temperatures in the crater" did not recharge (Intuitive Machines, 7 March 2025).
+    startUtc: "2025-03-06T17:30:00Z",
+    siteId: "im2-athena",
+  },
+};
+
+/** The replay named in the page URL (`?replay=im2`), if any. */
+export function replayFromUrl(): Replay | null {
+  const id = new URLSearchParams(location.search).get("replay");
+  return (id && REPLAYS[id]) || null;
 }
 
 const base = `${import.meta.env.BASE_URL}data/`;
@@ -63,23 +97,26 @@ async function fetchJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-const EXPECTED_BYTES = 631296 + 78912;
-
 export async function loadAppData(onProgress: (fraction: number, label: string) => void): Promise<AppData> {
+  const replay = replayFromUrl();
+  const suffix = replay?.suffix ?? "";
+  onProgress(0, "Ephemeris");
+  const meta = await fetchJson<{ start: string; stepHours: number; count: number; dsn: { stations: Station[]; file?: string } }>(`ephem${suffix}.json`);
+  // float32 x 6 per hour for the vectors, one int8 per station per hour for DSN
+  const expectedBytes = meta.count * (24 + meta.dsn.stations.length);
   let bytes = 0;
   const tick = (label: string) => (n: number) => {
     bytes += n;
-    onProgress(Math.min(0.95, bytes / EXPECTED_BYTES), label);
+    onProgress(Math.min(0.95, bytes / expectedBytes), label);
   };
-  onProgress(0, "Ephemeris");
-  const meta = await fetchJson<{ start: string; stepHours: number; count: number; dsn: { stations: Station[] } }>("ephem.json");
   const [ephemBuf, dsnBuf, sitesJson] = await Promise.all([
-    fetchWithProgress("ephem.bin", tick("Sun and Earth positions")),
-    fetchWithProgress("dsn.bin", tick("Deep Space Network")),
+    fetchWithProgress(`ephem${suffix}.bin`, tick("Sun and Earth positions")),
+    fetchWithProgress(meta.dsn.file ?? `dsn${suffix}.bin`, tick("Deep Space Network")),
     fetchJson<{ sites: Site[] }>("sites.json"),
   ]);
   onProgress(1, "Ready");
   return {
+    replay,
     ephem: {
       startMs: Date.parse(meta.start),
       stepHours: meta.stepHours,
