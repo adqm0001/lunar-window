@@ -18,13 +18,14 @@ import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
 
 
 // How far the side panels reach into the 3D view on each side, in CSS px (0 where there are none).
+// Only the side columns count (the <aside> panels); a phone sheet spanning the width is not a side panel.
 function panelInsets(host: HTMLElement) {
   const h = host.getBoundingClientRect();
   let left = 0;
   let right = 0;
-  for (const el of document.querySelectorAll<HTMLElement>(".left, .right")) {
+  for (const el of document.querySelectorAll<HTMLElement>("aside.left, aside.right")) {
     const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) continue;
+    if (r.width === 0 || r.height === 0 || r.width > h.width * 0.45) continue;
     if (r.left + r.width / 2 < h.left + h.width / 2) left = Math.max(left, r.right - h.left);
     else right = Math.max(right, h.right - r.left);
   }
@@ -35,6 +36,8 @@ export default function Scene3D() {
   const host = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<MoonScene | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Top of the split-view site names: just under the layer bar, which wraps to more rows on narrow screens.
+  const [tagTop, setTagTop] = useState(84);
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const globe = useApp((s) => s.globe);
@@ -149,7 +152,12 @@ export default function Scene3D() {
       scene.setSplit(false);
       return;
     }
-    scene.setSplit(true, insets());
+    const fit = () => {
+      scene.setSplit(true, insets());
+      const bar = document.querySelector(".layer-bar");
+      if (bar && host.current) setTagTop(Math.round(bar.getBoundingClientRect().bottom - host.current.getBoundingClientRect().top) + 8);
+    };
+    fit();
     const { pinned, selectedId, select } = useApp.getState();
     const [a, b] = [pinned.find((p) => p.id === leftId), pinned.find((p) => p.id === rightId)];
     if (a) {
@@ -157,9 +165,8 @@ export default function Scene3D() {
       else select(a.id);
     }
     if (b) scene.flySplitTo(b);
-    const onResize = () => scene.setSplit(true, insets());
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [scene, leftId, rightId]);
 
   useEffect(() => {
@@ -260,8 +267,8 @@ export default function Scene3D() {
       )}
       {splitPair && (
         <>
-          <div className="split-tag left">{splitPair[0].name}</div>
-          <div className="split-tag right">{splitPair[1].name}</div>
+          <div className="split-tag split-tag-l" style={{ top: tagTop }}>{splitPair[0].name}</div>
+          <div className="split-tag split-tag-r" style={{ top: tagTop }}>{splitPair[1].name}</div>
         </>
       )}
       {!field && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}

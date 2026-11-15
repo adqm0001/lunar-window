@@ -177,8 +177,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .compare.compact .compare-head { margin-bottom: 0; }
 .split-view { position: absolute; top: 0; bottom: 0; left: 50%; right: 0; z-index: 1; border-left: 1px solid rgba(255,255,255,0.28); touch-action: none; }
 .split-tag { position: absolute; top: 84px; z-index: 2; pointer-events: none; font: 600 12px var(--sans); letter-spacing: 0.02em; color: var(--text); background: rgba(6,8,14,0.72); border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 10px; white-space: nowrap; }
-.split-tag.left { right: calc(50% + 10px); }
-.split-tag.right { left: calc(50% + 10px); }
+.split-tag-l { right: calc(50% + 10px); }
+.split-tag-r { left: calc(50% + 10px); }
 .compare-scroll { overflow: auto; }
 .compare-table { border-collapse: collapse; width: 100%; font-size: 11.5px; }
 .compare-table th { text-align: left; padding: 4px 10px 6px; vertical-align: top; position: relative; border-bottom: 1px solid var(--line); min-width: 120px; }
