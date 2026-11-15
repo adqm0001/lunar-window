@@ -6,7 +6,7 @@ export interface GlobalOverlay {
   south: HTMLCanvasElement;
   north: HTMLCanvasElement;
 }
-import { paintGlobal, THERMAL_LAYERS, type LayerId } from "./layers";
+import { paintGlobal, THERMAL_LAYERS, type LayerId, type Palette } from "./layers";
 import { useApp } from "../state/store";
 
 // Runs the whole-Moon engine on request and turns the result into an overlay image.
@@ -15,7 +15,12 @@ import { useApp } from "../state/store";
 let engine: GlobalLayers | null = null;
 let engineError: string | null = null;
 const cache = new Map<string, GlobalMetrics>();
-let lastMetrics: { layer: LayerId; m: GlobalMetrics } | null = null;
+export interface GlobalPaintSource {
+  layer: LayerId;
+  m: GlobalMetrics;
+}
+
+let lastMetrics: GlobalPaintSource | null = null;
 
 export function globalRequest(layer: LayerId, hour: number, rangeDays: number) {
   const kind: "light" | "thermal" = THERMAL_LAYERS.includes(layer) ? "thermal" : "light";
@@ -54,44 +59,26 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
   return m;
 }
 
-export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalOverlay | null> {
-  const st = useApp.getState();
-  if (!st.globe || !st.data) return null;
+export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalPaintSource | null> {
   const req = globalRequest(layer, hour, rangeDays);
-  let m = cache.get(req.key);
-  if (!m) {
-    if (!engine && !engineError) {
-      st.setGlobalStatus("Building horizons for the whole Moon on your GPU (one time)…");
-      await new Promise((r) => setTimeout(r, 30));
-      try {
-        engine = new GlobalLayers(st.globe, st.data.ephem);
-      } catch (e) {
-        engineError = (e as Error).message;
-      }
-    }
-    if (!engine) {
-      st.setGlobalStatus(engineError);
-      return null;
-    }
-    st.setGlobalStatus(req.kind === "thermal" ? "Running the soil heat model for the whole Moon…" : "Computing the whole Moon…");
-    await new Promise((r) => setTimeout(r, 30));
-    m = engine.compute(req.kind, req.start, req.hours);
-    if (cache.size > 6) cache.clear();
-    cache.set(req.key, m);
-  }
-  lastMetrics = { layer, m };
+  const m = await getGlobalMetrics(req.kind, req.start, req.hours);
+  return m ? { layer, m } : null;
+}
+
+export function paintGlobalOverlay(source: GlobalPaintSource, palette: Palette): GlobalOverlay {
+  const { layer, m } = source;
+  lastMetrics = source;
   const paint = (grid: GridData) => {
     const c = document.createElement("canvas");
     c.width = grid.w;
     c.height = grid.h;
     const g = c.getContext("2d")!;
     const img = g.createImageData(grid.w, grid.h);
-    paintGlobal(layer, grid.data, grid.w, grid.h, img);
+    paintGlobal(layer, grid.data, grid.w, grid.h, img, palette);
     g.putImageData(img, 0, 0);
     return c;
   };
   const byId = (id: string) => m!.grids.find((g) => g.id === id)!;
-  useApp.getState().setGlobalStatus(null);
   useApp.getState().setGlobalInfo({ points: m.points, steps: Math.round(m.hours / m.stride), millis: m.millis, horizonMillis: engine?.horizonMillis ?? 0 });
   return { eq: paint(byId("eq")), south: paint(byId("south")), north: paint(byId("north")) };
 }

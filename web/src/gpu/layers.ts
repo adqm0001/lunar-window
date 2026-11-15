@@ -2,6 +2,9 @@ import type { FieldData } from "../data/field";
 import type { FieldMetrics } from "./engine";
 
 export type LayerId = "terrain" | "now" | "sun" | "earth" | "link" | "night" | "slope" | "temp" | "ice" | "score" | "survive";
+export type Palette = "default" | "viridis";
+
+export const PALETTE_LAYERS: LayerId[] = ["sun", "earth", "link", "night", "temp"];
 
 export const THERMAL_LAYERS: LayerId[] = ["temp", "ice"];
 
@@ -26,6 +29,12 @@ export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
 const TEMP: Stop[] = [[0, 30, 20, 90], [0.14, 40, 90, 220], [0.28, 60, 200, 230], [0.48, 240, 220, 90], [0.72, 250, 110, 50], [0.9, 220, 40, 60], [1, 255, 200, 220]];
 const ICE: Stop[] = [[0, 20, 40, 120], [0.5, 60, 140, 255], [1, 190, 250, 255]];
+// Viridis samples from https://github.com/BIDS/colormap/blob/master/colormaps.py (CC0).
+const VIRIDIS: Stop[] = [
+  [0, 68, 1, 84], [32 / 255, 71, 45, 123], [64 / 255, 59, 82, 139],
+  [96 / 255, 44, 114, 142], [128 / 255, 33, 145, 140], [160 / 255, 40, 174, 128],
+  [192 / 255, 94, 201, 98], [224 / 255, 173, 220, 48], [1, 253, 231, 37],
+];
 export const TEMP_MIN = 20;
 export const TEMP_MAX = 400;
 export const ICE_MAX_DEPTH = 0.8;
@@ -44,7 +53,10 @@ export const LAYERS: LayerDef[] = [
   { id: "slope", label: "Safe to land", short: "Slope", ranged: false, stops: SLOPE, legend: ["steep", "flat"], describe: "Share of each 250 m cell with slope under 10°" },
 ];
 
-export const layerDef = (id: LayerId) => LAYERS.find((l) => l.id === id)!;
+export const layerDef = (id: LayerId, palette: Palette = "default"): LayerDef => {
+  const def = LAYERS.find((l) => l.id === id)!;
+  return palette === "viridis" && PALETTE_LAYERS.includes(id) ? { ...def, stops: VIRIDIS } : def;
+};
 
 function sample(stops: Stop[], t: number): [number, number, number] {
   const v = Math.max(0, Math.min(1, t));
@@ -126,10 +138,10 @@ export function paintSurvival(m: FieldMetrics, img: ImageData) {
   }
 }
 
-export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img: ImageData) {
+export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img: ImageData, palette: Palette = "default") {
   const n = field.meta.horizon.size;
   const px = img.data;
-  const def = layerDef(id);
+  const def = layerDef(id, palette);
   for (let i = 0; i < n * n; i++) {
     const v = layerValue(id, m, field, i);
     const o = i * 4;
@@ -178,8 +190,8 @@ export function paint(id: LayerId, m: FieldMetrics | null, field: FieldData, img
 export const GLOBAL_LAYERS: LayerId[] = ["sun", "earth", "link", "night", "temp", "ice"];
 
 // Colors a whole-Moon grid (row 0 = north, column 0 = 180°W) with the same palettes.
-export function paintGlobal(id: LayerId, data: Float32Array, w: number, h: number, img: ImageData) {
-  const def = layerDef(id);
+export function paintGlobal(id: LayerId, data: Float32Array, w: number, h: number, img: ImageData, palette: Palette = "default") {
+  const def = layerDef(id, palette);
   const px = img.data;
   const ch = id === "sun" || id === "temp" ? 0 : id === "earth" ? 1 : id === "link" ? 2 : 3;
   for (let i = 0; i < w * h; i++) {
