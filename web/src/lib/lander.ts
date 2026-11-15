@@ -115,6 +115,39 @@ export function sunTrack(e: Ephemeris, site: Site): SunTrack {
   return t;
 }
 
+/** The settings a survival map was simulated with. The map models every non-flat panel as Sun-tracking. */
+export interface SurvivalInputs {
+  start: number;
+  hours: number;
+  panelW: number;
+  batteryWh: number;
+  dayLoadW: number;
+  nightLoadW: number;
+  minSocPct: number;
+  horizontal: boolean;
+}
+
+export function survivalInputs(lander: Lander, start: number, hours: number): SurvivalInputs {
+  const { panelW, batteryWh, dayLoadW, nightLoadW, minSocPct } = lander;
+  return { start, hours, panelW, batteryWh, dayLoadW, nightLoadW, minSocPct, horizontal: lander.panel === "horizontal" };
+}
+
+const INPUT_NAMES: [keyof SurvivalInputs, string][] = [
+  ["start", "start time"],
+  ["hours", "mission length"],
+  ["horizontal", "panel mounting"],
+  ["panelW", "panel power"],
+  ["batteryWh", "battery"],
+  ["dayLoadW", "sunlit load"],
+  ["nightLoadW", "dark load"],
+  ["minSocPct", "dead-below level"],
+];
+
+/** Names of the settings that differ between a computed map and the current form, in form order. */
+export function changedSurvivalInputs(was: SurvivalInputs, now: SurvivalInputs): string[] {
+  return INPUT_NAMES.filter(([k]) => was[k] !== now[k]).map(([, name]) => name);
+}
+
 /** NaN means the requested hourly mission is not fully covered by the track. */
 export function survivedFraction(t: SunTrack, lander: Lander, start: number, hours: number): number {
   const available = Math.min(t.frac.length, t.az.length, t.el.length);

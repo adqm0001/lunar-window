@@ -4,6 +4,8 @@ import { percentOn } from "../lib/visibility";
 import { getSeries, getThermal, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
 import { ephemYears } from "../lib/years";
+import { iceVerdictPossible } from "../gpu/thermal";
+import { thermalSpanLabel } from "../lib/siteThermal";
 
 // Results of the offline pipeline run for 2020 (pipeline/validate_illumination.py), same year as
 // the published study. The 2026 column is recomputed live in the browser.
@@ -119,7 +121,10 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
                   <td>Shackleton crater floor (never sunlit)</td>
                   <td>below 110 K all year: a cold trap</td>
                   <td>
-                    {Math.round(thermal.b.min)}–{Math.round(thermal.b.max)} K · ice {thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}
+                    {Math.round(thermal.b.min)}–{Math.round(thermal.b.max)} K ·{" "}
+                    {iceVerdictPossible(thermal.b.hours)
+                      ? `ice ${thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}`
+                      : `over ${thermalSpanLabel(thermal.b.hours)} only: no full-year ice verdict`}
                   </td>
                 </tr>
               )}
@@ -127,8 +132,10 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           </table>
           <p className="muted">
             Sources: Williams et al. 2017 (Icarus) for global Diviner temperatures; Paige et al. 2010 (Science) for polar cold traps; soil properties from Hayne
-            et al. 2017; light and heat bounced off crater walls from Ingersoll et al. 1992 (Icarus). Both are a full year of hourly heat flow, run in your
-            browser.
+            et al. 2017; light and heat bounced off crater walls from Ingersoll et al. 1992 (Icarus).{" "}
+            {thermal.b && !iceVerdictPossible(thermal.b.hours)
+              ? `Both are hourly heat flow over the ${thermalSpanLabel(thermal.b.hours)} of data available, run in your browser.`
+              : "Both are a full year of hourly heat flow, run in your browser."}
           </p>
         </section>
 

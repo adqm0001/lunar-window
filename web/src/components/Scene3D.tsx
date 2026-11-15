@@ -12,6 +12,7 @@ import { formatLayerValue, layerValue } from "../gpu/layers";
 import { fieldCell } from "../data/field";
 import { formatLatLon } from "../lib/astro";
 import { GLOBAL_LAYERS } from "../gpu/layers";
+import { iceCovered } from "../gpu/thermal";
 import { addPointAt } from "../lib/points";
 import { applyLate, registerScene, sharedCamera } from "../state/share";
 import { useSelectedSite, useSiteState, useSites } from "../state/selectors";
@@ -206,7 +207,9 @@ export default function Scene3D() {
       useApp.getState().setGlobalInfo(null);
       return;
     }
-    if (playing) return;
+    // Playback freezes the whole-Moon map, except that the ice map is taken down as soon as the year it needs runs
+    // past the end of the data (computeGlobal returns null at once then).
+    if (playing && !(layer === "ice" && !iceCovered(data.ephem.count, day * 24))) return;
     let cancelled = false;
     computeGlobal(layer, day * 24, rangeDays).then((source) => {
       if (!cancelled) {
@@ -217,7 +220,7 @@ export default function Scene3D() {
     return () => {
       cancelled = true;
     };
-  }, [scene, globe, layer, rangeDays, day, playing]);
+  }, [scene, globe, layer, rangeDays, day, playing, data]);
 
   // Repaint the displayed window even while playback freezes new GPU calculations.
   useEffect(() => {

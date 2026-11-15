@@ -798,14 +798,12 @@ void main() {
   if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
-  // Longitude jumps by 360 degrees at the antimeridian, which made the GPU pick the blurriest mip level
-  // along that line (a dashed seam down the Moon). Take the texture gradients from the unwrapped longitude.
-  float dlx = dFdx(lon);
-  float dly = dFdy(lon);
-  dlx -= 360.0 * round(dlx / 360.0);
-  dly -= 360.0 * round(dly / 360.0);
-  vec2 uvDx = vec2(dlx / 360.0, dFdx(lat) / 180.0);
-  vec2 uvDy = vec2(dly / 360.0, dFdy(lat) / 180.0);
+  // uv.x jumps from 1 to 0 at longitude ±180°, which would make the GPU pick the smallest mip level along that
+  // line. Take the x derivative from a copy shifted by half a turn wherever that copy is continuous.
+  vec2 uvDx = dFdx(uv), uvDy = dFdy(uv);
+  float uxs = fract(uv.x + 0.5);
+  float sDx = dFdx(uxs), sDy = dFdy(uxs);
+  if (abs(sDx) + abs(sDy) < abs(uvDx.x) + abs(uvDy.x)) { uvDx.x = sDx; uvDy.x = sDy; }
   vec3 mapAlbedo = textureGrad(uColor, uv, uvDx, uvDy).rgb * 0.30;
   float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
   vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
@@ -840,7 +838,7 @@ void main() {
 
   if (any(isnan(col))) col = vec3(0.0);
   if (uGOverlayMix > 0.0) {
-    vec4 o = textureGrad(uGOverlay, uv, uvDx, uvDy);
+    vec4 o = texture(uGOverlay, uv);
     // near either pole switch to the polar grids (square cells instead of thin wedges)
     float kp = 2.0 * R_M * tan((PI / 2.0 - abs(latR)) / 2.0);
     vec2 pm = vec2(kp * sin(lonR), kp * cos(lonR));
