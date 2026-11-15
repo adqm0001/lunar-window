@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FieldData } from "../data/field";
+import type { Site } from "../data/load";
 
 type Build = { label: string; resolve: (f: FieldData) => void; reject: (e: Error) => void; progress: (p: number) => void };
 
@@ -13,10 +14,14 @@ vi.mock("./regionField", () => ({
   buildRegionField: (_g: unknown, opts: { label: string }, progress: (p: number) => void) =>
     new Promise((resolve, reject) => builds.push({ label: opts.label, resolve, reject, progress })),
 }));
-// The pole field covers |x|, |y| < 100 km of map coordinates.
+// The pole field covers |x|, |y| < 100 km of map coordinates and a region field covers everything. Picking a point
+// in a region field returns a site tagged with that field's label, so tests can see which field refined it.
 vi.mock("../data/field", () => ({
-  inField: (f: unknown, x: number, y: number) => f === pole && Math.abs(x) < 100000 && Math.abs(y) < 100000,
-  customSiteAt: () => null,
+  inField: (f: unknown, x: number, y: number) => f !== pole || (Math.abs(x) < 100000 && Math.abs(y) < 100000),
+  customSiteAt: (f: { meta: { label: string } }) =>
+    f === pole
+      ? null
+      : { id: "picked", name: "Custom point", lat: -81, lon: 10, group: "Custom", terrain: true, height_m: 0, horizon: [], refinedBy: f.meta.label },
 }));
 
 const field = (label: string) => ({ meta: { label } }) as unknown as FieldData;
@@ -34,6 +39,10 @@ async function fresh() {
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
+
+const point: Site = { id: "custom:point", name: "My point", lat: -81, lon: 10, group: "Custom", terrain: true, height_m: 0, horizon: [] };
+const refinedBy = (useApp: Awaited<ReturnType<typeof fresh>>["useApp"]) =>
+  (useApp.getState().customSites.find((c) => c.id === point.id) as (Site & { refinedBy?: string }) | undefined)?.refinedBy;
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -148,5 +157,36 @@ describe("analyzeArea request ordering", () => {
     builds[1].reject(new Error("GPU lost"));
     await pC;
     expect(useApp.getState().regionStatus).toEqual({ label: "Region C", progress: 1, error: "GPU lost" });
+  });
+
+  it("treats a second request for the region already building as the same build", async () => {
+    const { useApp, analyzeArea, label } = await fresh();
+    useApp.setState({ customSites: [point], selectedId: point.id });
+    const p1 = analyzeArea("Region A", -80, 0);
+    const p2 = analyzeArea("Region A", -80, 0);
+    expect(builds).toHaveLength(1);
+    builds[0].progress(0.6);
+    expect(useApp.getState().regionStatus).toEqual({ label: "Region A", progress: 0.6 });
+    builds[0].resolve(field("A"));
+    await Promise.all([p1, p2]);
+    expect(builds).toHaveLength(1);
+    expect(label()).toBe("A");
+    expect(useApp.getState().regionStatus).toBeNull();
+    expect(refinedBy(useApp)).toBe("A");
+  });
+
+  it("refines the selected custom point when a cached region is applied", async () => {
+    const { useApp, analyzeArea, label } = await fresh();
+    const pA = analyzeArea("Region A", -80, 0);
+    builds[0].resolve(field("A"));
+    await pA;
+    await analyzeArea("Artemis B", -89.5, 0);
+    expect(label()).toBe("POLE");
+
+    useApp.setState({ customSites: [point], selectedId: point.id });
+    await analyzeArea("Region A", -80, 0);
+    expect(builds).toHaveLength(1);
+    expect(label()).toBe("A");
+    expect(refinedBy(useApp)).toBe("A");
   });
 });
