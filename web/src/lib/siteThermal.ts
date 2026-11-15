@@ -37,6 +37,12 @@ export function terrainViewFactor(horizonDeg: ArrayLike<number>): number {
   return horizonDeg.length ? f / horizonDeg.length : 0;
 }
 
+/** The span a site's temperatures cover, for labels: "13 months" for the panel's full window, else hours or days. */
+export function thermalSpanLabel(hours: number): string {
+  if (hours >= 24 * 395) return "13 months";
+  return hours < 48 ? `${hours} h` : `${Math.round(hours / 24)} d`;
+}
+
 /** The window siteThermal actually models: start rounded down to a whole day, clipped to the ephemeris. */
 export function thermalWindow(e: Ephemeris, startHour: number, hours: number) {
   const start = Math.max(0, Math.min(e.count - 1, Math.floor(startHour / 24) * 24));

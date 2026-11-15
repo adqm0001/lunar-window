@@ -18,6 +18,10 @@
 
 export const NZ = 14;
 export const ICE_K = 110;
+/** Ice is stable where the warmest temperature over a full year of sunlight stays below ICE_K (Paige et al. 2010, Science). */
+export const ICE_HOURS = 365 * 24;
+/** A shorter run hasn't seen the year's warmest days, so it can't say whether ice survives. */
+export const iceVerdictPossible = (hours: number) => hours >= ICE_HOURS;
 
 // Normal-incidence albedo of the surrounding terrain and emissivity, as in the direct-sunlight terms.
 export const WALL_ALBEDO = 0.12;

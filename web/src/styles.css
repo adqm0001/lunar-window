@@ -128,6 +128,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .map-legend { position: absolute; top: 76px; right: 354px; width: 240px; font-size: 11px; color: var(--muted); padding: 11px 13px; z-index: 2; }
 .seg { display: flex; gap: 2px; }
 .legend-desc.mono { font-family: var(--mono); font-size: 10px; }
+.legend-desc.warn { color: #ffc846; }
 .left::-webkit-scrollbar, .right::-webkit-scrollbar { width: 6px; }
 .left::-webkit-scrollbar-thumb, .right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 /* Firefox has no ::-webkit-scrollbar. Kept behind @supports because Chrome 121+ ignores the rules above once these are set. */

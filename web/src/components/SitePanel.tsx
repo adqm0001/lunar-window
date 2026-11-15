@@ -3,7 +3,8 @@ import { formatLatLon, toMap } from "../lib/astro";
 import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { hoursUntilChange, longestRun, percentOn } from "../lib/visibility";
-import type { SiteThermal } from "../lib/siteThermal";
+import { thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
+import { iceVerdictPossible } from "../gpu/thermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
 import { contactWindows, estimateRateBps, type ContactWindow } from "../lib/contacts";
 import { ephemAt, type Ephemeris } from "../data/load";
@@ -215,14 +216,18 @@ export default function SitePanel() {
             <dd style={{ color: tNow < 110 ? "var(--earth)" : tNow > 250 ? "var(--sun)" : undefined }}>
               {Math.round(tNow)} K ({Math.round(tNow - 273.15)} °C)
             </dd>
-            <dt>Coldest / hottest (13 months)</dt>
+            <dt>Coldest / hottest ({thermalSpanLabel(therm.hours)})</dt>
             <dd>
               {Math.round(therm.min)} K / {Math.round(therm.max)} K
             </dd>
             <dt>Water ice</dt>
-            <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
-              {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
-            </dd>
+            {iceVerdictPossible(therm.hours) ? (
+              <dd style={{ color: therm.iceDepth >= 0 ? "var(--earth)" : undefined }}>
+                {therm.iceDepth < 0 ? "too warm, even 80 cm down" : therm.iceDepth === 0 ? "stable at the surface" : `stable below ${Math.round(therm.iceDepth * 100)} cm`}
+              </dd>
+            ) : (
+              <dd style={{ color: "var(--dim)" }}>needs a full year of data ({thermalSpanLabel(therm.hours)} modelled)</dd>
+            )}
           </dl>
           <TempChart t={therm} nowDay={Math.floor((hourBucket - therm.start) / 24)} />
         </>
@@ -262,7 +267,7 @@ function TempChart({ t, nowDay }: { t: SiteThermal; nowDay: number }) {
   for (let d = 0; d < n; d++) band += `${d ? "L" : "M"}${x(d).toFixed(1)},${y(t.dailyMax[d]).toFixed(1)}`;
   for (let d = n - 1; d >= 0; d--) band += `L${x(d).toFixed(1)},${y(t.dailyMin[d]).toFixed(1)}`;
   return (
-    <svg className="temp-chart" viewBox={`0 0 ${W} ${H + 12}`} width="100%" role="img" aria-label="Daily temperature range over the next 13 months">
+    <svg className="temp-chart" viewBox={`0 0 ${W} ${H + 12}`} width="100%" role="img" aria-label={`Daily temperature range over ${thermalSpanLabel(t.hours)}`}>
       <path d={band + "Z"} fill="rgba(255,160,90,0.35)" stroke="rgba(255,170,100,0.8)" strokeWidth="0.6" />
       {110 > lo && 110 < hi && (
         <>
