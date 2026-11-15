@@ -1,3 +1,4 @@
+import { firstColorMap } from "../lib/colorMaps";
 import { toMap } from "../lib/astro";
 
 export interface GlobeData {
@@ -46,10 +47,15 @@ function loadImage(path: string): Promise<HTMLImageElement> {
   });
 }
 
+let fullColorFile: string | null = null;
+
 export async function loadGlobe(): Promise<GlobeData> {
   const meta = await (await fetch(base + "globe.json")).json();
-  // the 25 MB 80 m polar file is fetched afterwards (loadPolar80) so the Moon appears sooner
-  const [g, p, color] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), loadImage(meta.color.file)]);
+  // The 80 m polar terrain is fetched afterwards (startPolar80) and the colour map starts as the 100 KB preview
+  // (the 7 MB full map follows via loadFullColor), so the Moon appears sooner.
+  const [g, p, first] = await Promise.all([gunzipFetch(meta.globe.file), gunzipFetch(meta.polar.file), firstColorMap(meta.color, loadImage)]);
+  const color = first.image;
+  fullColorFile = first.full;
   polar80Meta = meta.polar80;
   return {
     globe: undelta(g, meta.globe.width),
@@ -67,6 +73,11 @@ export async function loadGlobe(): Promise<GlobeData> {
     p80First: meta.polar80.firstCenterMeters,
     color,
   };
+}
+
+/** The full-size colour map that replaces the preview loadGlobe started with, or null if it already has it. */
+export async function loadFullColor(): Promise<HTMLImageElement | null> {
+  return fullColorFile ? loadImage(fullColorFile) : null;
 }
 
 export const P80_MISSING = -32768;
