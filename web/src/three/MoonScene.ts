@@ -64,8 +64,7 @@ export class MoonScene {
     camFrom: THREE.Vector3;
     camTo: THREE.Vector3;
     upTo: THREE.Vector3 | null;
-    rollFrom: THREE.Vector3;
-    rollTo: THREE.Vector3 | null;
+    rollAim: THREE.Vector3 | null;
     t: number;
     dur: number;
     orbit: boolean;
@@ -527,27 +526,20 @@ export class MoonScene {
     this.dirty = true;
   }
 
-  flyToOrbit(dur = 3.5) {
+  /** `southUp`: end with the south pole up on screen (overview button); otherwise keep the current roll. */
+  flyToOrbit(dur = 3.5, southUp = true) {
     const dir = this.camera.position.clone().sub(MOON_CENTER).normalize();
     if (dir.y > 0.97) dir.set(0, 0.62, 1).normalize();
-    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), dur, null);
+    this.startFlight(MOON_CENTER.clone(), dir.multiplyScalar(R_MOON_KM + 3600), dur, null, southUp ? new THREE.Vector3(0, 1, 0) : null);
   }
 
-  private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null) {
+  // `up`: the destination's vertical for a surface view (null = orbit). `orbitUp`: optional screen-up to end an orbit flight with.
+  private startFlight(to: THREE.Vector3, offTo: THREE.Vector3, dur: number, up: THREE.Vector3 | null, orbitUp: THREE.Vector3 | null = null) {
     const from = this.controls.target.clone();
     const camFrom = this.camera.position.clone();
     this.controls.enabled = false;
-    // Screen-up at the start and at the end; the flight turns steadily from one to the other.
-    const camTo = to.clone().add(offTo);
-    const rollFrom = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
-    let rollTo: THREE.Vector3 | null = null;
-    if (up) {
-      const viewEnd = to.clone().sub(camTo).normalize();
-      rollTo = up.clone().projectOnPlane(viewEnd);
-      if (rollTo.lengthSq() < 1e-4) rollTo = rollFrom.clone().projectOnPlane(viewEnd);
-      rollTo = rollTo.lengthSq() > 1e-9 ? rollTo.normalize() : null;
-    }
-    this.flight = { from, to: to.clone(), camFrom, camTo, upTo: up?.clone() ?? null, rollFrom, rollTo, t: 0, dur, orbit: up === null };
+    const rollAim = (up ?? orbitUp)?.clone() ?? null;
+    this.flight = { from, to: to.clone(), camFrom, camTo: to.clone().add(offTo), upTo: up?.clone() ?? null, rollAim, t: 0, dur, orbit: up === null };
   }
 
   private configureControls(orbit: boolean) {
@@ -782,7 +774,7 @@ export class MoonScene {
         const alt = Math.max(0.15, this.camera.position.distanceTo(MOON_CENTER) - this.groundRadius(camUp, 0.1));
         const fast = this.keys.has("shift") ? 3 : 1;
         this.camera.position.addScaledVector(camUp, lift * alt * 1.1 * fast * dt);
-        if (lift > 0 && this.camera.position.distanceTo(target) > this.controls.maxDistance * 0.97) this.flyToOrbit(1.8);
+        if (lift > 0 && this.camera.position.distanceTo(target) > this.controls.maxDistance * 0.97) this.flyToOrbit(1.8, false);
       }
       const turn = (this.keys.has("e") ? 1 : 0) - (this.keys.has("q") ? 1 : 0);
       if (turn) {
@@ -850,7 +842,7 @@ export class MoonScene {
         if (this.flight || this.mapMode) return;
         const d = this.camera.position.distanceTo(this.controls.target);
         if (!this.orbitMode && e.deltaY > 0 && d > this.controls.maxDistance * 0.97) {
-          this.flyToOrbit(1.8);
+          this.flyToOrbit(1.8, false);
           return;
         }
         if (this.orbitMode && e.deltaY < 0 && d < this.controls.minDistance * 1.01 + 30) {
@@ -1030,16 +1022,27 @@ export class MoonScene {
       const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
       if (dir.lengthSq() < 1e-8) dir.copy(b);
       this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
-      // Roll: turn steadily from the starting screen-up to the final one. Where that is too close to the
-      // view direction, or when heading to orbit (trackball, any up is fine), carry last frame's screen-up.
+      // Roll: carry last frame's screen-up (never parallel to the view, so it can't flip), then turn it
+      // about the view axis only, gently and faster near the end, toward the wanted up. Where the wanted up
+      // points almost along the view (looking straight down) it is ignored.
       const view = this.controls.target.clone().sub(this.camera.position).normalize();
-      let screenUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).projectOnPlane(view);
-      if (f.rollTo) {
-        const turn = new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(f.rollFrom, f.rollTo), k);
-        const planned = f.rollFrom.clone().applyQuaternion(turn).projectOnPlane(view);
-        if (planned.lengthSq() > 0.04) screenUp = planned;
+      const screenUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion).projectOnPlane(view);
+      if (screenUp.lengthSq() > 1e-9) {
+        screenUp.normalize();
+        const want = f.rollAim?.clone().projectOnPlane(view);
+        const strength = want?.length() ?? 0;
+        if (want && strength > 0.05) {
+          want.normalize();
+          const phi = Math.atan2(screenUp.clone().cross(want).dot(view), screenUp.dot(want));
+          let turn = phi;
+          if (f.t < 1) {
+            const cap = THREE.MathUtils.degToRad(2 + 20 * k ** 4);
+            turn = THREE.MathUtils.clamp(phi * k * k * Math.min(1, strength / 0.3), -cap, cap);
+          }
+          screenUp.applyAxisAngle(view, turn);
+        }
+        this.camera.up.copy(screenUp);
       }
-      if (screenUp.lengthSq() > 1e-9) this.camera.up.copy(screenUp.normalize());
       this.camera.lookAt(this.controls.target);
       if (f.t >= 1) {
         if (f.upTo) this.camera.up.copy(f.upTo);
