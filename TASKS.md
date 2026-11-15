@@ -350,3 +350,10 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Files:** `src/three/MoonScene.ts` (`loop`).
   - **Spec:** while presenting, use `renderer.setAnimationLoop` and render the scene directly (skip the composer/bloom). Place the camera rig at the selected site, 1.7 m above the ground, using `sitePosition` and the local up vector.
   - **Verify:** in the emulator, you stand on Connecting ridge B and can look around; time playback moves the Sun.
+
+## Follow-up bug fixes
+
+- [x] **Guide sustained slow High-quality playback toward Balanced** ([#101](https://github.com/adqm0001/lunar-window/issues/101)) — taken: malqedra
+  - **Files:** `web/src/lib/playbackPerformance.ts` and tests, `web/src/components/PlaybackQualityNotice.tsx`, `web/src/three/MoonScene.ts`, `web/src/App.tsx`, `web/src/styles.css`.
+  - **Spec:** while High quality is playing in a visible tab, observe actual rendered frames. Ignore six seconds of startup, then offer Balanced after an eight-second window below 15 FPS or with three gaps of at least 250 ms. Offer Keep High, reset on pause/quality/visibility changes, and clear after recovery. This implements the issue's guidance option.
+  - **Verify:** frame-history regressions, desktop and phone actions/layout, pause/visibility/recovery guards, production loading/playback, and renderer timing. The reported Iris Xe hardware configuration was not independently reproduced; rendering-speed improvement is not claimed.
