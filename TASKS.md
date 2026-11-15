@@ -317,7 +317,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Act 6: New features
 
-- [ ] **56. Lander shadow** (M)
+- [x] **56. Lander shadow** (M)
   - **Files:** `src/three/lod.ts`, `src/three/shaders.ts`, `src/three/MoonScene.ts` (`updateLander`), `src/three/landerModel.ts`.
   - **Spec:** uniforms `uLanderPos` (world km), `uLanderUp`, `uLanderR = 0.0025` km, `uLanderH = 0.0045` km, `uLanderOn`. In both terrain fragment shaders, within 0.2 km of the lander, project the pixel into the lander's local tangent plane and test it against the shadow of a vertical cylinder of radius R, height H, cast away from the Sun (length `H / tan(sunElevation)`). Same idea as `rockShadow` in `src/three/craterTexture.ts`.
   - **Verify:** "See the lander on the ground" shows a long shadow pointing away from the Sun that rotates as time plays.
