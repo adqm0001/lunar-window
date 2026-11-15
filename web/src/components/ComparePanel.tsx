@@ -4,13 +4,14 @@ import Icon from "./Icon";
 import { useMemo } from "react";
 import { fieldSafePct } from "../data/field";
 import { formatLatLon } from "../lib/astro";
-import { hoursUntilChange, longestRun, percentOn, siteStateAt } from "../lib/visibility";
+import { compareStats, compareWindow, SUN_LIT } from "../lib/compareStats";
+import { hoursUntilChange, percentOn, siteStateAt } from "../lib/visibility";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { formatDuration, useApp } from "../state/store";
 
-const lit = (v: number) => v >= 128;
 const on = (v: number) => v === 1;
-const dark = (v: number) => v < 128;
+const MONTH = 720;
+const YEAR = 8760;
 
 interface Row {
   label: string;
@@ -30,30 +31,33 @@ export default function ComparePanel() {
   const { select, togglePin, setCompareOpen, setSplit } = useApp.getState();
   const h = Math.floor(hour);
   const day = Math.floor(hour / 24) * 24;
-  const monthHours = Math.min(720, data.ephem.count - day);
-  const yearHours = Math.min(8760, data.ephem.count - day);
-  const monthLabel = monthHours === 720 ? "next 30 d" : `available ${formatDuration(monthHours)}`;
-  const yearLabel = yearHours === 8760 ? "next 12 mo" : `available ${formatDuration(yearHours)}`;
   const seriesVersion = useSeriesVersion();
 
   const rows = useMemo<Row[]>(() => {
     const st = pinned.map((s) => siteStateAt(data.ephem, s, h));
     const se = pinned.map((s) => getSeries(data.ephem, s));
     const pct = (v: number) => `${v.toFixed(1)}%`;
+    const month = compareWindow(day, MONTH, data.ephem.count);
+    const year = compareWindow(day, YEAR, data.ephem.count);
+    const monthLabel = month.truncated ? `available ${formatDuration(month.hours)}` : "next 30 d";
+    const yearLabel = year.truncated ? `available ${formatDuration(year.hours)}` : "next 12 mo";
+    const monthStats = se.map((x) => x && compareStats(x, month.start, month.end));
+    const yearStats = se.map((x) => x && compareStats(x, year.start, year.end));
     return [
       { label: "Sun now", values: st.map((x) => x.sunFraction * 100), format: (v) => (v >= 50 ? `UP ${Math.round(v)}%` : "DOWN"), better: "high" },
       { label: "Earth now", values: st.map((x) => (x.earthUp ? 1 : 0)), format: (v) => (v ? "IN VIEW" : "HIDDEN"), better: "high" },
       { label: "DSN link now", values: st.map((x) => (x.link ? 1 : 0)), format: (v) => (v ? "OPEN" : "DOWN"), better: "high" },
       {
         label: "Sun changes in",
-        values: se.map((x) => x && hoursUntilChange(x.sun, h, lit)),
+        values: se.map((x) => x && hoursUntilChange(x.sun, h, SUN_LIT)),
         format: (v) => formatDuration(v),
         better: null,
       },
-      { label: `Sunlit, ${monthLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + monthHours, lit)), format: pct, better: "high" },
-      { label: `DSN contact, ${monthLabel}`, values: se.map((x) => x && percentOn(x.link, day, day + monthHours, on)), format: pct, better: "high" },
-      { label: `Sunlit, ${yearLabel}`, values: se.map((x) => x && percentOn(x.sun, day, day + yearHours, lit)), format: pct, better: "high" },
-      { label: `Longest night, ${yearLabel}`, values: se.map((x) => x && longestRun(x.sun, day, day + yearHours, dark)), format: (v) => formatDuration(v), better: "low" },
+      { label: `Sunlit, ${monthLabel}`, values: monthStats.map((x) => x && x.sunlit), format: pct, better: "high" },
+      { label: `DSN contact, ${monthLabel}`, values: se.map((x) => x && percentOn(x.link, month.start, month.end, on)), format: pct, better: "high" },
+      { label: `Power + comms, ${monthLabel}`, values: monthStats.map((x) => x && x.powerComms), format: pct, better: "high" },
+      { label: `Sunlit, ${yearLabel}`, values: yearStats.map((x) => x && x.sunlit), format: pct, better: "high" },
+      { label: `Longest night, ${yearLabel}`, values: yearStats.map((x) => x && x.longestNight), format: (v) => formatDuration(v), better: "low" },
       {
         label: "Flat ground (< 10°)",
         values: pinned.map((s) => (field ? fieldSafePct(field, s.lat, s.lon) : null)),
@@ -61,7 +65,7 @@ export default function ComparePanel() {
         better: "high",
       },
     ];
-  }, [data, field, pinned, h, day, seriesVersion, monthHours, yearHours, monthLabel, yearLabel]);
+  }, [data, field, pinned, h, day, seriesVersion]);
 
   return (
     <div className={`glass compare${split ? " compact" : ""}`}>

@@ -152,6 +152,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .quality-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .app.cinema .quality-notice { display: none; }
 .stage-msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.stage-error { display: grid; justify-items: center; gap: 12px; width: min(360px, calc(100% - 32px)); padding: 16px; text-align: center; color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.stage-error .btn { min-height: 44px; }
 
 .glass, .left, .right, .bottom {
   background: linear-gradient(150deg, #ffffff1c, transparent 30%, #d3e5ff05), rgba(6,8,11,0.30);
