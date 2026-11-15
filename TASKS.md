@@ -106,7 +106,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). File one GitHub issue per problem: device, browser, steps, screenshot, console errors.
 
-- [ ] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar).
+- [x] **12. Integrated-graphics laptop** (S). Smoothness at Saver / Balanced / High (top bar). [Intel Iris Xe test report](docs/testing/task-12-integrated-graphics.md): all modes tested; High playback stalls recorded for follow-up.
 
 - [ ] **13. Mac Safari** (S).
 
