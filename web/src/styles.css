@@ -217,6 +217,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 
 
 .legend-desc.mono { font-family: var(--mono); font-size: 10px; }
+.legend-desc.warn { color: #ffc846; }
 .left::-webkit-scrollbar, .right::-webkit-scrollbar { width: 6px; }
 .left::-webkit-scrollbar-thumb, .right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 /* Firefox has no ::-webkit-scrollbar. Kept behind @supports because Chrome 121+ ignores the rules above once these are set. */
@@ -248,6 +249,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .search-btn:disabled { opacity: 0.6; cursor: wait; }
 .f-stats { margin: 12px 0 8px; font-family: var(--mono); font-size: 10.5px; color: var(--accent); line-height: 1.5; }
 .results { display: flex; flex-direction: column; gap: 5px; }
+.results.stale { opacity: 0.45; }
+.f-hint.warn { color: #ffc846; }
 .result { display: flex; gap: 10px; align-items: center; text-align: left; background: rgba(255,255,255,0.02); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; cursor: pointer; }
 .result:hover { border-color: var(--line-2); }
 .result.active { border-color: rgba(167,199,250,0.65); background: rgba(130,177,234,0.20); }
@@ -313,14 +316,21 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .row-x { color: var(--dim); font-size: 10px; padding: 2px 4px; border-radius: 4px; }
 .row-x:hover { color: var(--danger); background: rgba(255,170,163,0.1); }
 
-.layer-label { pointer-events: none; display: flex; flex-direction: column; font: 500 11px var(--sans); color: #fff; background: rgba(6,8,14,0.72); border: 1px solid rgba(255,255,255,0.18); border-radius: 7px; padding: 4px 8px; white-space: nowrap; }
-.layer-label b { font-weight: 600; font-size: 11.5px; }
-.layer-label span { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+/* zero-size anchor on the layer; the box is moved up or down by Cutaway.layout so the core labels don't overlap */
+.layer-label { pointer-events: none; position: relative; width: 0; height: 0; }
+.layer-label .ll-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(6,8,14,0.8); }
+.layer-label .ll-line { position: absolute; left: 0; top: -0.5px; height: 1px; background: rgba(255,255,255,0.6); transform-origin: 0 50%; }
+.layer-label .ll-box { position: absolute; left: 0; top: 0; transform: translate(14px, -50%); display: flex; flex-direction: column; font: 500 11px var(--sans); color: #fff; background: rgba(6,8,14,0.72); border: 1px solid rgba(255,255,255,0.18); border-radius: 7px; padding: 4px 8px; white-space: nowrap; }
+.layer-label .ll-box b { font-weight: 600; font-size: 11.5px; }
+.layer-label .ll-box span { color: var(--muted); font-size: 10px; font-family: var(--mono); }
+.chip.share { min-width: 112px; }
 .temp-chart { display: block; margin: 6px 0 4px; }
 .temp-chart .tc-label { font: 8.5px var(--mono); fill: var(--muted); }
 .f-select { width: 100%; background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 8px; font-size: 12px; }
 .f-check { display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; color: var(--muted); margin: 12px 0 4px; cursor: pointer; }
 .f-hint.error { color: var(--danger); }
+.f-hint.warn { color: var(--sun); }
+.mc.stale { opacity: 0.45; }
 .rover-kv { margin-top: 12px; }
 .site-label.rover-label { background: rgba(10,21,19,0.65); border-color: rgba(167,217,200,0.35); color: var(--link); }
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }

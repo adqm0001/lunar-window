@@ -1,7 +1,7 @@
 import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
 import { loadField } from "./data/field";
-import { loadGlobe, startPolar80 } from "./data/globe";
+import { loadFullColor, loadGlobe, startPolar80 } from "./data/globe";
 import { useApp } from "./state/store";
 import { applyEarly, currentScene, openedFromLink, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
@@ -112,10 +112,12 @@ export default function App() {
     if (!data || startedField) return;
     startedField = true;
     const s = useApp.getState();
-    loadField(s.setFieldProgress)
+    // The 3D scene needs both the pole field and the globe, so they load together. The globe starts with a preview
+    // colour map; the full-size one (7 MB) is fetched only once both are in, so it doesn't slow the first view.
+    const field = loadField(s.setFieldProgress)
       .then(s.setField)
       .catch((e: Error) => s.setFieldError(e.message));
-    loadGlobe()
+    const globe = loadGlobe()
       .then((g) => {
         s.setGlobe(g);
         startPolar80(g, {
@@ -123,8 +125,20 @@ export default function App() {
           onStart: () => currentScene()?.beginPolar80(),
           onTile: (t) => currentScene()?.applyPolar80Tile(t),
         }).catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
+        return g;
       })
-      .catch((e: Error) => console.warn("Globe data failed to load:", e.message));
+      .catch((e: Error) => {
+        console.warn("Globe data failed to load:", e.message);
+        return null;
+      });
+    Promise.all([globe, field])
+      .then(async ([g]) => {
+        const img = g && (await loadFullColor());
+        if (!g || !img) return;
+        g.color = img; // also used if the scene builds the globe later
+        currentScene()?.setColorMap(img);
+      })
+      .catch((e: Error) => console.warn("Full-size colour map failed to load:", e.message));
   }, [data]);
 
   usePlayback();

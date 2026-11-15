@@ -186,6 +186,7 @@ export class MoonScene {
     this.stars = this.makeStars();
     this.scene.add(this.stars);
     this.scene.add(this.cutaway.group);
+    this.cutaway.onResize = () => (this.dirty = true);
     this.scene.add(this.lander.group, this.lander.lights);
 
     const { geometry } = this.makeTerrain();
@@ -494,7 +495,10 @@ export class MoonScene {
     const tangent = offset.clone().projectOnPlane(up);
     if (tangent.lengthSq() < 1e-6) tangent.set(1, 0, 0).projectOnPlane(up);
     const dist = Math.min(Math.max(offset.length(), 6), 14);
-    this.startFlight(p, tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38)), 1.8, up);
+    // Same distance as now (within 6–14 km), at a fixed viewing angle: 0.92 / 0.38 is ~23° down. setLength keeps
+    // the distance exact, so going from site to site doesn't creep the camera closer each time.
+    const next = tangent.setLength(0.92).add(up.clone().multiplyScalar(0.38)).setLength(dist);
+    this.startFlight(p, next, 1.8, up);
   }
 
   get canvas(): HTMLCanvasElement {
@@ -1157,10 +1161,12 @@ export class MoonScene {
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Never negative: a clock that steps back (or a test clock) would otherwise run flights and damping backwards.
+    const elapsed = Math.max(0, (now - this.last) / 1000);
+    const dt = Math.min(0.05, elapsed);
     // Flights keep to their duration even when frames are slow (a region analysis busy on the GPU), up to 1/4 s
     // per frame so a tab that was hidden doesn't skip the whole flight.
-    const flightDt = Math.min(0.25, (now - this.last) / 1000);
+    const flightDt = Math.min(0.25, elapsed);
     this.last = now;
     const keys = this.keys;
     if (this.splitOn && this.activeRight) this.keys = NO_KEYS;
@@ -1188,6 +1194,10 @@ export class MoonScene {
     else {
       this.renderPass.camera = this.camera;
       this.composer.render();
+    }
+    if (this.cutOn && !this.cutPending) {
+      const size = this.labels.getSize();
+      this.cutaway.layout(this.camera, size.width, size.height);
     }
     this.labels.render(this.scene, this.camera);
     recordRenderedFrame(now);
@@ -1387,13 +1397,29 @@ export class MoonScene {
     this.composer.render();
   }
 
-  setGlobe(g: GlobeData) {
-    this.dirty = true;
-    this.globe = g;
-    const tex = new THREE.Texture(g.color);
+  private colorTexture(img: HTMLImageElement) {
+    const tex = new THREE.Texture(img);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
+    return tex;
+  }
+
+  /** Swaps the globe's colour map (the full-size map arriving after the preview it started with). */
+  setColorMap(img: HTMLImageElement) {
+    if (!this.globe || !this.lod) return;
+    this.globe.color = img;
+    const u = this.lod.material.uniforms.uColor;
+    const old = u.value as THREE.Texture;
+    u.value = this.colorTexture(img);
+    old.dispose();
+    this.dirty = true;
+  }
+
+  setGlobe(g: GlobeData) {
+    this.dirty = true;
+    this.globe = g;
+    const tex = this.colorTexture(g.color);
     if (this.lod) {
       this.scene.remove(this.lod.group);
       this.lod.dispose();
@@ -1750,6 +1776,7 @@ export class MoonScene {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
+    this.cutaway.dispose();
     this.controls.dispose();
     this.split?.controls.dispose();
     this.splitEl?.remove();

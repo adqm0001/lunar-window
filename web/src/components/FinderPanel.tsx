@@ -1,6 +1,7 @@
 import Icon from "./Icon";
 import { useState } from "react";
 import { DEFAULT_WEIGHTS, findBestSpots, fitsFinderMission, type FinderParams } from "../gpu/finder";
+import { changedFinderParams, sameWeights } from "../lib/finderSettings";
 import { formatDuration, formatUtc, hourToDate, useApp } from "../state/store";
 
 const MISSIONS = [3, 7, 14, 30, 90];
@@ -26,10 +27,15 @@ export default function FinderPanel() {
   const result = useApp((s) => s.finder);
   const selectedId = useApp((s) => s.selectedId);
   const { setFinder, setFinderOpen, select } = useApp.getState();
-  const [missionDays, setMissionDays] = useState(14);
-  const [maxNight, setMaxNight] = useState(50);
-  const [minFlat, setMinFlat] = useState(50);
-  const [priority, setPriority] = useState(0);
+  // Reopening the panel shows the settings of the search whose results are still listed.
+  const [kept] = useState(() => useApp.getState().finder?.params ?? null);
+  const [missionDays, setMissionDays] = useState(kept && MISSIONS.includes(kept.missionDays) ? kept.missionDays : 14);
+  const [maxNight, setMaxNight] = useState(kept && NIGHTS.some(([, h]) => h === kept.maxNightHours) ? kept.maxNightHours : 50);
+  const [minFlat, setMinFlat] = useState(kept && FLATS.includes(kept.minSafePct) ? kept.minSafePct : 50);
+  const [priority, setPriority] = useState(() => {
+    const i = kept ? PRIORITIES.findIndex(([, w]) => sameWeights(w, kept.weights)) : -1;
+    return i >= 0 ? i : 0;
+  });
   const [busy, setBusy] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const km = field ? Math.round((2 * field.meta.extentMeters) / 1000) : 0;
@@ -37,9 +43,9 @@ export default function FinderPanel() {
 
   const start = Math.floor(hour);
   const fits = fitsFinderMission(start, missionDays, data.ephem.count);
-  const resultsCurrent = result && result.params.startHour === start && result.params.missionDays === missionDays
-    && result.params.maxNightHours === maxNight && result.params.minSafePct === minFlat
-    && (["sun", "link", "earth", "flat"] as const).every((key) => result.params.weights[key] === PRIORITIES[priority][1][key]);
+  const params: FinderParams = { startHour: start, missionDays, maxNightHours: maxNight, minSafePct: minFlat, weights: PRIORITIES[priority][1] };
+  // The listed spots belong to the settings they were searched with; say which ones have changed since.
+  const stale = result ? changedFinderParams(result.params, params) : [];
   const run = () => {
     if (!field || !fits) return;
     setSearchError(null);
@@ -136,12 +142,17 @@ export default function FinderPanel() {
 
       {result && (
         <>
-          {!resultsCurrent && <p className="f-hint result-warning" role="status">Mission settings changed. Rank sites again to update these results.</p>}
           <div className="f-stats">
 {(result.evaluated - result.rejected).toLocaleString()} eligible sites · {result.params.missionDays}-day mission
           </div>
+          {stale.length > 0 && (
+            <div className="f-hint warn" role="status">
+              Out of date: the {joinNames(stale)} changed since this search, so the spots below are for the earlier settings. Search again to
+              update them.
+            </div>
+          )}
           {result.candidates.length === 0 && <div className="f-hint">No spot meets all constraints. Loosen the night or flat-ground limits.</div>}
-          <div className="results">
+          <div className={stale.length ? "results stale" : "results"}>
             {result.candidates.map((c) => (
               <button key={c.site.id} className={`result ${c.site.id === selectedId ? "active" : ""}`} onClick={() => select(c.site.id)}>
                 <span className="r-rank">#{c.rank}</span>
@@ -162,4 +173,8 @@ export default function FinderPanel() {
       )}
     </aside>
   );
+}
+
+function joinNames(names: string[]) {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

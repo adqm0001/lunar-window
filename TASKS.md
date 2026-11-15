@@ -90,7 +90,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **5. Video clip: rover** (S). Screen-record ⛟ Rover route: Connecting ridge B → Shackleton ridge A → Plan route → Replay. [Verified 47.5-second clip](docs/videos/task-5-rover.md).
 
-- [ ] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit.
+- [x] **6. Video clip: lander** (S). ♥ Lander sim → "See the lander on the ground", slow orbit. [Verified close-up orbit clip](docs/videos/task-6-lander.md).
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
@@ -352,6 +352,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Verify:** in the emulator, you stand on Connecting ridge B and can look around; time playback moves the Sun.
 
 ## Follow-up bug fixes
+
+- [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
+  - **Files:** `web/src/state/share.ts` and regression tests.
+  - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
+  - **Verify:** fresh-tab round trips for the first and another finder result; existing custom points and punctuation in names; built-in/custom selection with finder results present; the 20-point limit; time, camera and supported layer restoration; TypeScript, tests and build; desktop and phone viewport loading without console errors.
 
 - [x] **Guide sustained slow High-quality playback toward Balanced** ([#101](https://github.com/adqm0001/lunar-window/issues/101)) — taken: malqedra
   - **Files:** `web/src/lib/playbackPerformance.ts` and tests, `web/src/components/PlaybackQualityNotice.tsx`, `web/src/three/MoonScene.ts`, `web/src/App.tsx`, `web/src/styles.css`.
