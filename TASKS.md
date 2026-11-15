@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Disclose the site's available contact interval** ([#205](https://github.com/adqm0001/lunar-window/issues/205)) — taken: malqedra
+  - **Files:** `web/src/components/SitePanel.tsx` and regression tests.
+  - **Spec:** retain the next-seven-days label when fully covered; otherwise show the exact available hours and the active dataset's cutoff. Describe no-pass results only for the covered interval, without inferring an all-week blocked horizon or a necessary relay. Preserve contact windows, rates and totals.
+  - **Verify:** full-week and exact-boundary controls, 167 hours remaining, final main/replay hour, passes and no passes; TypeScript, tests, build and production before/after checks without console errors.
+
 - [x] **Preserve a selected landing-finder result in shared links** ([#152](https://github.com/adqm0001/lunar-window/issues/152)) — taken: malqedra
   - **Files:** `web/src/state/share.ts` and regression tests.
   - **Spec:** serialize the selected finder candidate as a named custom point, using the existing point format. Preserve its coordinates and selection when opened in a fresh tab, without changing the source page's points or search results. Keep built-in/custom point links working and retain the selected result at the 20-point limit. Computed score/survival maps still require their own calculation.
