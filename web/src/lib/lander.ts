@@ -34,6 +34,28 @@ export function panelFactor(mode: PanelMode, sunAz: number, sunEl: number, panel
   return Math.max(0, Math.cos(el) * Math.cos(((sunAz - panelAz) * Math.PI) / 180));
 }
 
+/**
+ * The one rule for a dead battery, shared by simulate, survivedFraction and (in GLSL) the survival map shader in
+ * gpu/engine.ts: dead once the charge `wh` is at or below the dead-below level. A battery with no capacity stores
+ * nothing, so it is dead as soon as an hour draws more than the panels supply.
+ */
+export function batteryDead(wh: number, capacityWh: number, minSocPct: number): boolean {
+  return capacityWh > 0 ? wh <= (minSocPct / 100) * capacityWh : wh < 0;
+}
+
+/** State of charge in percent. A battery with no capacity is never short of charge while the panels cover the load. */
+export function chargePct(wh: number, capacityWh: number): number {
+  return capacityWh > 0 ? (100 * wh) / capacityWh : 100;
+}
+
+/**
+ * True when a survivedFraction (or survival map channel 0) value means the battery never died. Those values are
+ * exactly 1 only for a battery that never dies, and below 1 for one that dies in any hour, even the last.
+ */
+export function survivedMission(lived: number): boolean {
+  return lived >= 1;
+}
+
 export interface SimResult {
   soc: Float32Array;
   power: Float32Array;
@@ -72,12 +94,12 @@ export function simulate(e: Ephemeris, site: Site, lander: Lander, startHour: nu
     energy += p;
     if (died === null) {
       wh = Math.min(lander.batteryWh, wh + p - load);
-      if ((100 * wh) / lander.batteryWh <= lander.minSocPct) {
+      if (batteryDead(wh, lander.batteryWh, lander.minSocPct)) {
         died = k + 1;
         wh = 0;
       }
     }
-    const pct = died === null ? (100 * wh) / lander.batteryWh : 0;
+    const pct = died === null ? chargePct(wh, lander.batteryWh) : 0;
     soc[k + 1] = pct;
     minSoc = Math.min(minSoc, pct);
   }
@@ -148,19 +170,55 @@ export function changedSurvivalInputs(was: SurvivalInputs, now: SurvivalInputs):
   return INPUT_NAMES.filter(([k]) => was[k] !== now[k]).map(([, name]) => name);
 }
 
-/** NaN means the requested hourly mission is not fully covered by the track. */
+/**
+ * Share of the mission the battery lasted: the whole hours completed before the hour it dies in, so it is 1 only
+ * when it never dies (see survivedMission). NaN means the requested hourly mission is not fully covered by the track.
+ */
 export function survivedFraction(t: SunTrack, lander: Lander, start: number, hours: number): number {
   const available = Math.min(t.frac.length, t.az.length, t.el.length);
   if (!Number.isInteger(start) || !Number.isInteger(hours) || start < 0 || hours <= 0 || start + hours > available) return NaN;
   const panelAz = lander.panel === "vertical" && lander.panelAz < 0 ? t.az[start] : lander.panelAz;
   let wh = lander.batteryWh;
-  const floor = (lander.minSocPct / 100) * lander.batteryWh;
   for (let k = 0; k < hours; k++) {
     const i = start + k;
     const f = t.frac[i];
     const p = lander.panelW * f * panelFactor(lander.panel, t.az[i], t.el[i], panelAz);
     wh = Math.min(lander.batteryWh, wh + p - (f >= 0.5 ? lander.dayLoadW : lander.nightLoadW));
-    if (wh <= floor) return (k + 1) / hours;
+    if (batteryDead(wh, lander.batteryWh, lander.minSocPct)) return k / hours;
   }
   return 1;
+}
+
+/**
+ * CPU reference for one cell of the survival map shader (SURVIVE_MAIN in gpu/engine.ts), which the tests can run.
+ * `frac` and `el` are the Sun's visible disc fraction and elevation (deg) per hour; like the shader, every panel that
+ * is not flat is modelled as Sun-tracking. Returns the shader's channels: [lived, lowest charge (0..1), mean sunlit
+ * fraction, hour the battery died in or -1]. Keep it in step with the shader.
+ */
+export function survivalMapCell(frac: ArrayLike<number>, el: ArrayLike<number>, s: SurvivalInputs, stride = 1): [number, number, number, number] {
+  const steps = Math.max(1, Math.floor(s.hours / stride));
+  let wh = s.batteryWh;
+  let alive = true;
+  let diedAt = -1;
+  let minSoc = 1;
+  let sunSum = 0;
+  for (let k = 0; k < steps; k++) {
+    const i = s.start + k * stride;
+    const f = frac[i];
+    const e = (el[i] * Math.PI) / 180;
+    const p = s.panelW * f * (s.horizontal ? Math.max(0, Math.sin(e)) : Math.max(0, Math.cos(e)));
+    const load = f >= 0.5 ? s.dayLoadW : s.nightLoadW;
+    if (alive) {
+      wh = Math.min(s.batteryWh, wh + (p - load) * stride);
+      if (batteryDead(wh, s.batteryWh, s.minSocPct)) {
+        alive = false;
+        diedAt = (k + 1) * stride;
+        wh = 0;
+      }
+    }
+    minSoc = Math.min(minSoc, alive ? chargePct(wh, s.batteryWh) / 100 : 0);
+    sunSum += f;
+  }
+  const total = steps * stride;
+  return [diedAt < 0 ? 1 : (diedAt - stride) / total, minSoc, sunSum / steps, diedAt];
 }

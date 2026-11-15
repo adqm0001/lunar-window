@@ -124,15 +124,18 @@ void main() {
     float f = uPanelMode == 2 ? max(0.0, sin(el)) : max(0.0, cos(el));
     float p = uPanelW * frac * f;
     float load = frac >= 0.5 ? uDayLoad : uNightLoad;
+    // Mirrors batteryDead / chargePct / survivalMapCell in lib/lander.ts: keep them in step.
     if (alive) {
       wh = min(uBattery, wh + (p - load) * float(uStride));
-      if (wh / uBattery <= uMinSoc) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
+      bool dead = uBattery > 0.0 ? wh <= uMinSoc * uBattery : wh < 0.0;
+      if (dead) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
     }
-    minSoc = min(minSoc, alive ? wh / uBattery : 0.0);
+    minSoc = min(minSoc, alive ? (uBattery > 0.0 ? wh / uBattery : 1.0) : 0.0);
     sunSum += frac;
   }
   float total = float(uSteps * uStride);
-  outColor = vec4(diedAt < 0.0 ? 1.0 : diedAt / total, minSoc, sunSum / float(uSteps), diedAt);
+  // lived: the steps completed before the one it died in, so only a battery that never dies reaches 1
+  outColor = vec4(diedAt < 0.0 ? 1.0 : (diedAt - float(uStride)) / total, minSoc, sunSum / float(uSteps), diedAt);
 }`;
 
 // Packs "Sun up" and "link to Earth" into bits: 4 x 32-bit words = 128 hours per pass.

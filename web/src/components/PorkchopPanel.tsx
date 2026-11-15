@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { sunTrack, survivedFraction } from "../lib/lander";
+import { sunTrack, survivedFraction, survivedMission } from "../lib/lander";
 import { formatUtc, hourToDate, useApp } from "../state/store";
 import { useSites } from "../state/selectors";
 
@@ -75,7 +75,7 @@ export default function PorkchopPanel() {
       g.fillText(sites[r].name.slice(0, 22), 4, y + 13);
       for (let k = 0; k < cols; k++) {
         const v = row[k];
-        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : v >= 0.999 ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
+        g.fillStyle = !Number.isFinite(v) ? NO_DATA_COLOR : survivedMission(v) ? "rgba(61,220,151,0.9)" : v >= 0.75 ? "rgba(255,200,70,0.85)" : v >= 0.4 ? "rgba(255,130,70,0.85)" : "rgba(200,40,60,0.85)";
         g.fillRect(LABEL_W + k * cw, y + 2, Math.max(1, cw - 0.3), ROW_H - 4);
       }
     });
@@ -103,7 +103,7 @@ export default function PorkchopPanel() {
   };
 
   const hv = hover && hover.row < grid.rows.length && hover.col < cols ? grid.rows[hover.row][hover.col] : null;
-  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (v >= 0.999 ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
+  const best = useMemo(() => grid.rows.map((row) => row.reduce((a, v) => a + (survivedMission(v) ? 1 : 0), 0) / Math.max(1, cols)), [grid, cols]);
 
   return (
     <div className="glass porkchop">
@@ -146,7 +146,7 @@ export default function PorkchopPanel() {
         {hover && hv !== null ? (
           <span>
             {sites[hover.row].name} · land {formatUtc(hourToDate(data, start + hover.col * STEP_H))} UTC →{" "}
-            {Number.isFinite(hv) ? <><b style={{ color: hv >= 0.999 ? "var(--link)" : "var(--danger)" }}>{hv >= 0.999 ? "survives" : `dies on day ${Math.max(1, Math.round(hv * missionDays))}`}</b> · click to jump there</> : "unavailable: not enough data for the full mission"}
+            {Number.isFinite(hv) ? <><b style={{ color: survivedMission(hv) ? "var(--link)" : "var(--danger)" }}>{survivedMission(hv) ? "survives" : `dies on day ${Math.max(1, Math.round(hv * missionDays))}`}</b> · click to jump there</> : "unavailable: not enough data for the full mission"}
           </span>
         ) : (
           <span>
