@@ -1,6 +1,6 @@
 import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
-import { loadField } from "./data/field";
+import { fieldLoader } from "./data/fieldLoad";
 import { loadFullColor, loadGlobe, startPolar80 } from "./data/globe";
 import { useApp } from "./state/store";
 import { applyEarly, currentScene, openedFromLink, syncUrl } from "./state/share";
@@ -101,9 +101,7 @@ export default function App() {
     const s = useApp.getState();
     // The 3D scene needs both the pole field and the globe, so they load together. The globe starts with a preview
     // colour map; the full-size one (7 MB) is fetched only once both are in, so it doesn't slow the first view.
-    const field = loadField(s.setFieldProgress)
-      .then(s.setField)
-      .catch((e: Error) => s.setFieldError(e.message));
+    const field = fieldLoader.start();
     const globe = loadGlobe()
       .then((g) => {
         s.setGlobe(g);
