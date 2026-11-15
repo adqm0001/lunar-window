@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toMap } from "../lib/astro";
 import { changedSurvivalInputs, LANDER_PRESETS, PANEL_LABEL, simulate, survivalInputs, type Lander, type PanelMode, type SimResult } from "../lib/lander";
@@ -91,7 +92,7 @@ export default function LanderPanel() {
           <div className="finder-sub">Hour-by-hour battery at {site.name}</div>
         </div>
         <button className="icon-btn" onClick={() => setLanderOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
 
@@ -152,7 +153,7 @@ export default function LanderPanel() {
           setTimeout(() => currentScene()?.viewLander(), 60);
         }}
       >
-        👁 See the lander on the ground
+        <Icon name="eye" /> View lander
       </button>
 
       <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy}>
@@ -179,10 +180,10 @@ export default function LanderPanel() {
         ))}
       </div>
       {!survival && <div className="f-hint">Run the map simulation first, then 4,000 random touchdowns are scored around this site.</div>}
-      {survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Use “⚡ Analyze this area in detail” in the right panel.</div>}
+      {survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Select Analyze area in the site panel.</div>}
       {mc && siteInField && (
         <div className={stale.length ? "mc stale" : "mc"}>
-          <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "#ffd27a" : "var(--danger)" }}>
+          <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "var(--sun)" : "var(--danger)" }}>
             {mc.okPct.toFixed(1)}%
           </div>
           <div className="mc-text">
@@ -229,17 +230,17 @@ function SocChart({ sim, minSoc }: { sim: SimResult; minSoc: number }) {
     for (let k = 0; k < n; k++) {
       const v = sim.power[k] / maxP;
       if (v <= 0.01) continue;
-      g.fillStyle = `rgba(255,181,71,${0.08 + 0.25 * v})`;
+      g.fillStyle = `rgba(247,213,119,${0.08 + 0.25 * v})`;
       g.fillRect((k / n) * w, 0, Math.max(1, w / n + 0.5), h);
     }
-    g.strokeStyle = "rgba(255,93,108,0.6)";
+    g.strokeStyle = "rgba(255,170,163,0.6)";
     g.setLineDash([3, 3]);
     g.beginPath();
     g.moveTo(0, h - (minSoc / 100) * h);
     g.lineTo(w, h - (minSoc / 100) * h);
     g.stroke();
     g.setLineDash([]);
-    g.strokeStyle = sim.diedAtHour === null ? "#3ddc97" : "#ff5d6c";
+    g.strokeStyle = sim.diedAtHour === null ? "#a7d9c8" : "#ffaaa3";
     g.lineWidth = 1.6;
     g.beginPath();
     for (let k = 0; k <= n; k++) {
@@ -249,8 +250,8 @@ function SocChart({ sim, minSoc }: { sim: SimResult; minSoc: number }) {
       else g.lineTo(x, y);
     }
     g.stroke();
-    g.fillStyle = "#7d889b";
-    g.font = "9px JetBrains Mono, monospace";
+    g.fillStyle = "#bdc3cd";
+    g.font = "9px Geist, sans-serif";
     g.fillText("battery %", 4, 10);
     g.fillText(`${Math.round(n / 24)} d`, w - 22, h - 3);
   }, [sim, minSoc]);

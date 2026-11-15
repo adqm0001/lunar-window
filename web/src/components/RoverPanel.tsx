@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fieldCell } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
@@ -84,7 +85,7 @@ export default function RoverPanel() {
           <div className="finder-sub">Drive only in sunlight, on gentle slopes, as the shadows move hour by hour</div>
         </div>
         <button className="icon-btn" onClick={() => setRoverOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
 
@@ -158,7 +159,7 @@ export default function RoverPanel() {
           </div>
           <div className="chips" style={{ marginTop: 8 }}>
             <button className="btn primary" onClick={replay}>
-              ▶ Replay the drive
+              <Icon name="play" /> Replay drive
             </button>
             <button className="btn" onClick={() => to && select(to.id)}>
               Go to destination
