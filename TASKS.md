@@ -112,7 +112,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [x] **14. Firefox** (S).
 
-- [ ] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels.
+- [x] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels. [Android Chrome test report](docs/testing/task-15-android.md); persistent 3D lag recorded in [bug #146](https://github.com/adqm0001/lunar-window/issues/146).
 
 - [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); 3D touch-camera lag/jumping tracked in [#143](https://github.com/adqm0001/lunar-window/issues/143).
 
