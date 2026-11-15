@@ -6,6 +6,7 @@ import { isRoute } from "../lib/rover";
 import { planRouteInWorker } from "../workers/client";
 import { currentScene, openedFromLink } from "../state/share";
 import { SPEEDS, useApp } from "../state/store";
+import { ephemYears } from "../lib/years";
 
 interface Step {
   title: string;
@@ -161,7 +162,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Checked against NASA",
-    text: "Sun positions match JPL Horizons to 0.00003°, sunlight matches published research within 3.7 points, temperatures match NASA's Diviner instrument. Use Share view to send anyone this exact scene.",
+    text: "Sun positions match JPL Horizons to 0.00003°. Sunlight at the five peaks of light is 3.7 points from published research on average, and temperatures are checked against NASA's Diviner at the Apollo 11 site and Shackleton's floor. Use Share view to send anyone this exact scene.",
     enter: () => {
       closePanels();
       st().setRover(null);
@@ -192,6 +193,8 @@ export default function Tour() {
   const step = useApp((s) => s.tourStep);
   const setStep = useApp((s) => s.setTourStep);
   const globe = useApp((s) => s.globe);
+  const ephem = useApp((s) => s.data?.ephem);
+  const years = ephem ? ephemYears(ephem).label : "the loaded years";
   const [offer, setOffer] = useState(false);
   const [card, setCard] = useState<HTMLDivElement | null>(null);
 
@@ -234,7 +237,7 @@ export default function Tour() {
       <div className="glass tour-card welcome" role="dialog" aria-label="Welcome">
         <div className="tour-title">Plan a landing at the Moon's south pole</div>
         <div className="tour-text">
-          Real NASA terrain, the real Sun and Earth for any hour of 2026–2028, and GPU models of sunlight, radio contact, temperature and ice. New here? The
+          Real NASA terrain, the real Sun and Earth for any hour of {years}, and GPU models of sunlight, radio contact, temperature and ice. New here? The
           one-minute tour shows what it can do.
         </div>
         <div className="tour-nav">
