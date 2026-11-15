@@ -129,6 +129,21 @@ export async function copyShareLink(): Promise<boolean> {
     await navigator.clipboard.writeText(url);
     return true;
   } catch {
-    return false;
+    // The async clipboard is refused in some browsers and embedded views; the older copy command often still works.
+    const ta = document.createElement("textarea");
+    ta.value = url;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    }
+    ta.remove();
+    return ok;
   }
 }

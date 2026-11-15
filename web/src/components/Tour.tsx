@@ -27,6 +27,8 @@ function closePanels() {
   s.setValidationOpen(false);
   s.setReportOpen(false);
   s.setPorkchopOpen(false);
+  // On phones and tablets a tool opens the Sites sheet; close it too, so it doesn't linger under later steps.
+  s.setMobilePanel("none");
   if (s.playing) s.togglePlaying();
 }
 

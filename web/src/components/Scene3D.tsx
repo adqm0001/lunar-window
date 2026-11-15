@@ -194,8 +194,8 @@ export default function Scene3D() {
   }, [scene, leftId, rightId]);
 
   useEffect(() => {
-    scene?.setScatter(mc ? mc.points : null);
-  }, [scene, mc]);
+    scene?.setScatter(mc && landerOpen ? mc.points : null);
+  }, [scene, mc, landerOpen]);
 
   // whole-Moon version of the current layer, painted onto the globe outside the detailed area
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useApp } from "../state/store";
 import { percentOn } from "../lib/visibility";
 import { useSites } from "../state/selectors";
@@ -17,6 +17,15 @@ export default function SiteList() {
   const sites = useSites();
   const dayBucket = Math.floor(hour / 24);
   const seriesVersion = useSeriesVersion();
+  // Your points are renamed in place (double-click, or F2 on the focused row); Enter or leaving the box saves, Esc cancels.
+  const [editing, setEditing] = useState<string | null>(null);
+  const saveName = (id: string, value: string) => {
+    if (value.trim()) useApp.getState().renameCustomSite(id, value.trim().slice(0, 40));
+    setEditing(null);
+  };
+  // After the box closes from the keyboard, put focus back on the row instead of losing it to the page.
+  const refocusRow = (id: string) =>
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`button[data-site="${CSS.escape(id)}"]`)?.focus());
 
   // Sites whose series is still being computed are left out and show an empty bar.
   const sunlit = useMemo(() => {
@@ -40,40 +49,59 @@ export default function SiteList() {
       {groups.map(([group, sites]) => (
         <div key={group}>
           <div className="section-label">{group === "Custom" ? "Your points · click the terrain to add" : group}</div>
-          {sites.map((s) => (
-            <button
-              key={s.id}
-              className={`site-row ${s.id === selectedId ? "active" : ""}`}
-              onClick={() => select(s.id)}
-              onDoubleClick={() => {
-                if (s.group !== "Custom") return;
-                const name = window.prompt("Name this point", s.name);
-                if (name && name.trim()) useApp.getState().renameCustomSite(s.id, name.trim().slice(0, 40));
-              }}
-              title={s.group === "Custom" ? "Double-click to rename" : undefined}
-            >
-              <span className="name">{s.name}</span>
-              <span className="bar">
-                <b style={{ width: `${sunlit[s.id] ?? 0}%` }} />
-              </span>
-              <span className="meta" style={{ width: 32, textAlign: "right" }}>
-                {s.id in sunlit ? `${Math.round(sunlit[s.id])}%` : "…"}
-              </span>
-              {s.group === "Custom" && (
-                <span
-                  className="row-x"
-                  role="button"
-                  aria-label={`Remove ${s.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    useApp.getState().removeCustomSite(s.id);
+          {sites.map((s) => {
+            const custom = s.group === "Custom";
+            if (custom && editing === s.id)
+              return (
+                <input
+                  key={s.id}
+                  className="row-edit"
+                  aria-label={`New name for ${s.name}`}
+                  defaultValue={s.name}
+                  maxLength={40}
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={(e) => saveName(s.id, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      saveName(s.id, e.currentTarget.value);
+                      refocusRow(s.id);
+                    } else if (e.key === "Escape") {
+                      setEditing(null);
+                      refocusRow(s.id);
+                    }
                   }}
-                >
-                  ✕
+                />
+              );
+            const row = (
+              <button
+                key={s.id}
+                data-site={s.id}
+                className={`site-row ${s.id === selectedId ? "active" : ""}`}
+                onClick={() => select(s.id)}
+                onDoubleClick={() => custom && setEditing(s.id)}
+                onKeyDown={(e) => custom && e.key === "F2" && setEditing(s.id)}
+                title={custom ? "Double-click (or F2) to rename" : undefined}
+              >
+                <span className="name">{s.name}</span>
+                <span className="bar">
+                  <b style={{ width: `${sunlit[s.id] ?? 0}%` }} />
                 </span>
-              )}
-            </button>
-          ))}
+                <span className="meta" style={{ width: 32, textAlign: "right" }}>
+                  {s.id in sunlit ? `${Math.round(sunlit[s.id])}%` : "…"}
+                </span>
+              </button>
+            );
+            if (!custom) return row;
+            return (
+              <div key={s.id} className="site-row-box">
+                {row}
+                <button className="row-x" aria-label={`Remove ${s.name}`} title={`Remove ${s.name}`} onClick={() => useApp.getState().removeCustomSite(s.id)}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
         </div>
       ))}
       {/* A replay reloads the page with its own ephemeris (see REPLAYS in data/load.ts); exiting reloads without it. */}

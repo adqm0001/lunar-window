@@ -135,7 +135,7 @@ export class MoonScene {
   private cutaway = new Cutaway();
   private cutOn = false;
   private cutPending = false;
-  private scatter: THREE.Points | null = null;
+  private scatter: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null = null;
   private routeGroup = new THREE.Group();
   private route: RoverRoute | null = null;
   private rover: THREE.Group | null = null;
@@ -1157,15 +1157,18 @@ export class MoonScene {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Flights keep to their duration even when frames are slow (a region analysis busy on the GPU), up to 1/4 s
+    // per frame so a tab that was hidden doesn't skip the whole flight.
+    const flightDt = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     const keys = this.keys;
     if (this.splitOn && this.activeRight) this.keys = NO_KEYS;
-    this.stepCamera(dt);
+    this.stepCamera(dt, flightDt);
     this.keys = keys;
     if (this.splitOn)
       this.inView(true, () => {
         if (!this.activeRight) this.keys = NO_KEYS;
-        this.stepCamera(dt);
+        this.stepCamera(dt, flightDt);
         this.keys = keys;
       });
     this.updateDepthAndSky();
@@ -1189,22 +1192,25 @@ export class MoonScene {
   };
 
   // Moves the current view's camera one frame: flight, 2D map keys, or orbit/surface controls.
-  private stepCamera(dt: number) {
+  private stepCamera(dt: number, flightDt: number) {
     if (this.flight) {
       const f = this.flight;
-      f.t = Math.min(1, f.t + dt / f.dur);
+      f.t = Math.min(1, f.t + flightDt / f.dur);
       const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
       this.controls.target.lerpVectors(f.from, f.to, k);
       const a = f.camFrom.clone().sub(MOON_CENTER);
       const b = f.camTo.clone().sub(MOON_CENTER);
-      const altA = Math.max(0.05, a.length() - R_MOON_KM);
-      const altB = Math.max(0.05, b.length() - R_MOON_KM);
+      // Altitudes are measured from just below the lower end of the flight, not from the reference sphere:
+      // mare sites such as Apollo 11 lie ~2 km below it, and clamping there left the camera 2 km up.
+      const base = Math.min(a.length(), b.length()) - 0.05;
+      const altA = a.length() - base;
+      const altB = b.length() - base;
       const arc = a.angleTo(b);
       const hop = arc * R_MOON_KM * 0.7 * Math.sin(Math.PI * k);
       const alt = Math.exp(Math.log(altA) + (Math.log(altB) - Math.log(altA)) * k) + hop;
       const dir = new THREE.Vector3().copy(a.normalize()).lerp(b.normalize(), k);
       if (dir.lengthSq() < 1e-8) dir.copy(b);
-      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(R_MOON_KM + alt));
+      this.camera.position.copy(MOON_CENTER).add(dir.normalize().multiplyScalar(base + alt));
       // Roll: carry last frame's screen-up (never parallel to the view, so it can't flip), then turn it
       // about the view axis only, gently and faster near the end, toward the wanted up. Where the wanted up
       // points almost along the view (looking straight down) it is ignored.
@@ -1587,6 +1593,7 @@ export class MoonScene {
     if (this.scatter) {
       this.scene.remove(this.scatter);
       this.scatter.geometry.dispose();
+      this.scatter.material.dispose();
       this.scatter = null;
     }
     if (!points || points.length === 0) return;
