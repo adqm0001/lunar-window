@@ -1194,6 +1194,10 @@ export class MoonScene {
       this.renderPass.camera = this.camera;
       this.composer.render();
     }
+    if (this.cutOn && !this.cutPending) {
+      const size = this.labels.getSize();
+      this.cutaway.layout(this.camera, size.width, size.height);
+    }
     this.labels.render(this.scene, this.camera);
     recordRenderedFrame(now);
   };
