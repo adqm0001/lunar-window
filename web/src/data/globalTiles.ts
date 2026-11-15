@@ -12,6 +12,8 @@ type Entry = Int16Array | "loading" | "missing";
 const tiles = new Map<number, Entry>();
 const listeners = new Set<(key: number) => void>();
 const waiting: number[] = [];
+const failedAt = new Map<number, number>();
+const RETRY_MS = 15000;
 let inflight = 0;
 
 export const tileKey = (tx: number, ty: number) => ty * COLS + tx;
@@ -46,7 +48,10 @@ function pump() {
         trim();
         listeners.forEach((cb) => cb(key));
       })
-      .catch(() => tiles.set(key, "missing"))
+      .catch(() => {
+        tiles.set(key, "missing");
+        failedAt.set(key, performance.now());
+      })
       .finally(() => {
         inflight--;
         pump();
@@ -80,7 +85,10 @@ export function getGlobalTile(key: number): Int16Array | null {
 }
 
 export function requestGlobalTile(key: number) {
-  if (tiles.has(key)) return;
+  const t = tiles.get(key);
+  // a failed fetch (a network blip) is tried again, but at most every RETRY_MS
+  if (t === "missing" && performance.now() - (failedAt.get(key) ?? 0) > RETRY_MS) tiles.delete(key);
+  else if (t !== undefined) return;
   tiles.set(key, "loading");
   waiting.push(key);
   pump();
