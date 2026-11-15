@@ -353,6 +353,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 ## Follow-up bug fixes
 
+- [x] **Enforce rover Earth/DSN contact throughout each drive** ([#200](https://github.com/adqm0001/lunar-window/issues/200)) — taken: malqedra
+  - **Files:** `web/src/lib/rover.ts` and regression tests.
+  - **Spec:** when the Earth-link rule is enabled, require contact at both endpoint cells for every sampled hour spanned by a move, using the existing conservative sunlight convention. Waiting can remain without contact; routes with the rule disabled remain unrestricted by contact.
+  - **Verify:** the reported 3×3 / 250 m / 48 h reproduction; mid-drive contact loss; destination contact absent; a later valid window, including across bit 31/32; an exact-hour arrival; rule-off and no-window controls; TypeScript, tests, build, and the production rover tool without console errors.
+
 - [x] **Keep the rover destination action tied to its completed route** ([#199](https://github.com/adqm0001/lunar-window/issues/199)) — taken: malqedra
   - **Files:** `web/src/components/RoverPanel.tsx`, `web/src/state/store.ts`, and regression tests.
   - **Spec:** retain the submitted destination with each successful route. Navigate to that target after form edits or panel reopening, and identify it in the button. Disable the action if the target disappears or its id is reused for different coordinates. Clear its metadata with the route. Leave the route-search algorithm unchanged.
