@@ -62,7 +62,7 @@ export default function Modal({ className, title, subtitle, onClose, children }:
   return createPortal(
     <div className="modal-back" onClick={onClose}>
       <div ref={dialogRef} className={`glass modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId}
-        tabIndex={-1} onClick={(event) => event.stopPropagation()}>
+        tabIndex={-1} onKeyDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <div className="finder-head">
           <div>
             <div className="finder-title" id={titleId}>{title}</div>

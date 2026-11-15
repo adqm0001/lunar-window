@@ -236,7 +236,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 - [x] **40. Keyboard handling in windows** (S) — taken: malqedra
   - **Files:** `src/components/ValidationPanel.tsx`, `SkylinePanel.tsx`, `RegionReport.tsx` (consider a shared `src/components/Modal.tsx`).
   - **Spec:** Escape calls `onClose`; focus moves to the close button on open; Tab/Shift+Tab cycle within the modal; focus returns to the opener on close. `role="dialog"`, `aria-modal="true"`, `aria-labelledby` the title.
-  - **Verify:** keyboard-only: open each window, cycle focus, Escape closes.
+  - **Verify:** keyboard-only: open each window, cycle focus, Escape closes; Space and Enter activate Close, and modal key presses do not trigger background timeline or camera shortcuts.
 
 - [ ] **41. Color-blind palette** (M)
   - **Files:** `src/gpu/layers.ts`, `src/state/store.ts`, `src/components/LayerControls.tsx`.
