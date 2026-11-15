@@ -10,7 +10,10 @@ const RANGES = [7, 30, 90, 365];
 
 function PaletteControls({ palette, onChange }: { palette: Palette; onChange: (p: Palette) => void }) {
   return (
-    <div className="seg" role="group" aria-label="Map color palette">
+    <div className="seg" role="group" aria-label="Map color palette" onKeyDown={(event) => {
+      // Let the focused button use Space before the app's playback shortcut.
+      if (event.key === " ") event.stopPropagation();
+    }}>
       <button className={`chip ${palette === "default" ? "sel" : ""}`} aria-pressed={palette === "default"}
         onClick={() => onChange("default")} title="Original layer colors">Default colors</button>
       <button className={`chip ${palette === "viridis" ? "sel" : ""}`} aria-pressed={palette === "viridis"}

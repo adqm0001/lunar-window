@@ -7,7 +7,7 @@ import { MoonScene } from "../three/MoonScene";
 import { uniqueFeatures } from "../data/artemis";
 import { analyzeArea } from "../gpu/regions";
 import { useApp } from "../state/store";
-import { computeGlobal, globalValueAt } from "../gpu/globalOverlay";
+import { computeGlobal, globalValueAt, paintGlobalOverlay, type GlobalPaintSource } from "../gpu/globalOverlay";
 import { formatLayerValue, layerValue } from "../gpu/layers";
 import { fieldCell } from "../data/field";
 import { formatLatLon } from "../lib/astro";
@@ -46,6 +46,7 @@ export default function Scene3D() {
   const st = useSiteState();
   const { metrics } = useFieldMetrics();
   const lastSelected = useRef<string | null>(null);
+  const displayedGlobal = useRef<GlobalPaintSource | null>(null);
   const view = useApp((s) => s.view);
   const [hover, setHover] = useState<{ x: number; y: number; text: string; value: string | null } | null>(null);
   const hoverAt = useRef(0);
@@ -129,19 +130,29 @@ export default function Scene3D() {
   useEffect(() => {
     if (!scene) return;
     if (!globe || !GLOBAL_LAYERS.includes(layer)) {
+      displayedGlobal.current = null;
       scene.setGlobalOverlay(null);
       useApp.getState().setGlobalInfo(null);
       return;
     }
     if (playing) return;
     let cancelled = false;
-    computeGlobal(layer, day * 24, rangeDays, palette).then((c) => {
-      if (!cancelled) scene.setGlobalOverlay(c);
+    computeGlobal(layer, day * 24, rangeDays).then((source) => {
+      if (!cancelled) {
+        displayedGlobal.current = source;
+        scene.setGlobalOverlay(source ? paintGlobalOverlay(source, useApp.getState().palette) : null);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [scene, globe, layer, rangeDays, day, playing, palette]);
+  }, [scene, globe, layer, rangeDays, day, playing]);
+
+  // Repaint the displayed window even while playback freezes new GPU calculations.
+  useEffect(() => {
+    const source = displayedGlobal.current;
+    if (scene && source?.layer === layer) scene.setGlobalOverlay(paintGlobalOverlay(source, palette));
+  }, [scene, layer, palette]);
 
   useEffect(() => {
     scene?.setRoute(rover && "stops" in rover ? rover : null);
