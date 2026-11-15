@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, useEffect, useState } from "react";
 import { gradientCss, layerDef, LAYERS, PALETTE_LAYERS, type Palette } from "../gpu/layers";
 import { useFieldMetrics } from "../gpu/useFieldMetrics";
 import { formatUtc, hourToDate, useApp } from "../state/store";
@@ -22,7 +22,28 @@ function PaletteControls({ palette, onChange }: { palette: Palette; onChange: (p
   );
 }
 
+// Publishes an element's height as a CSS variable on <body>, so the panels below it can keep clear (styles.css).
+function useHeightVar(name: string) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!el) return;
+    const set = () => document.body.style.setProperty(name, `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    window.addEventListener("resize", set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", set);
+      document.body.style.removeProperty(name);
+    };
+  }, [el, name]);
+  return setEl;
+}
+
 export default function LayerControls() {
+  const barRef = useHeightVar("--layer-bar-h");
+  const legendRef = useHeightVar("--legend-h");
   const data = useApp((s) => s.data)!;
   const field = useApp((s) => s.field);
   const fieldProgress = useApp((s) => s.fieldProgress);
@@ -52,7 +73,7 @@ export default function LayerControls() {
 
   return (
     <>
-      <div className="glass layer-bar">
+      <div ref={barRef} className="glass layer-bar">
         <div className="seg">
           {(["3d", "2d"] as const).map((v) => (
             <button key={v} className={`chip ${v === view ? "sel" : ""}`} onClick={() => setView(v)}>
@@ -106,7 +127,7 @@ export default function LayerControls() {
         {hasPalette && <div className="mobile-palette"><PaletteControls palette={palette} onChange={setPalette} /></div>}
       </div>
 
-      <div className="glass map-legend">
+      <div ref={legendRef} className="glass map-legend">
         <div className="legend-title">{view === "3d" && layer === "terrain" ? "Real-time shadows" : def.label}</div>
         {hasPalette && <PaletteControls palette={palette} onChange={setPalette} />}
         {def.stops.length > 0 && (

@@ -17,7 +17,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; overflow: hidden; }
+html, body, #root { height: 100%; margin: 0; overflow: hidden; overflow: clip; }
 body { background: var(--bg); color: var(--text); font: 13px/1.45 var(--sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
 button { font: inherit; color: inherit; }
 /* Keyboard focus: every focusable control gets the same outline; never remove outlines elsewhere. */
@@ -50,6 +50,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .site-row.active { background: rgba(139,156,255,0.08); border-color: rgba(139,156,255,0.3); }
 .site-row .name { flex: 1; font-size: 12.5px; }
 .site-row .meta { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+.site-row-box { position: relative; }
+.site-row-box .site-row { padding-right: 30px; }
+.site-row-box .row-x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; }
+.row-edit { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.04); border: 1px solid var(--accent); border-radius: 8px; padding: 6px 8px; color: var(--text); font: 12.5px var(--sans); }
 .bar { width: 42px; height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
 .bar > b { display: block; height: 100%; background: var(--sun); }
 
@@ -171,7 +175,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .pin-btn { flex-shrink: 0; background: none; border: 1px solid var(--line-2); border-radius: 7px; padding: 4px 8px; font-size: 11px; color: var(--muted); cursor: pointer; }
 .pin-btn:hover { color: var(--text); border-color: var(--accent); }
 .pin-btn.on { color: #ffd27a; border-color: rgba(255,210,122,0.5); background: rgba(255,210,122,0.08); }
-.compare { position: absolute; left: 272px; right: 354px; bottom: 168px; max-height: 300px; padding: 10px 12px; z-index: 3; display: flex; flex-direction: column; }
+.compare { position: absolute; left: 272px; right: 354px; bottom: 168px; max-height: min(300px, calc(100vh - 256px - max(var(--layer-bar-h, 52px), var(--legend-h, 112px)))); padding: 10px 12px; z-index: 3; display: flex; flex-direction: column; }
 .compare-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .compare-scroll { overflow: auto; }
 .compare-table { border-collapse: collapse; width: 100%; font-size: 11.5px; }
@@ -189,6 +193,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .chip.moon { color: #cfd6ff; }
 
 .left.lander { width: 320px; }
+@media (min-width: 1101px) { .app:has(.left.lander) .layer-bar { left: 344px; } }
 .num-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-top: 8px; }
 .num { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--muted); }
 .num-in { display: flex; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--line-2); border-radius: 7px; padding: 0 7px; }
@@ -210,7 +215,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 
 .analyze-btn { width: 100%; margin-top: 12px; color: #ffd27a; border-color: rgba(255,210,122,0.45); }
 
-.porkchop { position: absolute; left: 272px; right: 354px; bottom: 168px; max-height: 330px; padding: 10px 12px; z-index: 3; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.porkchop { position: absolute; left: 272px; right: 354px; bottom: 168px; max-height: min(330px, calc(100vh - 256px - max(var(--layer-bar-h, 52px), var(--legend-h, 112px)))); padding: 10px 12px; z-index: 3; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .porkchop-canvas { width: 100%; display: block; cursor: crosshair; }
 .porkchop-foot { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 6px; vertical-align: -1px; }
@@ -287,9 +292,35 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
 .report-table td { white-space: nowrap; }
 .report-note { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
-/* ---- phones and narrow windows ---- */
+/* ---- laptop-width windows ----
+   The top bar drops its least important items as the window narrows (the site name and its Sun / Earth / DSN
+   status are also in the right panel), and the layer bar gets the whole middle column with the legend below it. */
+@media (max-width: 1440px) {
+  .topbar .brand small { display: none; }
+}
+@media (max-width: 1300px) {
+  .topbar { gap: 12px; }
+  .topbar > span:not(.pill) { display: none; }
+}
+@media (max-width: 1180px) {
+  .topbar .pill { display: none; }
+}
+@media (min-width: 1101px) and (max-width: 1500px) {
+  .layer-bar { right: 354px; }
+  .map-legend { top: calc(84px + var(--layer-bar-h, 52px)); max-height: calc(100vh - 286px - var(--layer-bar-h, 52px)); overflow-y: auto; }
+  .porkchop { max-height: max(150px, min(330px, calc(100vh - 264px - var(--layer-bar-h, 52px) - var(--legend-h, 112px)))); }
+  .compare { max-height: max(150px, min(300px, calc(100vh - 264px - var(--layer-bar-h, 52px) - var(--legend-h, 112px)))); }
+  /* during the tour, the legend scrolls in the space above the tour card instead of going under it */
+  body:has(.tour-card:not(.welcome)) .map-legend { max-height: max(60px, calc(100vh - 300px - var(--tour-h, 200px) - var(--layer-bar-h, 52px))); }
+}
+/* The tour card stays inside the middle column, clear of the side panels (tool panels are up to 320 px wide). */
+@media (min-width: 1101px) {
+  .tour-card { left: calc(50vw - 15px); width: min(520px, calc(100vw - 694px)); }
+}
+
+/* ---- phones, tablets and narrow windows ---- */
 .mobile-nav, .m-lift, .mobile-palette { display: none; }
-@media (max-width: 760px) {
+@media (max-width: 1100px) {
   .topbar { top: 8px; left: 8px; right: 8px; height: 44px; gap: 8px; padding: 0 10px; }
   .topbar .brand small, .topbar .power, .topbar .pill, .topbar > span, .topbar .share { display: none; }
   .topbar .brand { letter-spacing: 0.1em; font-size: 11px; }
@@ -321,6 +352,11 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
   .porkchop .compare-head .f-hint, .compare .compare-head .f-hint { order: 3; flex-basis: 100%; }
   .porkchop .compare-head .chips { order: 4; flex-basis: 100%; }
   .tour-card { bottom: 66px; }
+  /* during the tour the card sits at the top, under the layer bar, so the sheet with the step's tool stays visible below it */
+  .tour-card:not(.welcome) { top: 104px; bottom: auto; }
+  body:has(.modal-back) .tour-card:not(.welcome) { top: auto; bottom: 12px; }
+  body:has(.tour-card:not(.welcome)) .app.m-sites .left,
+  body:has(.tour-card:not(.welcome)) .app.m-site .right { max-height: calc(100vh - 184px - var(--tour-h, 200px)); }
   .hover-tip { display: none; }
   .modal { padding: 14px; }
   .vtable { font-size: 10.5px; }
