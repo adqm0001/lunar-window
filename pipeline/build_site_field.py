@@ -102,7 +102,7 @@ def main():
             "layout": "uint8 [layer][row][col]; layer 0 = mean slope deg * 4, layer 1 = % of cell under 10 deg",
         },
     }
-    (OUT / "field_ridge_b.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    (OUT / "field_ridge_b.json").write_bytes((json.dumps(meta, indent=2) + "\n").encode("utf-8"))
     print(f"{SITE['name']}: horizon {n}x{n}x{N_AZ}, {h.min():.1f}..{h.max():.1f} deg; "
           f"heights {mesh_n}x{mesh_n}, {z.min():.0f}..{z.max():.0f} m; "
           f"centre ({cx}, {cy}) m")
