@@ -162,7 +162,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Checked against NASA",
-    text: "Sun positions match JPL Horizons to 0.00003°, sunlight matches published research within 3.7 points, temperatures match NASA's Diviner instrument. Use Share view to send anyone this exact scene.",
+    text: "Sun positions match JPL Horizons to 0.00003°. Sunlight at the five peaks of light is 3.7 points from published research on average, and temperatures are checked against NASA's Diviner at the Apollo 11 site and Shackleton's floor. Use Share view to send anyone this exact scene.",
     enter: () => {
       closePanels();
       st().setRover(null);
