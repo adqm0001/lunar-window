@@ -1,3 +1,4 @@
+import Icon from "./Icon";
 import { useState } from "react";
 import { DEFAULT_WEIGHTS, findBestSpots, fitsFinderMission, type FinderParams } from "../gpu/finder";
 import { changedFinderParams, sameWeights } from "../lib/finderSettings";
@@ -36,7 +37,7 @@ export default function FinderPanel() {
     return i >= 0 ? i : 0;
   });
   const [busy, setBusy] = useState(false);
-  const spots = field ? field.meta.horizon.size ** 2 : 0;
+  const [searchError, setSearchError] = useState<string | null>(null);
   const km = field ? Math.round((2 * field.meta.extentMeters) / 1000) : 0;
   const areaLabel = field?.meta.label ? `the ${km} × ${km} km ${field.meta.label} area` : `the ${km} × ${km} km polar area`;
 
@@ -47,10 +48,24 @@ export default function FinderPanel() {
   const stale = result ? changedFinderParams(result.params, params) : [];
   const run = () => {
     if (!field || !fits) return;
+    setSearchError(null);
     setBusy(true);
     setTimeout(() => {
       try {
-        setFinder(findBestSpots(field, params));
+        const ranked = findBestSpots(field, {
+          startHour: start,
+          missionDays,
+          maxNightHours: maxNight,
+          minSafePct: minFlat,
+          weights: PRIORITIES[priority][1],
+        });
+        if (!ranked) {
+          setSearchError("The terrain model is still loading. Try again in a moment.");
+          return;
+        }
+        setFinder(ranked);
+      } catch {
+        setSearchError("The site search could not finish. Try a shorter mission or reload the terrain.");
       } finally {
         setBusy(false);
       }
@@ -61,18 +76,23 @@ export default function FinderPanel() {
     <aside className="left finder">
       <div className="finder-head">
         <div>
-          <div className="finder-title">Find a landing spot</div>
-          <div className="finder-sub">Scores every 250 m cell in {areaLabel}</div>
+          <div className="finder-title">Find best site</div>
+          <div className="finder-sub">Rank sites in {areaLabel} for this mission.</div>
         </div>
         <button className="icon-btn" onClick={() => setFinderOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
 
-      <label className="f-label">Landing time</label>
-      <div className="f-value">{formatUtc(hourToDate(data, start))} UTC</div>
-      <div className="f-hint">Set it with the timeline below</div>
-
+      <label className="f-label" htmlFor="finder-landing-time">Landing time · UTC</label>
+      <input id="finder-landing-time" className="landing-time-input" type="datetime-local" step="3600"
+        min={formatUtc(hourToDate(data, 0)).replace(" ", "T")}
+        max={formatUtc(hourToDate(data, data.ephem.count - 1)).replace(" ", "T")}
+        value={formatUtc(hourToDate(data, start)).replace(" ", "T")}
+        onChange={(event) => {
+          const time = Date.parse(event.target.value + "Z");
+          if (Number.isFinite(time)) useApp.getState().setHour((time - data.ephem.startMs) / 3600000);
+        }} />
       <label className="f-label">Mission length</label>
       <div className="chips">
         {MISSIONS.map((d) => (
@@ -110,8 +130,9 @@ export default function FinderPanel() {
       </div>
 
       <button className="btn primary search-btn" onClick={run} disabled={!field || busy || !fits}>
-        {!field ? "Loading terrain…" : busy ? "Searching…" : `Search ${spots.toLocaleString()} spots`}
+        {!field ? "Loading terrain…" : busy ? "Ranking…" : `Rank landing sites`}
       </button>
+      {searchError && <div className="f-hint error" role="alert">{searchError}</div>}
       {!fits && (
         <div className="f-hint" role="status">
           A {missionDays}-day mission from here runs past the end of the data ({formatUtc(hourToDate(data, data.ephem.count - 1))} UTC). Choose an
@@ -122,8 +143,7 @@ export default function FinderPanel() {
       {result && (
         <>
           <div className="f-stats">
-            {result.evaluated.toLocaleString()} spots × {result.params.missionDays * 24} h scored on the GPU in {result.millis.toFixed(0)} ms ·{" "}
-            {result.rejected.toLocaleString()} ruled out
+            {(result.evaluated - result.rejected).toLocaleString()} eligible sites · {result.params.missionDays}-day mission
           </div>
           {stale.length > 0 && (
             <div className="f-hint warn" role="status">
@@ -139,16 +159,16 @@ export default function FinderPanel() {
                 <span className="r-main">
                   <span className="r-score">{Math.round(c.score * 100)}</span>
                   <span className="r-metrics">
-                    <i style={{ color: "var(--sun)" }}>☀ {Math.round(c.sun * 100)}%</i>
-                    <i style={{ color: "var(--link)" }}>⇅ {Math.round(c.link * 100)}%</i>
-                    <i>☾ {formatDuration(c.nightHours)}</i>
-                    <i>▱ {c.safePct}%</i>
+                    <i style={{ color: "var(--sun)" }}><Icon name="sun" /> {Math.round(c.sun * 100)}%</i>
+                    <i style={{ color: "var(--link)" }}><Icon name="link" /> {Math.round(c.link * 100)}%</i>
+                    <i><Icon name="moon" /> {formatDuration(c.nightHours)}</i>
+                    <i><Icon name="slope" /> {c.safePct}%</i>
                   </span>
                 </span>
               </button>
             ))}
           </div>
-          <div className="f-hint">☀ sunlit · ⇅ Sun + Earth + DSN at once · ☾ longest night · ▱ flat ground</div>
+          <div className="f-hint">Sunlight · Power and comms · Longest night · Safe terrain</div>
         </>
       )}
     </aside>
