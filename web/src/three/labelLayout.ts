@@ -4,7 +4,11 @@
  * centred on its own anchors (so it spreads both ways) without running into the group above it.
  */
 export function spreadLabels(ys: number[], heights: number[], gap: number): { dy: number[]; group: number[] } {
-  const order = ys.map((_, i) => i).sort((a, b) => ys[a] - ys[b]);
+  // a label without a usable screen position (NaN or ±Infinity) stays put and in a group of its own
+  const order = ys
+    .map((_, i) => i)
+    .filter((i) => Number.isFinite(ys[i]))
+    .sort((a, b) => ys[a] - ys[b]);
   // each group: its items (in order), each item's centre relative to the group's first centre, and that first centre
   const groups: { items: number[]; rel: number[]; top: number }[] = [];
   const bottom = (g: (typeof groups)[number]) => g.top + g.rel[g.rel.length - 1] + heights[g.items[g.items.length - 1]] / 2;
@@ -25,7 +29,7 @@ export function spreadLabels(ys: number[], heights: number[], gap: number): { dy
     groups.push(g);
   }
   const dy = new Array<number>(ys.length).fill(0);
-  const group = new Array<number>(ys.length).fill(0);
+  const group = ys.map((_, i) => -1 - i); // skipped labels keep these unique ids
   groups.forEach((g, gi) =>
     g.items.forEach((it, k) => {
       dy[it] = g.top + g.rel[k] - ys[it];

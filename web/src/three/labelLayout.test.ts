@@ -47,4 +47,14 @@ describe("spreading cutaway labels", () => {
     expect(group[1]).toBe(group[2]);
     expect(new Set(group).size).toBe(3);
   });
+
+  it("leaves a label with no usable screen position where it is and lays out the rest", () => {
+    const ys = [494.6, NaN, 473.0, Infinity, 120];
+    const hs = [37, 37, 37, 37, 37];
+    const { dy } = spreadLabels(ys, hs, 4);
+    expect(dy.every(Number.isFinite)).toBe(true);
+    expect(dy[1]).toBe(0);
+    expect(dy[3]).toBe(0);
+    expect(overlaps([494.6, 473.0, 120], [37, 37, 37], [dy[0], dy[2], dy[4]], 4)).toBe(false);
+  });
 });
