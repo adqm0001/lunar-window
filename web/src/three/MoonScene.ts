@@ -17,7 +17,7 @@ import { globeHeight } from "../data/globe";
 import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
-import { LanderModel } from "./landerModel";
+import { LANDER_SHADOW_H_KM, LANDER_SHADOW_R_KM, LanderModel } from "./landerModel";
 import { altaz, localFrame } from "../lib/astro";
 import type { GlobalOverlay } from "../gpu/globalOverlay";
 import { craterTexture } from "./craterTexture";
@@ -175,6 +175,11 @@ export class MoonScene {
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uTime: { value: 0 },
+        uLanderPos: { value: new THREE.Vector3() },
+        uLanderUp: { value: new THREE.Vector3(0, 1, 0) },
+        uLanderR: { value: LANDER_SHADOW_R_KM },
+        uLanderH: { value: LANDER_SHADOW_H_KM },
+        uLanderOn: { value: 0 },
       },
     });
     this.terrainMesh = new THREE.Mesh(geometry, this.terrainMat);
@@ -464,9 +469,15 @@ export class MoonScene {
     const site = this.landerSite;
     const p = site ? this.sitePosition(site) : null;
     this.lander.setVisible(!!p);
+    const mats = [this.terrainMat, ...(this.lod ? [this.lod.material] : [])];
+    for (const m of mats) m.uniforms.uLanderOn.value = p ? 1 : 0;
     if (!site || !p) return;
     const f = localFrame(site.lat, site.lon);
     const up = p.clone().sub(MOON_CENTER).normalize();
+    for (const m of mats) {
+      m.uniforms.uLanderPos.value.copy(p);
+      m.uniforms.uLanderUp.value.copy(up);
+    }
     const north = new THREE.Vector3(f.north[1], -f.north[2], -f.north[0]);
     this.lander.place(p, up, north);
     const sun = altaz(this.lastSunMe, f, R_MOON_KM + site.height_m / 1000);
@@ -1047,6 +1058,7 @@ export class MoonScene {
     if (this.gOverlay) setTimeout(() => this.setGlobalOverlay(this.gOverlay), 0);
     this.setCutUniforms(this.cutOn && !this.cutPending);
     this.globeMats = [this.lod.material];
+    this.updateLander();
     this.updateHoles();
     this.scene.add(this.lod.group);
     for (const m of this.globeMats) {
