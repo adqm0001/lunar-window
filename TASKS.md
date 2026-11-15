@@ -94,7 +94,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
-- [ ] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
+- [x] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
 
 - [ ] **9. Edit and upload video** (M). Clips 1–7 + voice-over, ≤ 3:00, upload (unlisted YouTube is fine). **Depends on** 1–8.
 
