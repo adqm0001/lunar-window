@@ -4,6 +4,7 @@ import { useSeries } from "../state/selectors";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { canRecord, startRecording, stopRecording } from "../lib/recorder";
 import { ephemYears } from "../lib/years";
+import { scrubHour, viewStart } from "../lib/timelineScrub";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -30,6 +31,8 @@ export default function Timeline() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [windowDays, setWindowDays] = useState(30);
   const scrubbing = useRef<"main" | "overview" | null>(null);
+  // View start frozen at pointerdown so the pointer-to-hour mapping stays linear for the whole drag.
+  const [frozenStart, setFrozenStart] = useState<number | null>(null);
   const view = useApp((s) => s.view);
   const [recStart, setRecStart] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -52,7 +55,7 @@ export default function Timeline() {
 
   const total = data.ephem.count;
   const span = windowDays * 24;
-  const start = Math.max(0, Math.min(total - span, hour - span / 3));
+  const start = frozenStart ?? viewStart(hour, span, total);
 
   useEffect(() => {
     const el = wrapRef.current!;
@@ -164,8 +167,11 @@ export default function Timeline() {
   const hourFromEvent = (e: React.PointerEvent, mode: "main" | "overview") => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const W = size.w - LABEL_W - 12;
-    const f = Math.max(0, Math.min(1, (e.clientX - rect.left - LABEL_W) / W));
-    return mode === "overview" ? f * total : start + f * span;
+    return scrubHour((e.clientX - rect.left - LABEL_W) / W, mode, start, span, total);
+  };
+  const endScrub = () => {
+    scrubbing.current = null;
+    setFrozenStart(null);
   };
 
   return (
@@ -210,12 +216,16 @@ export default function Timeline() {
           (e.target as Element).setPointerCapture(e.pointerId);
           const rect = canvasRef.current!.getBoundingClientRect();
           scrubbing.current = e.clientY - rect.top < OVERVIEW_H + 8 ? "overview" : "main";
+          // The mapping uses the view as it was before this press; the render then keeps it frozen until release.
           setHour(hourFromEvent(e, scrubbing.current));
+          setFrozenStart(start);
         }}
         onPointerMove={(e) => {
           if (scrubbing.current) setHour(hourFromEvent(e, scrubbing.current));
         }}
-        onPointerUp={() => (scrubbing.current = null)}
+        onPointerUp={endScrub}
+        onPointerCancel={endScrub}
+        onLostPointerCapture={endScrub}
       >
         <canvas ref={canvasRef} />
       </div>
