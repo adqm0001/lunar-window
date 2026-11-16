@@ -61,7 +61,7 @@ We used SI image generation for earlier interface concepts that are absent from 
 | JPL DE421 Planetary Ephemeris | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/a_old_versions/de421.bsp |
 | NASA NAIF SPICE Generic Kernels (Moon frame and orientation) | https://naif.jpl.nasa.gov/pub/naif/generic_kernels/ |
 | NASA JPL Horizons System | https://ssd.jpl.nasa.gov/horizons/ |
-| NASA SVS CGI Moon Kit | https://svs.gsfc.nasa.gov/4720/ |
+| NASA SVS CGI Moon Kit | https://www.nasa.gov/missions/nasa-goddard-creates-cgi-moon-kit-as-a-form-of-visual-storytelling/ |
 | NASA Deep Space Network | https://www.nasa.gov/communicating-with-missions/dsn/ |
 | NASA Artemis III Moon Landing Regions (October 2024 reference catalog) | https://www.nasa.gov/news-release/nasa-provides-update-on-artemis-iii-moon-landing-regions/ |
 | LRO Diviner Lunar Radiometer Experiment (published temperature benchmarks) | https://www.diviner.ucla.edu/ |
@@ -71,13 +71,13 @@ We used SI image generation for earlier interface concepts that are absent from 
 | Link Text | Link URL |
 | --- | --- |
 | Bussey et al. (2010), published illumination from JAXA Kaguya topography, used as a comparison reference | https://doi.org/10.1016/j.icarus.2010.03.028 |
-| Hayne et al. (2017), lunar regolith thermal properties | https://doi.org/10.1002/2017JE005387 |
+| Hayne et al. (2017), lunar regolith thermal properties | https://arxiv.org/abs/1711.00977 |
 | Williams et al. (2017), Diviner surface temperatures | https://doi.org/10.1016/j.icarus.2016.08.012 |
-| Paige et al. (2010), Diviner observations of south polar cold traps | https://doi.org/10.1126/science.1187726 |
+| Paige et al. (2010), Diviner observations of south polar cold traps | https://geoweb.rsl.wustl.edu/community/applications/core/interface/file/attachment.php?id=505 |
 | Ingersoll et al. (1992), polar frost stability and crater radiative heating | https://ntrs.nasa.gov/citations/19930034907 |
-| Weber et al. (2011), seismic model used for the Moon cutaway | https://doi.org/10.1126/science.1199375 |
+| Weber et al. (2011), seismic model used for the Moon cutaway | https://asu.elsevierpure.com/en/publications/seismic-detection-of-the-lunar-core/ |
 | IAU/USGS Gazetteer of Planetary Nomenclature (crater and region centers) | https://planetarynames.wr.usgs.gov/ |
-| Intuitive Machines IM-2 landing announcement (replay time) | https://investors.intuitivemachines.com/news-releases/news-release-details/intuitive-machines-lands-and-operates-second-mission-moon |
+| IM-2 Athena touchdown confirmation from NASA and Intuitive Machines (replay time) | https://www.nasa.gov/blogs/missions/2025/03/06/intuitive-machines-mission-lands-near-south-pole-carrying-nasa-science/ |
 | Geist typeface and SIL Open Font License | https://github.com/vercel/geist-font |
 | Viridis color palette | https://github.com/BIDS/colormap/blob/master/colormaps.py |
 | React | https://react.dev/ |
