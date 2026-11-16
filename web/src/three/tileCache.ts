@@ -78,6 +78,24 @@ float h64(float latDeg, float lonDeg, out bool ok) {
   ivec2 p = ivec2(floor(vec2(px, py)));
   vec2 f = vec2(px, py) - floor(vec2(px, py));
   float a; float b; float d; float e;
+  // Fast path: all four pixels in one tile (all but ~0.4% of lookups), so the tile index is read once
+  // instead of four times. Same result as the general path below. Shadow rays call this up to 90 times per pixel.
+  int W = 48 * 480;
+  int x = ((p.x % W) + W) % W;
+  int tx = x / 480;
+  int ty = p.y / 480;
+  int lx = x - tx * 480;
+  int ly = p.y - ty * 480;
+  if (p.y >= 0 && lx < 479 && ly < 479) {
+    int layer = texelFetch(uT64Index, ivec2(tx, ty), 0).r;
+    ok = layer >= 0;
+    if (!ok) return 0.0;
+    a = float(texelFetch(uT64, ivec3(lx, ly, layer), 0).r);
+    b = float(texelFetch(uT64, ivec3(lx + 1, ly, layer), 0).r);
+    d = float(texelFetch(uT64, ivec3(lx, ly + 1, layer), 0).r);
+    e = float(texelFetch(uT64, ivec3(lx + 1, ly + 1, layer), 0).r);
+    return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);
+  }
   ok = pix64(p, a) && pix64(p + ivec2(1, 0), b) && pix64(p + ivec2(0, 1), d) && pix64(p + ivec2(1, 1), e);
   if (!ok) return 0.0;
   return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);
