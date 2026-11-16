@@ -170,6 +170,7 @@ export const useApp = create<AppState>((set, get) => ({
       rover: null,
       roverDestination: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
+      selectedId: resolveSelection(s.selectedId, s.data, s.customSites, null),
     })),
   landerOpen: false,
   roverOpen: false,
@@ -224,7 +225,7 @@ export const useApp = create<AppState>((set, get) => ({
   setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,
   setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
-  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
+  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? resolveSelection(s.selectedId, s.data, s.customSites, finder) })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSites: [],
@@ -240,20 +241,30 @@ export const useApp = create<AppState>((set, get) => ({
       if (i >= 0) {
         const next = [...s.customSites];
         next[i] = { ...site, name: s.customSites[i].name };
-        return { customSites: next, selectedId: site.id };
+        // A pinned copy of this point follows the replacement (same id, kept name).
+        return { customSites: next, pinned: s.pinned.map((p) => (p.id === site.id ? next[i] : p)), selectedId: site.id };
       }
       const seq = s.pointSeq + 1;
       const named = site.name === "Custom point" ? { ...site, name: `Point ${seq}` } : site;
       return { customSites: [...s.customSites, named].slice(-20), pointSeq: seq, selectedId: site.id };
     }),
   removeCustomSite: (id) =>
+    set((s) => {
+      const customSites = s.customSites.filter((c) => c.id !== id);
+      const pinned = s.pinned.filter((p) => p.id !== id);
+      return {
+        customSites,
+        pinned,
+        compareOpen: s.compareOpen && pinned.length > 0,
+        split: s.split && pinned.length >= 2,
+        selectedId: s.selectedId === id ? resolveSelection(id, s.data, customSites, s.finder) : s.selectedId,
+      };
+    }),
+  renameCustomSite: (id, name) =>
     set((s) => ({
-      customSites: s.customSites.filter((c) => c.id !== id),
-      pinned: s.pinned.filter((p) => p.id !== id),
-      split: s.split && s.pinned.filter((p) => p.id !== id).length >= 2,
-      selectedId: s.selectedId === id ? "connecting-ridge-b" : s.selectedId,
+      customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)),
+      pinned: s.pinned.map((p) => (p.id === id ? { ...p, name } : p)),
     })),
-  renameCustomSite: (id, name) => set((s) => ({ customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)) })),
   hour: 0,
   playing: false,
   speedIndex: 2,
@@ -270,6 +281,12 @@ export const useApp = create<AppState>((set, get) => ({
   setSpeedIndex: (speedIndex) => set({ speedIndex }),
   select: (selectedId) => set({ selectedId }),
 }));
+
+/** Keep `id` if it names a built-in site, a custom point or a finder candidate; otherwise the first built-in site. */
+function resolveSelection(id: string, data: AppData | null, customSites: Site[], finder: FinderResult | null) {
+  if (data?.sites.some((x) => x.id === id) || customSites.some((x) => x.id === id) || finder?.candidates.some((c) => c.site.id === id)) return id;
+  return data?.sites[0]?.id ?? id;
+}
 
 export function hourToDate(data: AppData, hour: number) {
   return new Date(data.ephem.startMs + hour * 3600e3);

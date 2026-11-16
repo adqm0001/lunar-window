@@ -1,6 +1,7 @@
 import type { Ephemeris } from "../data/load";
 import type { FieldData } from "../data/field";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
+import { missionFits } from "../lib/lander";
 import { THERMAL_MAIN, thermalWarmup } from "./thermal";
 import { gpuIdle } from "./gpuWait";
 
@@ -323,10 +324,12 @@ export class GpuEngine {
     gl.viewport(0, 0, size, size);
   }
 
-  computeSurvival(startHour: number, hours: number, lander: SurvivalLander): FieldMetrics {
+  /** Null when the ephemeris doesn't cover the whole mission, so a shortened run never shows as survival. */
+  computeSurvival(startHour: number, hours: number, lander: SurvivalLander): FieldMetrics | null {
+    if (!missionFits(startHour, hours, this.count)) return null;
     const gl = this.gl;
-    const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
-    const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
+    const start = startHour;
+    const len = hours;
     const stride = Math.max(1, Math.ceil(len / 4400));
     const steps = Math.max(1, Math.floor(len / stride));
     const t0 = performance.now();
