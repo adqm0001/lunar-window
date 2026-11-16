@@ -14,7 +14,7 @@ Lunar Window is a browser-based tool for comparing where and when to land at the
 
 Use this public link to the narrated demo in the Project Demonstration field.
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/2a4f5dec89c1b495d73690caffc3df855f08e558/docs/demo/lunar-window-30s.mp4
+https://cdn.jsdelivr.net/gh/adqm0001/lunar-window@2a4f5dec89c1b495d73690caffc3df855f08e558/docs/demo/lunar-window-30s.mp4
 
 The live planner demo includes narration recorded by the team. The [seven-slide PDF](https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf) is also available.
 
