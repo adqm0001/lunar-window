@@ -5,6 +5,7 @@ import { inField } from "../data/field";
 import { analyzeArea } from "../gpu/regions";
 import { createCountdownCache } from "../lib/countdown";
 import { longestRun, percentOn } from "../lib/visibility";
+import { pinIdentity } from "../lib/pins";
 import { PANEL_THERMAL_HOURS, thermalSpanLabel, type SiteThermal } from "../lib/siteThermal";
 import { iceVerdictPossible } from "../gpu/thermal";
 import { getThermal, useSeriesVersion } from "../state/seriesCache";
@@ -57,7 +58,7 @@ export default function SitePanel() {
   const hour = useApp((s) => s.hour);
   const site = useSelectedSite();
   const st = useSiteState();
-  const pinned = useApp((s) => s.pinned.some((p) => p.id === site.id));
+  const pinned = useApp((s) => s.pinned.some((p) => p.id === pinIdentity(site)));
   const togglePin = useApp((s) => s.togglePin);
   const field = useApp((s) => s.field);
   const outside = useMemo(() => {
