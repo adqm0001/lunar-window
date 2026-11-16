@@ -1,6 +1,6 @@
 import * as THREE from "three";
+import { FrameOrbitControls } from "./FrameOrbitControls";
 import { recordRenderedFrame } from "../lib/playbackPerformance";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -47,7 +47,7 @@ type Flight = {
 // the other view here and swaps it in (swapView), so movement, flight and drawing code serve both views.
 interface ViewSlot {
   camera: THREE.PerspectiveCamera;
-  controls: OrbitControls;
+  controls: FrameOrbitControls;
   controlsEl: HTMLElement;
   flight: Flight | null;
   orbitMode: boolean;
@@ -78,7 +78,7 @@ export class MoonScene {
   private labels: CSS2DRenderer;
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
-  private controls: OrbitControls;
+  private controls: FrameOrbitControls;
   private composer: EffectComposer;
   private lens: ShaderPass;
   private terrainMat: THREE.ShaderMaterial;
@@ -109,7 +109,7 @@ export class MoonScene {
   private lastRender = 0;
   private orbitMode = true;
   private keys = new Set<string>();
-  private draggingCtl = new WeakSet<OrbitControls>();
+  private draggingCtl = new WeakSet<FrameOrbitControls>();
   private get dragging() {
     return this.draggingCtl.has(this.controls);
   }
@@ -178,7 +178,7 @@ export class MoonScene {
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20000);
     this.camera.position.copy(MOON_CENTER).add(new THREE.Vector3(0, 0.62, 1).normalize().multiplyScalar(R_MOON_KM + 3600));
     this.controlsEl = this.renderer.domElement;
-    this.controls = new OrbitControls(this.camera, this.controlsEl);
+    this.controls = new FrameOrbitControls(this.camera, this.controlsEl);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(MOON_CENTER);
@@ -610,7 +610,7 @@ export class MoonScene {
   private configureControls(orbit: boolean) {
     const target = this.controls ? this.controls.target.clone() : MOON_CENTER.clone();
     this.controls?.dispose();
-    this.controls = new OrbitControls(this.camera, this.controlsEl);
+    this.controls = new FrameOrbitControls(this.camera, this.controlsEl);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.07;
     this.controls.target.copy(target);
@@ -634,7 +634,7 @@ export class MoonScene {
     }
     // The constructor already aimed the camera at its default target (the world origin); re-aim it
     // now, or the first frame after a flight shows the wrong view, rolled upside down.
-    this.controls.update();
+    this.controls.updateFrame();
   }
 
   // ---- 2D map mode: the same terrain seen straight down, north up (0 longitude up near the poles)
@@ -1256,7 +1256,7 @@ export class MoonScene {
         this.controls.rotateSpeed = 0.5 * Math.min(1, Math.max(0.05, alt / 3000));
         this.spinOrbit(dt);
       } else this.moveOnSurface(dt);
-      if (this.controls.update() || this.keys.size) this.dirty = true;
+      if (this.controls.updateFrame(flightDt) || this.keys.size) this.dirty = true;
       if (this.keepAboveGround()) this.dirty = true;
     }
     if (this.autoExposure(dt)) this.dirty = true;
@@ -1275,7 +1275,7 @@ export class MoonScene {
     if (on && !this.split) {
       const el = this.ensureSplitEl();
       const cam = this.camera.clone();
-      const controls = new OrbitControls(cam, el);
+      const controls = new FrameOrbitControls(cam, el);
       controls.target.copy(this.controls.target);
       this.split = {
         camera: cam,
