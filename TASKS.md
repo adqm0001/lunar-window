@@ -96,7 +96,7 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [x] **8. Voice-over script** (S). A script and edit plan for a video of **30 seconds or less**, following the team-supplied 2026 project-page instructions. See [voiceover.md](docs/voiceover.md).
 
-- [ ] **9. Edit and upload video** (M, optional if using the seven-slide demo). Edit selected footage with captions or narration to **30 seconds or less**, upload publicly, and verify the link while signed out. [A 29-second captioned MP4](docs/demo/lunar-window-29s.mp4) is included, with optional narration in Task 8. Raw clips can be longer but are not the submitted demo. The team-supplied 2026 instructions permit a seven-slide deck instead of a video.
+- [x] **9. Edit and upload video** (M, optional if using the seven-slide demo). [29-second captioned MP4](docs/demo/lunar-window-29s.mp4), with optional narration in Task 8. Verified 29.000 seconds, 1920 × 1080, H.264, 30 fps, 870 frames, no audio, full-file decode and browser playback/seeking. The [public link](docs/submission.md#link-to-project-demo) downloads without authentication and matches the checked file by SHA-256. This replaces the old three-minute spec with the team-supplied 2026 limit. The seven-slide deck remains an alternative demo.
 
 - [x] **10. Slides** (M). **Seven slides total**, including title and team, covering the challenge, local horizon, NASA data and method, site ranking, comparison and landing dates, evidence and limitations, and impact. Use current app screenshots and all five team names. Provide PDF and editable PPTX. See [slides.pdf](docs/slides.pdf), [slides.pptx](docs/slides.pptx), and [sources](docs/sources.md).
 

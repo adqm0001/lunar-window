@@ -48,4 +48,3 @@ NASA-hosted material, partner publications, fonts and software have their own cr
 ## Submission guidance
 
 The official [challenge](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/), [project submission guide](https://www.spaceappschallenge.org/resources/project-submission-guide/) and [judging guide](https://www.spaceappschallenge.org/resources/judging-awards-guide/) identify the task and evaluation context. The project-page instructions supplied by the team for this revision specify **up to seven English slides or a video of 30 seconds or less**. Direct retrieval of the guide pages was unavailable during this revision, so no unverified 2026 scoring weights are asserted.
-

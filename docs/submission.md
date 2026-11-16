@@ -14,13 +14,17 @@ Lunar Window is a browser-based tool for comparing where and when to land at the
 
 Use the **seven-slide PDF** as the official demo. It already includes the project, challenge, team names, NASA data, working interface and limitations.
 
-After these files merge into the public main branch, the intended link is:
+Public PDF link, verified without signing in:
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/main/docs/slides.pdf
+https://raw.githubusercontent.com/adqm0001/lunar-window/f97e42d19ecf7965310431623e6ab6250e84f077/docs/slides.pdf
 
-This address already exists for the previous deck. Confirm that the public link displays the refreshed seven-slide version before submitting it. A proposed branch or a pending PR does not replace the main-branch file. The editable source is `docs/slides.pptx`; `docs/slides.html` is a local browser preview.
+This link pins the checked demo revision, so it works before the documentation PR merges and does not depend on the review branch remaining open. The editable source is `docs/slides.pptx`; `docs/slides.html` is a local browser preview.
 
 An alternative [29-second captioned video](demo/lunar-window-29s.mp4) combines opening slides with actual site ranking, comparison and landing-date selection. It has no audio. Choose its public link instead if you prefer video. The [optional narration script](voiceover.md) fits within the time limit when read at the stated pace. The older long raw clips are source material, not the submitted short demo.
+
+Public video link, verified without signing in:
+
+https://raw.githubusercontent.com/adqm0001/lunar-window/f97e42d19ecf7965310431623e6ab6250e84f077/docs/demo/lunar-window-29s.mp4
 
 ## Link to Final Project
 
@@ -97,15 +101,15 @@ Additional references include Hayne et al. (2017) for regolith properties, Willi
 Software: C++/OpenMP, Python, NumPy, Skyfield, Pillow, TypeScript, React, three.js, Zustand, WebGL2, Vite and Vitest. Geist is bundled under the SIL Open Font License. The optional Viridis palette derives from the BIDS CC0 colormap collection. The presentation uses Segoe UI. SI and screenshot tooling are disclosed above.
 
 Full publications, URLs, media credits and license notes:
-https://github.com/adqm0001/lunar-window/blob/main/docs/sources.md
+https://github.com/adqm0001/lunar-window/blob/f97e42d19ecf7965310431623e6ab6250e84f077/docs/sources.md
 
 ## Team credits
 
-Adam Benmoussa  
-Sazid Malik  
-Achraf Benchoubane  
-Mohammad Al-Qedra  
-Mohanad Abdelaal
+- Adam Benmoussa
+- Sazid Malik
+- Achraf Benchoubane
+- Mohammad Al-Qedra
+- Mohanad Abdelaal
 
 The slides identify Lunar Window as the project/team label. Confirm the registered team name and local event in the official form.
 
@@ -119,4 +123,3 @@ The slides identify Lunar Window as the project/team label. Confirm the register
 - Exclude likenesses of people under 18 from the demo and final project.
 - Complete every required form field and choose **Submit for Judging** by November 15 at 11:59 p.m. in the applicable event time zone, as specified in the team-supplied guide.
 - Keep Task 11 unchecked until the actual submission and its public links have been verified.
-
