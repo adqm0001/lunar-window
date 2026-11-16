@@ -15,13 +15,14 @@ import { toLatLon, toMap } from "../lib/astro";
 import { EARTH_FRAG, EARTH_VERT, TERRAIN_FRAG, TERRAIN_VERT } from "./shaders";
 import type { GlobeData, Polar80Tile } from "../data/globe";
 import { globeHeight } from "../data/globe";
-import { latLonFromWorld, MOON_CENTER, worldFromLatLon } from "./globe";
+import { latLonFromWorld, MOON_CENTER, polarToWorld, worldFromLatLon } from "./globe";
+import { vertexNormals } from "./meshNormals";
 import { LodTerrain, surfaceHeightM, type Quality } from "./lod";
 import { Cutaway } from "./cutaway";
 import { LANDER_SHADOW_H_KM, LANDER_SHADOW_R_KM, LanderModel } from "./landerModel";
 import { altaz, localFrame } from "../lib/astro";
 import type { GlobalOverlay } from "../gpu/globalOverlay";
-import { craterTexture } from "./craterTexture";
+import { craterTexture, onCraterTexture } from "./craterTexture";
 import { R_MOON_KM } from "../lib/astro";
 import type { ScatterPoint } from "../lib/montecarlo";
 import { roverAt, type RoverRoute } from "../lib/rover";
@@ -102,6 +103,8 @@ export class MoonScene {
   private lastSites: Site[] = [];
   onPickLatLon: ((lat: number, lon: number) => void) | null = null;
   private dirty = true;
+  // the crater detail texture is built in a worker and arrives after the first frames
+  private offCrater = onCraterTexture(() => (this.dirty = true));
   private lastRender = 0;
   private orbitMode = true;
   private keys = new Set<string>();
@@ -282,15 +285,14 @@ export class MoonScene {
     const cy = f.meta.centerY ?? 0;
     const pos = new Float32Array(n * n * 3);
     const map = new Float32Array(n * n * 2);
+    // polarToWorld places a vertex exactly like mapToWorld, without trig or allocation: this loop runs 1.6 million
+    // times at startup and mapToWorld made it take ~2 s.
     for (let r = 0; r < n; r++) {
       for (let c = 0; c < n; c++) {
         const i = r * n + c;
         const x = (c + 0.5) * cell - E + cx;
         const y = E - (r + 0.5) * cell + cy;
-        const w = this.mapToWorld(x, y, f.heights[i]);
-        pos[i * 3] = w.x;
-        pos[i * 3 + 1] = w.y;
-        pos[i * 3 + 2] = w.z;
+        polarToWorld(x, y, f.heights[i] * EXAGGERATION, pos, i * 3);
         map[i * 2] = x;
         map[i * 2 + 1] = y;
       }
@@ -298,10 +300,12 @@ export class MoonScene {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute("aMap", new THREE.BufferAttribute(map, 2));
-    // Normals come from the full grid; Saver then draws every second vertex (a quarter of the triangles).
-    const full = new THREE.BufferAttribute(gridIndex(n, 1), 1);
+    // Normals come from the full grid (vertexNormals: three's computeVertexNormals on the typed arrays); Saver then
+    // draws every second vertex (a quarter of the triangles).
+    const fullIdx = gridIndex(n, 1);
+    const full = new THREE.BufferAttribute(fullIdx, 1);
     geometry.setIndex(full);
-    geometry.computeVertexNormals();
+    geometry.setAttribute("normal", new THREE.BufferAttribute(vertexNormals(pos, fullIdx), 3));
     geometry.userData.full = full;
     geometry.userData.coarse = new THREE.BufferAttribute(gridIndex(n, 2), 1);
     if (this.quality === "saver") geometry.setIndex(geometry.userData.coarse);
@@ -1781,6 +1785,7 @@ export class MoonScene {
   }
 
   dispose() {
+    this.offCrater();
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     this.cutaway.dispose();

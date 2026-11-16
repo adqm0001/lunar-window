@@ -2,6 +2,7 @@ import type { Ephemeris } from "../data/load";
 import type { GlobeData } from "../data/globe";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
 import { BOUNCE_ABSORBED, NZ, ICE_K, STEP_HOUR_GLSL, thermalWarmup } from "./thermal";
+import { gpuIdle } from "./gpuWait";
 
 // The same sunlight, Earth, link, night, temperature and ice maps as the polar engine, for the
 // whole Moon on a 0.25° grid (1440 x 720, about a million points), all on the GPU.
@@ -348,6 +349,8 @@ export class GlobalLayers {
   private count: number;
   private buf = new Float32Array(GW * GH * 4);
   private hzTex = new Map<GridId, WebGLTexture>();
+  // one job at a time: a job's GL state stays set across the awaits between its bands
+  private queue: Promise<unknown> = Promise.resolve();
   horizonMillis = 0;
 
   private setGrid(p: WebGLProgram, grid: { code: number; w: number; h: number }) {
@@ -464,7 +467,20 @@ export class GlobalLayers {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out, 0);
   }
 
-  compute(kind: "light" | "thermal", startHour: number, hours: number): GlobalMetrics {
+  /**
+   * Whole-Moon metrics for a window. The GPU work goes one band at a time with a wait for the GPU in between (see
+   * gpuIdle): run in one go, the thermal model blocked the page for over a second. Resolves to null if `alive`
+   * turns false before it's done (nobody wants the result any more); queued jobs run one after another.
+   */
+  compute(kind: "light" | "thermal", startHour: number, hours: number, alive: () => boolean = () => true): Promise<GlobalMetrics | null> {
+    const run = () => this.run(kind, startHour, hours, alive);
+    const job = this.queue.then(run, run);
+    this.queue = job.catch(() => undefined);
+    return job;
+  }
+
+  private async run(kind: "light" | "thermal", startHour: number, hours: number, alive: () => boolean): Promise<GlobalMetrics | null> {
+    if (!alive()) return null;
     const gl = this.gl;
     const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
     const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
@@ -495,7 +511,11 @@ export class GlobalLayers {
       for (let y = 0; y < grid.h; y += band) {
         gl.scissor(0, y, grid.w, Math.min(band, grid.h - y));
         gl.drawArrays(gl.TRIANGLES, 0, 3);
-        gl.flush();
+        await gpuIdle(gl);
+        if (!alive()) {
+          gl.disable(gl.SCISSOR_TEST);
+          return null;
+        }
       }
       gl.disable(gl.SCISSOR_TEST);
       const n = grid.w * grid.h * 4;

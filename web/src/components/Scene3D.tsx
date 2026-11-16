@@ -214,7 +214,7 @@ export default function Scene3D() {
     // past the end of the data (computeGlobal returns null at once then).
     if (playing && !(layer === "ice" && !iceCovered(data.ephem.count, day * 24))) return;
     let cancelled = false;
-    computeGlobal(layer, day * 24, rangeDays).then((source) => {
+    computeGlobal(layer, day * 24, rangeDays, () => !cancelled).then((source) => {
       if (!cancelled) {
         displayedGlobal.current = source;
         scene.setGlobalOverlay(source ? paintGlobalOverlay(source, useApp.getState().palette) : null);
