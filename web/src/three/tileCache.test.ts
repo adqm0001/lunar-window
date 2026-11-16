@@ -32,15 +32,15 @@ describe("visible height tiles", () => {
     load(0);
     cache.use([0]);
     for (let key = 1; key <= 64; key++) load(key);
-    expect((cache.index.image.data as Int16Array)[0]).toBeGreaterThanOrEqual(0);
+    expect(cache.index.image.data[0]).toBeGreaterThanOrEqual(0);
   });
 
   it("reuploads a needed tile after it was evicted", () => {
     const cache = new GpuTileCache();
     for (let key = 0; key <= 64; key++) load(key);
-    expect((cache.index.image.data as Int16Array)[0]).toBe(-1);
+    expect(cache.index.image.data[0]).toBe(-1);
     cache.use([0]);
-    expect((cache.index.image.data as Int16Array)[0]).toBeGreaterThanOrEqual(0);
+    expect(cache.index.image.data[0]).toBeGreaterThanOrEqual(0);
   });
 
   it("checks pending visible tiles again when the camera has no new work", () => {
