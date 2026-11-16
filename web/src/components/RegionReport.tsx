@@ -69,18 +69,18 @@ export default function RegionReport({ onClose }: { onClose: () => void }) {
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.region.name}>
-                  <td>{i + 1}</td>
-                  <td>{r.region.name}</td>
-                  <td>
+                  <td className="rt-rank">{i + 1}</td>
+                  <td className="rt-name">{r.region.name}</td>
+                  <td data-label="Sunlit avg / best">
                     {pct(r.sunAvg)} / <b style={{ color: "var(--sun)" }}>{pct(r.sunBest)}</b>
                   </td>
-                  <td>{pct(r.earthAvg)}</td>
-                  <td style={{ color: "var(--link)" }}>{pct(r.linkBest)}</td>
-                  <td>{formatDuration(r.nightBestH)}</td>
-                  <td style={{ color: "var(--earth)" }} title={iceOk ? undefined : "Needs a full year of data"}>
+                  <td data-label="Earth in view">{pct(r.earthAvg)}</td>
+                  <td data-label="Sun + DSN best" style={{ color: "var(--link)" }}>{pct(r.linkBest)}</td>
+                  <td data-label="Longest night (best)">{formatDuration(r.nightBestH)}</td>
+                  <td data-label="Ice-stable area" style={{ color: "var(--earth)" }} title={iceOk ? undefined : "Needs a full year of data"}>
                     {iceOk ? pct(r.iceArea) : "—"}
                   </td>
-                  <td>
+                  <td className="rt-go">
                     <button className="btn small" onClick={() => go(r)} title="Add the best spot as a point and fly there">
                       Go to best spot
                     </button>
