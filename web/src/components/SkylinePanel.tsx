@@ -59,7 +59,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
   const y = (el: number) => H - ((el - bottom) / (top - bottom)) * H;
 
   let ground = `M0,${H}`;
-  for (let a = 0; a <= 720; a++) ground += `L${x(a / 2).toFixed(1)},${y(hz[a % hz.length]).toFixed(1)}`;
+  for (let a = 0; a <= 720; a++) ground += `L${x(a / 2).toFixed(1)},${y(horizonAt(hz, a / 2)).toFixed(1)}`;
   ground += `L${W},${H}Z`;
 
   const sunUpPct = Math.round((100 * paths.sun.filter((p) => p.up).length) / paths.sun.length);
