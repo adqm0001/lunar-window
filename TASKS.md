@@ -354,9 +354,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 ## Follow-up bug fixes
 
 - [x] **Keep finder snapshot pins distinct when rank ids are reused** ([#217](https://github.com/adqm0001/lunar-window/issues/217)) — taken: malqedra
-  - **Files:** pin identity helper, store/selectors, Compare and site pin controls, share links, and regression tests.
+  - **Files:** pin identity helper, store/selectors, Compare and site pin controls, 3D site markers, share links, and regression tests.
   - **Spec:** preserve pins for distinct finder locations under independent identities without changing finder results. Keep snapshot coordinates, horizons and labels selectable after later searches, with correct Compare removal/keys, split destinations and sharing. Retain built-in/custom behavior and the six-pin limit.
-  - **Verify:** reuse best:1 for two locations, remove either snapshot, retain/resolve selected snapshots through finder reset and eviction, built-in/custom controls and fresh-link round trip; TypeScript, tests, build and production finder/Compare/split checks without console errors.
+  - **Verify:** reuse best:1 for two locations, remove either snapshot, retain/resolve selected snapshots through finder reset and eviction, built-in/custom controls and fresh-link round trip. A live result and its snapshot should share one highlighted 3D marker. Run TypeScript, tests, build and production finder/Compare/split checks without console errors.
 
 - [x] **Render skyline horizons at their actual angular resolution** ([#207](https://github.com/adqm0001/lunar-window/issues/207)) — taken: malqedra
   - **Files:** `web/src/components/SkylinePanel.tsx` and regression tests.
