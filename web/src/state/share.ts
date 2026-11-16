@@ -78,7 +78,8 @@ export function encodeState(): string {
   const st = useApp.getState();
   // Finder IDs expire with the search. Share its selected result as a normal point, keeping
   // the newest points within the same 20-point limit used when adding a point in the app.
-  const result = st.finder?.candidates.find((c) => c.site.id === st.selectedId)?.site;
+  const result = st.finder?.candidates.find((c) => c.site.id === st.selectedId)?.site
+    ?? st.pinned.find((p) => p.id === st.selectedId && p.id.startsWith("pin:best:"));
   const points = result ? [...st.customSites.slice(-(MAX_SHARED_POINTS - 1)), result] : st.customSites;
   const q = new URLSearchParams();
   q.set("t", String(fix(st.hour, 2)));

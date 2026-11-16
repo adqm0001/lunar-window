@@ -7,12 +7,14 @@ export function useSites() {
   const data = useApp((s) => s.data)!;
   const custom = useApp((s) => s.customSites);
   const finder = useApp((s) => s.finder);
+  const pinned = useApp((s) => s.pinned);
   return useMemo(() => {
     const out = [...data.sites];
     if (finder) out.push(...finder.candidates.map((c) => c.site));
     out.push(...custom);
+    for (const pin of pinned) if (!out.some((site) => site.id === pin.id)) out.push(pin);
     return out;
-  }, [data, custom, finder]);
+  }, [data, custom, finder, pinned]);
 }
 
 export function useSelectedSite() {

@@ -59,6 +59,23 @@ afterEach(() => {
 });
 
 describe("shared landing finder results", () => {
+  it("shares an older pinned finder snapshot after another search and a reset", async () => {
+    const page = await freshPage();
+    const old = finder();
+    page.useApp.getState().setFinder(old);
+    page.useApp.getState().togglePin(old.candidates[0].site);
+    const saved = page.useApp.getState().pinned[0];
+    const newer = finder();
+    newer.candidates[0].site = { ...newer.candidates[0].site, lat: -88, lon: 42 };
+    page.useApp.getState().setFinder(newer);
+    page.useApp.getState().setFinder(null);
+    page.useApp.getState().select(saved.id);
+    const hash = page.share.encodeState();
+    const restored = await restore(hash);
+    const st = restored.useApp.getState();
+    expect(st.customSites.find((s) => s.id === st.selectedId)).toMatchObject({ name: saved.name, lat: saved.lat, lon: saved.lon });
+  });
+
   it.each([1, 2])("restores selected result #%s as a named point in a fresh page", async (rank) => {
     const { useApp, share } = await freshPage();
     const result = finder();
