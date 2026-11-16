@@ -126,6 +126,7 @@ export class LodTerrain {
   private tmp = new THREE.Vector3();
   meshes: THREE.Mesh[] = [];
   private cache = new GpuTileCache();
+  private neededTiles = new Set<number>();
 
   constructor(
     private g: GlobeData,
@@ -248,7 +249,11 @@ export class LodTerrain {
   update(cameras: THREE.Camera | THREE.Camera[]): boolean {
     const cams = Array.isArray(cameras) ? cameras : [cameras];
     const moved = cams.length !== this.lastCams.length || cams.some((c, i) => c.position.distanceToSquared(this.lastCams[i]) >= 1e-10);
-    if (!this.hasWork && !moved) return false;
+    if (!this.hasWork && !moved) {
+      // Failed visible downloads need another attempt even while the camera stays still.
+      this.cache.use(this.neededTiles);
+      return false;
+    }
     this.lastCams = cams.map((c) => c.position.clone());
     this.changedFlag = false;
     this.frame++;
@@ -273,9 +278,13 @@ export class LodTerrain {
     this.viewSets = sets;
     this.viewCams = cams;
     for (const set of sets) for (const n of set) n.lastUsed = this.frame;
-    const need = new Set<number>();
+    const need = this.neededTiles;
+    need.clear();
     // tiles the visible nodes were built from, plus ones they still wait for (a failed fetch is retried)
-    for (const set of sets) for (const n of set) for (const k of [...n.tiles, ...n.pending]) need.add(k);
+    for (const set of sets) for (const n of set) {
+      for (const k of n.tiles) need.add(k);
+      for (const k of n.pending) need.add(k);
+    }
     this.cache.use(need);
     this.useView(0);
     if (this.nodes.size > MAX_CACHED) this.evict();

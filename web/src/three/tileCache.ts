@@ -15,6 +15,7 @@ export class GpuTileCache {
   // When each layer was last needed (use() calls); the least recently needed one is replaced first.
   private lastUse: number[] = new Array(CACHE_LAYERS).fill(-1);
   private tick = 0;
+  private needed = new Set<number>();
   private indexData = new Int16Array(COLS * ROWS).fill(-1);
 
   constructor() {
@@ -42,7 +43,9 @@ export class GpuTileCache {
    */
   use(keys: Iterable<number>) {
     this.tick++;
-    for (const key of keys) {
+    this.needed.clear();
+    for (const key of keys) this.needed.add(key);
+    for (const key of this.needed) {
       const layer = this.layerOf.get(key);
       if (layer !== undefined) this.lastUse[layer] = this.tick;
       else if (getGlobalTile(key)) this.add(key);
@@ -55,7 +58,11 @@ export class GpuTileCache {
     const tile = getGlobalTile(key);
     if (!tile) return;
     let layer = 0;
-    for (let i = 1; i < CACHE_LAYERS; i++) if (this.lastUse[i] < this.lastUse[layer]) layer = i;
+    for (let i = 1; i < CACHE_LAYERS; i++) {
+      const currentNeeded = this.needed.has(this.keyOf[layer]);
+      const otherNeeded = this.needed.has(this.keyOf[i]);
+      if ((currentNeeded && !otherNeeded) || (currentNeeded === otherNeeded && this.lastUse[i] < this.lastUse[layer])) layer = i;
+    }
     this.lastUse[layer] = this.tick;
     const old = this.keyOf[layer];
     if (old >= 0) {

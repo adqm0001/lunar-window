@@ -98,6 +98,7 @@ export class MoonScene {
   private stars!: THREE.Points;
   private sunDir = new THREE.Vector3(1, 0, 0);
   private earthDir = new THREE.Vector3(0, 1, 0);
+  private patchCenter = new THREE.Vector3();
   private globe: GlobeData | null = null;
   private pendingIntro: Site | null = null;
   private lastSites: Site[] = [];
@@ -1739,11 +1740,12 @@ export class MoonScene {
     const g = mesh?.geometry;
     const levels = g?.userData.levels as THREE.BufferAttribute[] | undefined;
     if (!levels || !g.boundingSphere) return;
-    const center = g.boundingSphere.center.clone().applyMatrix4(mesh.matrixWorld);
-    const nearKm = Math.max(0, this.camera.position.distanceTo(center) - g.boundingSphere.radius);
+    const center = this.patchCenter.copy(g.boundingSphere.center).applyMatrix4(mesh.matrixWorld);
+    const leftDistance = this.camera.position.distanceTo(center);
+    const distance = this.split ? Math.min(leftDistance, this.split.camera.position.distanceTo(center)) : leftDistance;
+    const nearKm = Math.max(0, distance - g.boundingSphere.radius);
     let level = nearKm > 400 ? 3 : nearKm > 150 ? 2 : nearKm > 60 ? 1 : 0;
     if (this.quality === "saver") level = Math.max(level, 1);
-    if (this.split && this.splitOn) level = Math.min(level, 1);
     if (level === g.userData.level) return;
     g.userData.level = level;
     g.setIndex(levels[level]);
