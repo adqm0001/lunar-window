@@ -46,25 +46,25 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal className="validation" title="How do we know it's right?"
-      subtitle="Every number in Lunar Window is checked against NASA tools or published measurements" onClose={onClose}>
+      subtitle="How our estimates compare with NASA tools and published measurements" onClose={onClose}>
 
         <section>
           <h3>
             <span className="ok"><Icon name="check" /></span> Sun and Earth positions
           </h3>
           <p>
-            Our positions (JPL DE421 ephemeris, Moon body-fixed frame) were compared with NASA JPL's Horizons service for 3 sites, every day of a year, for both
-            the Sun and Earth. Largest difference: <b>0.00003°</b>, about 1/20,000 of the Sun's width.
+            We checked the Sun and Earth's positions against JPL Horizons daily for one year at three sites. The largest difference in elevation
+            was <b>0.00003°</b>, about 1/20,000 of the Sun's width.
           </p>
         </section>
 
         <section>
           <h3>
-            <span className="ok"><Icon name="check" /></span> Sunlight at the famous "peaks of light"
+            <span className="ok"><Icon name="check" /></span> Sunlight at five polar peaks
           </h3>
           <p>
-            Share of the year with at least half the Sun's disc above the real terrain horizon, compared with Bussey et al. 2010 (Icarus), which used Japan's
-            Kaguya terrain. Average difference for the same year: <b>{meanAbs.toFixed(1)} percentage points</b>.
+            We count an hour as sunlit when at least half the Sun's disc clears the terrain. Across five peaks in 2020, our yearly estimates
+            differed from those of Bussey et al. (2010), based on Japan's Kaguya terrain, by <b>{meanAbs.toFixed(1)} percentage points</b> on average.
           </p>
           <table className="vtable">
             <thead>
@@ -89,8 +89,8 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
             </tbody>
           </table>
           <p className="muted">
-            Lesson learned: the paper's coordinates land 50–160 m below each summit on NASA's LOLA map (the two spacecraft maps are offset), where the hill
-            itself blocks the Sun. Using the LOLA summits fixed it. The remaining gap comes from different terrain data and resolution.
+            The published coordinates fall 50 to 160 m below the corresponding summits on the LOLA map. At those points, the hill itself can block
+            the Sun, so we used the LOLA summit locations for the comparison. The two elevation datasets differ in detail and resolution.
           </p>
         </section>
 
@@ -98,7 +98,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           <h3>
             <span className="ok"><Icon name="check" /></span> Ground temperature
           </h3>
-          <p>Site temperatures from the CPU soil heat-flow model, compared with NASA's Diviner instrument on the Lunar Reconnaissance Orbiter:</p>
+          <p>We compare the temperatures from our soil model with published measurements from Diviner on NASA's Lunar Reconnaissance Orbiter.</p>
           <table className="vtable">
             <thead>
               <tr>
@@ -147,12 +147,11 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok"><Icon name="check" /></span> Engines agree with each other
+            <span className="ok"><Icon name="check" /></span> Terrain and sunlight maps
           </h3>
           <p>
-            The C++ horizon engine (6 billion terrain lookups on 8 cores) builds the horizon data. The browser's GPU engine reproduces the reference sunlight
-            maps computed from it to 4 decimal places, and the 3D shadows use that same horizon data, so what you see is what is computed. Terrain tiles were checked against the original NASA
-            files (Shackleton floor: −2788 m vs −2789 m).
+            The browser's sunlight maps match the reference maps from our C++ terrain model to four decimal places. The polar view uses the same
+            skyline data to draw shadows. We also checked the terrain tiles against the NASA files. The Shackleton floor is −2788 m in the tile and −2789 m in the source.
           </p>
         </section>
 
