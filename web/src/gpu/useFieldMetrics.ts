@@ -52,27 +52,31 @@ const thermalVersion = () => thermal.version;
 
 function thermalMetrics(start: number, hours: number): FieldMetrics | null {
   const key = `${start}:${hours}`;
+  // A cached window can also replace a pending one.
+  for (const [k, p] of thermal.pending) p.want = k === key;
   if (thermal.results.has(key)) {
     const m = thermal.results.get(key) ?? null;
     thermal.last.set(hours, m);
     return m;
   }
   // only the newest request is still wanted; older ones stop at their next band
-  for (const [k, p] of thermal.pending) if (k !== key) p.want = false;
   const e = getEngine();
   if (e && !thermal.pending.has(key)) {
     const p = { want: true };
     thermal.pending.set(key, p);
     e.computeThermal(start, hours, () => p.want).then(
       (m) => {
-        if (thermal.pending.get(key) === p) thermal.pending.delete(key);
-        if (!m) return;
+        if (thermal.pending.get(key) !== p) return;
+        thermal.pending.delete(key);
+        if (!m || !p.want) return;
         if (thermal.results.size > 8) thermal.results.clear();
         thermal.results.set(key, m);
         thermal.version++;
         thermal.subs.forEach((cb) => cb());
       },
-      () => thermal.pending.delete(key),
+      () => {
+        if (thermal.pending.get(key) === p) thermal.pending.delete(key);
+      },
     );
   }
   return thermal.last.get(hours) ?? null;

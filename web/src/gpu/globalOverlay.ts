@@ -50,7 +50,7 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
       st.setGlobalStatus("Building horizons for the whole Moon on your GPU (one time)…");
       await new Promise((r) => setTimeout(r, 30));
       try {
-        engine = new GlobalLayers(st.globe, st.data.ephem);
+        engine ??= new GlobalLayers(st.globe, st.data.ephem);
       } catch (e) {
         engineError = (e as Error).message;
       }
@@ -58,6 +58,12 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
     if (!engine) {
       st.setGlobalStatus(engineError);
       return null;
+    }
+    // Another caller may have started this window while the initial horizons were being built.
+    const joined = inflight.get(key);
+    if (joined) {
+      joined.wanted.push(wanted);
+      return joined.job;
     }
     st.setGlobalStatus(kind === "thermal" ? "Running the soil heat model for the whole Moon…" : "Computing the whole Moon…");
     const waiting = [wanted];
