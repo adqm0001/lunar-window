@@ -25,7 +25,8 @@ const EARTH: Stop[] = [[0, 6, 10, 25], [0.5, 30, 90, 190], [1, 170, 220, 255]];
 const LINK: Stop[] = [[0, 6, 14, 14], [0.5, 25, 140, 100], [1, 180, 255, 210]];
 const NIGHT: Stop[] = [[0, 61, 220, 151], [0.35, 255, 200, 70], [0.7, 255, 93, 108], [1, 90, 20, 40]];
 export const SCORE: Stop[] = [[0, 10, 16, 26], [0.4, 40, 66, 104], [0.7, 74, 118, 156], [0.88, 145, 191, 214], [1, 236, 246, 252]];
-export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [0.999, 255, 230, 120], [1, 61, 220, 151]];
+// Green is reserved for a battery that never dies, even in the last step.
+export const SURVIVE: Stop[] = [[0, 120, 20, 30], [0.5, 230, 80, 60], [0.85, 255, 190, 70], [1 - 1e-6, 255, 230, 120], [1, 61, 220, 151]];
 const SLOPE: Stop[] = [[0, 255, 93, 108], [0.6, 255, 200, 70], [1, 61, 220, 151]];
 const TEMP: Stop[] = [[0, 30, 20, 90], [0.14, 40, 90, 220], [0.28, 60, 200, 230], [0.48, 240, 220, 90], [0.72, 250, 110, 50], [0.9, 220, 40, 60], [1, 255, 200, 220]];
 const ICE: Stop[] = [[0, 20, 40, 120], [0.5, 60, 140, 255], [1, 190, 250, 255]];
@@ -59,17 +60,30 @@ export const layerDef = (id: LayerId, palette: Palette = "default"): LayerDef =>
 };
 
 function sample(stops: Stop[], t: number): [number, number, number] {
+  const out = new Uint8ClampedArray(3);
+  sampleInto(stops, t, out, 0);
+  return [out[0], out[1], out[2]];
+}
+
+// sample() written straight into pixel data: the same arithmetic without allocating per pixel (painting the
+// whole-Moon layers, 2.2 million pixels, spent about a second creating little arrays).
+function sampleInto(stops: Stop[], t: number, px: Uint8ClampedArray, o: number) {
   const v = Math.max(0, Math.min(1, t));
   for (let i = 1; i < stops.length; i++) {
-    if (v <= stops[i][0]) {
-      const [a, ...ca] = stops[i - 1];
-      const [b, ...cb] = stops[i];
-      const w = (v - a) / (b - a || 1);
-      return [ca[0] + (cb[0] - ca[0]) * w, ca[1] + (cb[1] - ca[1]) * w, ca[2] + (cb[2] - ca[2]) * w];
+    const s1 = stops[i];
+    if (v <= s1[0]) {
+      const s0 = stops[i - 1];
+      const w = (v - s0[0]) / (s1[0] - s0[0] || 1);
+      px[o] = s0[1] + (s1[1] - s0[1]) * w;
+      px[o + 1] = s0[2] + (s1[2] - s0[2]) * w;
+      px[o + 2] = s0[3] + (s1[3] - s0[3]) * w;
+      return;
     }
   }
   const last = stops[stops.length - 1];
-  return [last[1], last[2], last[3]];
+  px[o] = last[1];
+  px[o + 1] = last[2];
+  px[o + 2] = last[3];
 }
 
 export function gradientCss(stops: Stop[]) {
@@ -202,18 +216,12 @@ export function paintGlobal(id: LayerId, data: Float32Array, w: number, h: numbe
         px[o + 3] = 0;
         continue;
       }
-      const [r, g, b] = sample(def.stops, 1 - Math.min(1, v / ICE_MAX_DEPTH));
-      px[o] = r;
-      px[o + 1] = g;
-      px[o + 2] = b;
+      sampleInto(def.stops, 1 - Math.min(1, v / ICE_MAX_DEPTH), px, o);
       px[o + 3] = 240;
       continue;
     }
     const t = id === "night" ? Math.sqrt(v / NIGHT_SCALE_HOURS) : id === "temp" ? (v - TEMP_MIN) / (TEMP_MAX - TEMP_MIN) : v;
-    const [r, g, b] = sample(def.stops, t);
-    px[o] = r;
-    px[o + 1] = g;
-    px[o + 2] = b;
+    sampleInto(def.stops, t, px, o);
     px[o + 3] = 215;
   }
 }

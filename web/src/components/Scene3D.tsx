@@ -10,6 +10,7 @@ import { useApp } from "../state/store";
 import { computeGlobal, globalValueAt, paintGlobalOverlay, type GlobalPaintSource } from "../gpu/globalOverlay";
 import { formatLayerValue, layerValue } from "../gpu/layers";
 import { fieldCell } from "../data/field";
+import { fieldLoader } from "../data/fieldLoad";
 import { formatLatLon } from "../lib/astro";
 import { GLOBAL_LAYERS } from "../gpu/layers";
 import { iceCovered } from "../gpu/thermal";
@@ -48,6 +49,7 @@ export default function Scene3D() {
   const mc = useApp((s) => s.mc);
   const flyRequest = useApp((s) => s.flyRequest);
   const fieldProgress = useApp((s) => s.fieldProgress);
+  const fieldError = useApp((s) => s.fieldError);
   const hour = useApp((s) => s.hour);
   const layer = useApp((s) => s.layer);
   const palette = useApp((s) => s.palette);
@@ -212,7 +214,7 @@ export default function Scene3D() {
     // past the end of the data (computeGlobal returns null at once then).
     if (playing && !(layer === "ice" && !iceCovered(data.ephem.count, day * 24))) return;
     let cancelled = false;
-    computeGlobal(layer, day * 24, rangeDays).then((source) => {
+    computeGlobal(layer, day * 24, rangeDays, () => !cancelled).then((source) => {
       if (!cancelled) {
         displayedGlobal.current = source;
         scene.setGlobalOverlay(source ? paintGlobalOverlay(source, useApp.getState().palette) : null);
@@ -299,7 +301,15 @@ export default function Scene3D() {
           <div className="split-tag split-tag-r" style={{ top: tagTop }}>{splitPair[1].name}</div>
         </>
       )}
-      {!field && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
+      {!field && !fieldError && <div className="stage-msg">Loading terrain field {Math.round(fieldProgress * 100)}%</div>}
+      {!field && fieldError && (
+        <div className="stage-msg" role="alert">
+          <div className="glass stage-error">
+            <span>Couldn't load the terrain: {fieldError}</span>
+            <button className="btn primary" onClick={() => void fieldLoader.retry()}>Retry</button>
+          </div>
+        </div>
+      )}
       {error && <div className="stage-msg error">{error}</div>}
     </div>
   );

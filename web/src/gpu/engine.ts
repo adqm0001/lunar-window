@@ -1,7 +1,8 @@
 import type { Ephemeris } from "../data/load";
 import type { FieldData } from "../data/field";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
-import { THERMAL_MAIN } from "./thermal";
+import { THERMAL_MAIN, thermalWarmup } from "./thermal";
+import { gpuIdle } from "./gpuWait";
 
 const ROW = 4096;
 
@@ -124,15 +125,18 @@ void main() {
     float f = uPanelMode == 2 ? max(0.0, sin(el)) : max(0.0, cos(el));
     float p = uPanelW * frac * f;
     float load = frac >= 0.5 ? uDayLoad : uNightLoad;
+    // Mirrors batteryDead / chargePct / survivalMapCell in lib/lander.ts: keep them in step.
     if (alive) {
       wh = min(uBattery, wh + (p - load) * float(uStride));
-      if (wh / uBattery <= uMinSoc) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
+      bool dead = uBattery > 0.0 ? wh <= uMinSoc * uBattery : wh < 0.0;
+      if (dead) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
     }
-    minSoc = min(minSoc, alive ? wh / uBattery : 0.0);
+    minSoc = min(minSoc, alive ? (uBattery > 0.0 ? wh / uBattery : 1.0) : 0.0);
     sunSum += frac;
   }
   float total = float(uSteps * uStride);
-  outColor = vec4(diedAt < 0.0 ? 1.0 : diedAt / total, minSoc, sunSum / float(uSteps), diedAt);
+  // lived: the steps completed before the one it died in, so only a battery that never dies reaches 1
+  outColor = vec4(diedAt < 0.0 ? 1.0 : (diedAt - float(uStride)) / total, minSoc, sunSum / float(uSteps), diedAt);
 }`;
 
 // Packs "Sun up" and "link to Earth" into bits: 4 x 32-bit words = 128 hours per pass.
@@ -212,6 +216,10 @@ export class GpuEngine {
   private survUni: Record<string, WebGLUniformLocation | null> = {};
   private thermProg: WebGLProgram | null = null;
   private thermUni: Record<string, WebGLUniformLocation | null> = {};
+  // The thermal model writes into its own target, so the synchronous computes below can run while it is between
+  // bands without overwriting it; thermal jobs themselves run one at a time.
+  private thermFbo: WebGLFramebuffer | null = null;
+  private thermQueue: Promise<unknown> = Promise.resolve();
   private field: FieldData;
   private bitsProg: WebGLProgram | null = null;
   private bitsUni: Record<string, WebGLUniformLocation | null> = {};
@@ -344,12 +352,22 @@ export class GpuEngine {
 
   // Surface temperature through time for every cell (see thermal.ts). Output per cell:
   // max, mean and min surface temperature (K) and the shallowest depth (m) where ice stays stable.
-  computeThermal(startHour: number, hours: number): FieldMetrics {
+  // Runs a band at a time with a wait for the GPU in between (see gpuIdle) so the page keeps responding; resolves to
+  // null if `alive` turns false first.
+  computeThermal(startHour: number, hours: number, alive: () => boolean = () => true): Promise<FieldMetrics | null> {
+    const run = () => this.runThermal(startHour, hours, alive);
+    const job = this.thermQueue.then(run, run);
+    this.thermQueue = job.catch(() => undefined);
+    return job;
+  }
+
+  private async runThermal(startHour: number, hours: number, alive: () => boolean): Promise<FieldMetrics | null> {
+    if (!alive()) return null;
     const gl = this.gl;
     if (!this.thermProg) {
       this.thermProg = link(gl, VERT, FRAG.split("void main() {")[0] + THERMAL_MAIN);
       gl.useProgram(this.thermProg);
-      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uSpin"]) {
+      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uReplay", "uHistory"]) {
         this.thermUni[n] = gl.getUniformLocation(this.thermProg, n);
       }
       const f = this.field;
@@ -376,6 +394,17 @@ export class GpuEngine {
       gl.uniform1f(u.uDecodeOffset, decode.offsetDeg);
       gl.uniform1i(u.uHSize, hs);
       gl.uniform1f(u.uHCell, hc);
+      gl.activeTexture(gl.TEXTURE6);
+      const out = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, out);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, this.size, this.size, 0, gl.RGBA, gl.FLOAT, null);
+      nearest(gl, gl.TEXTURE_2D);
+      gl.activeTexture(gl.TEXTURE3);
+      this.thermFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.thermFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, out, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+      gl.useProgram(this.prog);
     }
     const start = Math.max(0, Math.min(this.count - 1, Math.floor(startHour)));
     const len = Math.max(1, Math.min(this.count - start, Math.floor(hours)));
@@ -387,18 +416,30 @@ export class GpuEngine {
     gl.uniform1i(u.uStart, start);
     gl.uniform1i(u.uSteps, steps);
     gl.uniform1i(u.uStride, stride);
-    gl.uniform1i(u.uSpin, Math.min(Math.floor(steps / 4), Math.round(709 / stride)));
-    // draw in bands so no single GPU job runs long enough to trip the driver watchdog
-    gl.enable(gl.SCISSOR_TEST);
+    // warm up on the lunar days before the window, then record all of it (see thermalWarmup)
+    const warm = thermalWarmup(start, stride, this.count);
+    gl.uniform1i(u.uReplay, warm.replay);
+    gl.uniform1i(u.uHistory, warm.history);
+    gl.useProgram(this.prog);
+    // Draw in bands (each short enough not to trip the driver watchdog), waiting for the GPU after each. Other computes
+    // may use the context in between, so each band sets its program and target again and puts them back after.
     const band = 32;
     for (let y = 0; y < this.size; y += band) {
+      gl.useProgram(this.thermProg);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.thermFbo);
+      gl.viewport(0, 0, this.size, this.size);
+      gl.enable(gl.SCISSOR_TEST);
       gl.scissor(0, y, this.size, Math.min(band, this.size - y));
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.flush();
+      gl.disable(gl.SCISSOR_TEST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+      gl.useProgram(this.prog);
+      await gpuIdle(gl);
+      if (!alive()) return null;
     }
-    gl.disable(gl.SCISSOR_TEST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.thermFbo);
     gl.readPixels(0, 0, this.size, this.size, gl.RGBA, gl.FLOAT, this.buf);
-    gl.useProgram(this.prog);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     const data = new Float32Array(this.buf.length);
     const rowLen = this.size * 4;
     for (let r = 0; r < this.size; r++) data.set(this.buf.subarray((this.size - 1 - r) * rowLen, (this.size - r) * rowLen), r * rowLen);
