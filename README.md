@@ -1,159 +1,146 @@
 # Lunar Window
 
-**Where and when to land at the Moon's south pole.**
+### Where and when to land at the Moon’s south pole
 
-A browser-based mission planner built for the NASA Space Apps Challenge 2026. It combines NASA's lunar terrain, the real positions of the Sun and Earth for every hour of 2026–2036, and physical models that run on your GPU to show sunlight, radio contact, surface temperature and water ice anywhere on the Moon.
+At the Moon's south pole, a ridge can get sunlight while the crater next to it stays dark. The same terrain can block a lander's view of Earth. Lunar Window lets you pick a site, move the clock and see when the Sun or Earth clears the skyline.
 
-**[Open the live app →](https://adqm0001.github.io/lunar-window/)**
+We built it for the 2026 NASA Space Apps Challenge. It's a prototype for comparing sites and dates, whether you're working through an early mission idea or teaching someone how lunar shadows move. [Lunar Landing Site Navigator challenge](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/)
 
-![The lunar south pole at low Sun, rendered from NASA LOLA terrain](docs/hero.jpg)
+**[Open the live planner](https://adqm0001.github.io/lunar-window/)** · **[Seven-slide demo](docs/slides.pdf)** · [Editable slides](docs/slides.pptx) · [Video demo](docs/demo/lunar-window-30s.mp4) · [Project-page form answers](project-desc.md)
 
----
+![Connecting ridge B with Sun and Earth status and a shared UTC timeline](docs/demo/overview.webp)
 
-## The problem
+## Try a landing plan
 
-Artemis is going to the lunar south pole because its permanently shadowed craters hold water ice: drinking water, oxygen and rocket fuel for long missions. It is also the hardest place on the Moon to land.
+1. Open the [planner](https://adqm0001.github.io/lunar-window/) and choose **Tour** for a nine-step introduction.
+2. Select **Connecting ridge B**. Open **Sun & Earth horizon** to see which parts of their paths the terrain blocks.
+3. Open **Find best site** and set the landing time in UTC. Set the mission length, how long the lander can go without sunlight and how much flat ground it needs. Click **Rank landing sites**.
+4. Use **+ Compare** on a site, then **Add site** to select another. Compare their readings and the separate **Sun, Earth and DSN** timeline rows. **Side by side** opens two terrain views.
+5. Open **Landing dates** to compare modeled battery endurance for different start times. Select a chart cell to inspect its date. **Whole Moon** returns to the overview.
 
-- The Sun never rises more than about 1.6° above the horizon. Hills a few hundred metres tall cast shadows tens of kilometres long.
-- Those shadows sweep around the landscape every 29.5 days, so a spot that is sunlit today can be dark tomorrow.
-- A solar-powered lander that sets down in the wrong place, or at the wrong time, runs out of power and freezes.
-- Earth dips behind the terrain too, cutting off direct radio contact.
+On a phone, use the tabs at the bottom to switch between the map tools, site details and timeline. If the Moon is slow to move, try **Saver** or **Balanced** in Settings.
 
-Mission planners have to answer two questions at once: **where** is there light, contact with Earth and safe ground, and **when**?
+## Planning tools
 
-## What it does
+| Tool | What it shows |
+| --- | --- |
+| **3D terrain and 2D map** | Inspect the surroundings, moving shadows and selected location. Add a custom point by coordinates or click the terrain. |
+| **Sun and Earth horizon** | See their paths against the terrain skyline, with current elevations and visibility changes. |
+| **Sunlight and communication layers** | Compare sunlight, Earth visibility, simultaneous power and DSN contact, longest night and slope over a selected period. |
+| **Find best site** | Rank the loaded area by mission date, duration, night tolerance, flat ground and priorities. The default polar field has **102,400 grid locations**. |
+| **Landing dates and comparison** | Compare start times for a chosen lander or place several sites on the same timeline. Green in Landing dates means the modeled battery lasts the requested mission. |
+| **Lander simulation** | See how much power the panels produce and how much the lander uses each hour. A survival map and 4,000 simulated touchdowns show what can happen if the lander misses its target. |
+| **Rover route planning** | Plan through sunlight and permitted slopes as shadows move, optionally require communication during movement, and replay the route. |
+| **Temperature and ice stability** | See how hot the soil gets and where the model estimates it stays cold enough for ice to persist. |
+| **Regional report and validation** | Compare NASA’s **October 2024 nine-region Artemis III candidate catalog**, analyze an area and inspect science checks. |
+| **Sharing and presentation** | Share the time, site, layer and camera in a URL, take the guided tour or record the 3D canvas. |
 
-| | |
-|---|---|
-| **3D Moon** | The whole Moon from NASA LOLA elevation data, from orbit down to 40 m terrain at the pole, lit by the real Sun at any hour. Every shadow is computed from the actual terrain horizon. |
-| **Sunlight, Earth and DSN maps** | Share of time each point sees the Sun, sees Earth, and has a Deep Space Network dish in view, plus the longest night, for any date range. |
-| **Temperature and water ice** | A heat-flow model of the lunar soil runs for every point and shows where water ice stays stable at or below the surface. |
-| **Landing spot finder** | Choose a landing date, mission length, longest night your battery can survive and the flat ground you need. It scores 102,400 spots and returns the top 10. |
-| **Lander simulator** | Solar panels, battery and power loads simulated hour by hour at a site, or across the whole area as a survival map. |
-| **Landing-miss Monte Carlo** | 4,000 simulated touchdowns around a target to estimate the odds of ending up on safe, sunlit ground. |
-| **Rover route planner** | Finds a route that keeps a solar rover in sunlight on drivable slopes as the shadows move, waiting out darkness when it has to, then animates the drive. |
-| **Artemis III report card** | Ranks NASA's nine candidate landing regions for your dates by sunlight, Earth contact, longest night and nearby ice. |
-| **Site details** | Countdown to the next sunset and Earth-set, the next week of DSN contact windows, ground temperature through the year, and a skyline view showing the paths of the Sun and Earth over the terrain. |
-| **Validation** | A built-in panel that compares the results against NASA JPL Horizons, published research and NASA's Diviner instrument. |
-| **Sharing** | Links that reopen the exact view (time, site, layer, camera), video recording of the 3D view and a one-minute guided tour. |
+![Mission constraints, ranked candidate and its power and communication timeline](docs/demo/finder.webp)
 
-<table>
-  <tr>
-    <td><img src="docs/temperature.jpg" alt="Maximum surface temperature around the south pole" /></td>
-    <td><img src="docs/sunlight-map.jpg" alt="Yearly sunlight across the south polar region" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>Maximum surface temperature: permanently shadowed craters in deep blue</sub></td>
-    <td align="center"><sub>Share of the year in sunlight across the south polar region</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/lander.jpg" alt="A lander at true scale on a ridge near Shackleton crater" /></td>
-    <td><img src="docs/low-sun.jpg" alt="Crater field under a low Sun" /></td>
-  </tr>
-  <tr>
-    <td align="center"><sub>A lander at true scale on the connecting ridge near Shackleton</sub></td>
-    <td align="center"><sub>Crater shadows with the Sun 8° above the horizon</sub></td>
-  </tr>
-</table>
+*A spot can rank first for one mission and drop down the list if you change the date or the lander's power needs.*
 
-## How we know it's right
+![Two sites compared using separate Sun, Earth and DSN signals on the same timeline](docs/demo/comparison.webp)
 
-| Check | Result |
-|---|---|
-| Sun and Earth positions vs. NASA JPL Horizons (3 sites, one year) | agree to **0.00003°** |
-| Sunlight at the five "peaks of light" vs. Bussey et al. 2010 | within **3.7 percentage points** on average |
-| Equatorial temperature (Apollo 11 site) vs. NASA Diviner | **86–385 K** modelled, about 95–390 K measured |
-| Shackleton crater floor (never sunlit) | **39–99 K** over a year with light bounced off the crater walls; below 110 K, a cold trap where ice is stable |
+*Earth can be in view even when none of the three Deep Space Network (DSN) stations can see the Moon. The timeline gives each of those conditions its own row.*
 
-The validation panel in the app recomputes several of these live. Its limits are stated openly too: the terrain is only as sharp as the LOLA data (40 m near the pole), small craters and rocks shown up close are for looks only, and the thermal model treats light and heat bounced between slopes with a single-bounce crater approximation (Ingersoll et al. 1992).
+<details>
+<summary>Phone layout and landing-date view</summary>
 
-## How it works
+<p><img src="docs/demo/phone.webp" width="280" alt="Phone site sheet showing Sun, Earth and DSN status" /></p>
 
-```
-NASA LOLA terrain ─┐
-                   ├─► C++ horizon engine (OpenMP) ─► horizon field: 102,400 points × 180 directions
-JPL DE421 ephemeris ┤
-                   └─► Sun / Earth / DSN positions, hourly 2026–2036
-                                       │
-                                       ▼
-            Browser (WebGL2): sunlight, contact, night, heat flow, routes, rendering
-```
+![Landing-date chart showing modeled battery endurance](docs/demo/landing-dates.webp)
 
-- **Horizons.** For every grid point, rays are marched outward across the terrain in every direction, accounting for the Moon's curvature, to find how high the skyline is. The Sun is visible when it stands above that skyline. The C++ engine does about 6 billion terrain lookups for the polar area in roughly a minute on 8 cores.
-- **Whole Moon on the GPU.** In the browser, horizons for 2.2 million more points are computed on the GPU in under a second, so every map also covers the whole Moon.
-- **Time series on the GPU.** Each map steps through thousands of hours for every point in parallel. A year of sunlight for the polar area takes milliseconds; a year of soil temperature for the whole Moon takes about a second and a half.
-- **Rendering.** three.js with custom shaders. A quadtree level-of-detail sphere streams terrain tiles, and every pixel looks up its own horizon toward the Sun, so the shadows on screen are the same physics as the numbers in the panels.
+</details>
 
-## Data
+## NASA data and how it works
 
-| Source | Use |
-|---|---|
-| NASA LRO LOLA gridded elevation (40 m, 80 m and 240 m polar; 64 and 16 pixels/degree global) | terrain, horizons, slopes |
-| NASA/JPL DE421 ephemeris and Moon frame kernels (via Skyfield) | Sun and Earth positions |
-| Deep Space Network station locations | radio contact windows |
-| NASA SVS CGI Moon Kit (LRO LROC) | surface color |
-| Hayne et al. 2017; Williams et al. 2017; Paige et al. 2010 | regolith properties and temperature checks |
-| Bussey et al. 2010 | sunlight checks at polar peaks |
-| NASA Artemis III candidate regions (2024), IAU feature centers | region outlines |
+Python and C++ prepare the terrain and Sun and Earth positions offline. GitHub Pages serves the files, and your browser runs the calculations for the site and time you choose. You can open the app without an account.
 
-## Running it locally
+For each point in the default polar grid, we store how high the skyline is in 180 directions. To work out whether a spot gets sunlight, the browser compares the Sun's elevation with the skyline in that direction. The polar 3D view uses the same skyline data for its shadows. NASA/JPL DE421 supplies hourly Sun and Earth positions from 2026 through 2036. Historical replays use their own dates.
 
-The app needs Node 20+ and a browser with WebGL2.
+For the contact estimates, the app also checks whether Goldstone, Madrid or Canberra can see the Moon. WebGL2 computes the area maps, and TypeScript handles site timelines, battery endurance and rover movement. The globe loads finer terrain tiles as you approach them.
+
+Near the pole, NASA's elevation data reaches 40 m resolution. The default 80 × 80 km analysis area samples the horizon every 250 m. The surface can look more detailed up close because the view also uses interpolation and adds small rocks and craters for display.
+
+| Data or reference | Use |
+| --- | --- |
+| [NASA LRO LOLA / PDS Geosciences Node](https://pds-geosciences.wustl.edu/missions/lro/lola.htm) | Polar and global elevation, meshes, skylines and slopes. |
+| [NASA/JPL DE421 and NAIF kernels](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/) | Sun/Earth geometry in the Moon-fixed frame, processed through Skyfield. |
+| [NASA/JPL Horizons](https://ssd.jpl.nasa.gov/horizons/) | Independent reference service for checking positions. |
+| [NASA Deep Space Network](https://www.nasa.gov/communicating-with-missions/dsn/) | Goldstone, Madrid and Canberra geometry for approximate contact windows. |
+| [NASA SVS CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/) | Surface color from LRO imagery, credited to NASA's Scientific Visualization Studio and the LRO Camera and LOLA teams. |
+| [NASA's October 2024 region announcement](https://www.nasa.gov/news-release/nasa-provides-update-on-artemis-iii-moon-landing-regions/) and [IAU/USGS Gazetteer](https://planetarynames.wr.usgs.gov/) | Historical candidate names and feature locations. Circles in the app show approximate areas around those features. |
+| [Bussey et al. (2010)](https://doi.org/10.1016/j.icarus.2010.03.028) | Published illumination derived from JAXA Kaguya topography, used as a comparison reference. We do not ingest Kaguya terrain directly. |
+| [Hayne et al. (2017)](https://doi.org/10.1002/2017JE005387), Williams et al. (2017), Paige et al. (2010), Ingersoll et al. (1992) | Regolith properties, Diviner temperature comparisons, cold-trap context and approximate crater heating. [Full references](docs/sources.md). |
+
+## Evidence and limits
+
+Open **Validation** under **Settings** to see what we checked and where the estimates can differ.
+
+| Check | Recorded result and scope |
+| --- | --- |
+| Sun and Earth positions against JPL Horizons | Largest reported elevation difference **0.00003°**, using daily samples at three sites through 2027. [Script](pipeline/validate_horizons.py). |
+| Illumination against Bussey et al. | Mean absolute difference about **3.7 percentage points** across five peaks in 2020, after registering the locations to LOLA summits. [Script](pipeline/validate_illumination.py). |
+| Thermal model against Diviner reference ranges | The panel compares model temperatures for Apollo 11 and the Shackleton floor with published Diviner measurements. |
+
+- A predicted contact window tells you when the geometry allows a link. An operational link also needs an antenna and link budget check, plus an available station.
+- Terrain resolution limits which slopes and hazards the app can resolve. The small rocks and craters added for the 3D view have no effect on calculations, and a site rank alone cannot establish landing safety.
+- Battery results depend on the panel, power draw and reserve you choose. An ice estimate needs a year of data and tells you where ice could persist. Measuring how much ice is there takes other instruments.
+- The heat model accounts for one bounce of light and heat from crater walls. Site and map models warm the soil up differently, so they can disagree over short periods.
+- If you pick a time close to the end of the dataset, the app shortens the window or asks you to pick another date.
+
+## Run locally
+
+Use **Node.js 20 or newer** and a browser with **WebGL2**.
 
 ```bash
-cd web
-npm install
+git clone https://github.com/adqm0001/lunar-window.git
+cd lunar-window/web
+npm ci
 npm run dev
 ```
 
-The processed data the app loads is already in `web/public/data`. To rebuild it from the original NASA files you need Python 3 and a C++ compiler with OpenMP (g++):
+Open the address printed by Vite. Processed data is included in `web/public/data`.
+
+Before a pull request:
 
 ```bash
-cd pipeline
-pip install -r requirements.txt
-python fetch_data.py          # downloads LOLA terrain and SPICE kernels
-python ephemeris.py           # Sun and Earth positions, DSN visibility
-python build_sites.py         # horizons for named sites
-python build_field.py         # polar horizon field, heights, slopes
-python build_globe.py         # global and polar terrain for the 3D Moon
-python build_tiles.py         # 40 m polar terrain tiles
-python build_global_tiles.py  # 64 pixels/degree global terrain tiles
-python validate_illumination.py
-python validate_horizons.py
+npx tsc --noEmit -p .
+npm test
+npm run build
 ```
 
-## Project layout
+Rebuilding the offline pipeline requires Python 3, `pipeline/requirements.txt`, and a C++ compiler with OpenMP. See [ARCHITECTURE.md](ARCHITECTURE.md) for formats, coordinate frames and rebuilding guidance.
 
-```
-engine/      C++ horizon ray-caster
-pipeline/    Python: data download, ephemeris, horizon fields, validation
-web/         TypeScript + React + three.js app
-  src/gpu/       GPU engines: sunlight, heat flow, whole Moon, rover visibility
-  src/three/     3D scene, terrain level of detail, shaders
-  src/lib/       astronomy, lander and rover models, thermal model
-  src/components UI panels
-docs/        screenshots for this page
-```
+| Folder | Contents |
+| --- | --- |
+| `web/` | TypeScript, React, three.js, Zustand and WebGL2 planner, built with Vite. |
+| `pipeline/` | Python data preparation, ephemerides and validation. |
+| `engine/` | C++/OpenMP terrain-horizon calculations. |
+| `docs/` | Slides, screenshots, submission copy, references and test reports. |
 
-## Contributing
+For contributions, read [CLAUDE.md](CLAUDE.md), [TASKS.md](TASKS.md) and [REVIEWING.md](REVIEWING.md). Changes go through checked pull requests. Merging to `main` deploys through GitHub Pages.
 
-The list of open work, with a spec for each task, is in **[TASKS.md](TASKS.md)**. Read **[ARCHITECTURE.md](ARCHITECTURE.md)** first: coordinate frames, data formats, engines and conventions.
+## Team
 
-1. Fork the repo (or create a branch if you've been added as a collaborator).
-2. Run the app locally (see above) and make your change on a branch named after the task, for example `thermal-bounced-light`.
-3. Check that the build passes before opening a pull request:
-   ```bash
-   cd web
-   npm run build
-   ```
-4. Open a pull request against `main` describing what changed and how you tested it. Screenshots help for anything visual.
+**Adam Benmoussa · Sazid Malik · Achraf Benchoubane · Mohammad Al-Qedra · Mohanad Abdelaal**
 
-Commit messages are short, plain descriptions of what the commit does. Every merge into `main` redeploys the live site automatically through GitHub Actions (`.github/workflows/pages.yml`), so please keep `main` working.
+## SI assistance
 
-## Built with
+Our team came up with Lunar Window and chose how to address the challenge. We made the scientific and design decisions, including which data to use, how to model sunlight, Earth visibility, Deep Space Network contact and temperature, and how to validate the results.
 
-C++ (OpenMP) · Python (NumPy, Skyfield, Pillow) · TypeScript · React · three.js · WebGL2 · Vite
+We used OpenAI Codex/ChatGPT and Anthropic Claude to help implement and review code, debug, test, explore interface ideas and draft documentation. Codex also helped write this README and project-page copy, lay out the slides and prepare the video edit and narration script. The demo images and video come from the running app.
 
----
+The terrain and ephemeris files come from the NASA and JPL data we process in the pipeline. [SI disclosure](docs/si-disclosure.json) · [Source credits](docs/sources.md)
 
-NASA data used here is in the public domain. Lunar Window is not affiliated with or endorsed by NASA.
+## Privacy
+
+The app runs calculations in your browser, without an account or analytics. It can remember display settings and whether you've already seen the tour. Anyone with a link you share can see the view settings and custom coordinates it contains. Recordings save to your device.
+
+GitHub Pages and external sites have their own logging and policies. See [GitHub’s privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
+## Licensing
+
+The team hasn't declared a license for its original code or documentation. Libraries, fonts and datasets have their own terms. [Source and license notes](docs/sources.md)
+
+Lunar Window is an independent Space Apps entry. NASA and partner names identify the challenge and source material and do not imply affiliation or endorsement.

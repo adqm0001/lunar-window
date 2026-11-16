@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "updated": "2026-11-15",
+  "project": "Lunar Window",
+  "team_decisions": "The team originated the idea, chose the approach to the challenge, and made the scientific and design decisions, including dataset selection, modeling sunlight, Earth visibility, Deep Space Network contact and temperature, and validating the results. The listed SI tools helped implement, test and document those decisions.",
+  "tools": [
+    {
+      "name": "OpenAI Codex / ChatGPT",
+      "uses": [
+        "code generation and edits",
+        "debugging",
+        "testing",
+        "pull request review",
+        "UI exploration",
+        "documentation",
+        "presentation text and layout",
+        "video editing and timed narration script"
+      ]
+    },
+    {
+      "name": "Anthropic Claude",
+      "uses": [
+        "code generation and edits",
+        "debugging",
+        "testing",
+        "pull request review",
+        "documentation"
+      ]
+    }
+  ],
+  "code_and_data": {
+    "acknowledgment": "SI tools assisted application and data-processing code. Source observations are NASA and cited partner/research resources. Processed datasets are computational derivatives, not SI-invented measurements.",
+    "scope": "Repository-wide descriptive disclosure. It does not assert a per-line provenance audit."
+  },
+  "presentation": {
+    "files": [
+      "README.md",
+      "docs/submission.md",
+      "project-desc.md",
+      "docs/slides.pptx",
+      "docs/slides.pdf",
+      "docs/voiceover.md",
+      "docs/demo/lunar-window-30s.mp4"
+    ],
+    "assistance": "SI-assisted writing and layout",
+    "visuals": "Screenshots of the running application with editable text and diagrams based on the team's project decisions.",
+    "sources": "Slide notes and docs/sources.md describe the data and validation references."
+  },
+  "team_confirmation": "Confirm additional member-specific tools and any later media additions before submitting.",
+  "video": {
+    "duration_seconds": 29.815,
+    "audio": "Narration recorded by team members",
+    "format": "1920x1080 HEVC MP4 at 30 fps with AAC audio",
+    "content": "Live application footage captured in Chromium at High graphics. SI tools helped prepare the edit and timed narration script."
+  }
+}

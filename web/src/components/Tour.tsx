@@ -47,7 +47,7 @@ function poleView() {
 const STEPS: Step[] = [
   {
     title: "Choose where and when to land",
-    text: "A useful landing site needs sunlight for power, a clear view of Earth for communication, and suitable terrain. This tour follows that decision using NASA terrain and the selected UTC date.",
+    text: "A ridge can be in sunlight while the crater next to it is dark. Pick a landing date and see how the terrain affects power and contact with Earth.",
     enter: () => {
       clearTools();
       const s = st();
@@ -60,8 +60,8 @@ const STEPS: Step[] = [
     },
   },
   {
-    title: "Read a site's power and communications",
-    text: "Connecting ridge B is one candidate near the south pole. Sun and Earth elevations, time to the next visibility change, and Deep Space Network contact are shown in Site. On a phone, use the Site tab to return here.",
+    title: "A closer look at Connecting ridge B",
+    text: "The Site panel shows how high the Sun and Earth are, when they come into view or disappear, and when a Deep Space Network station can see the Moon. On a phone, tap Site to reopen it.",
     enter: () => {
       clearTools();
       st().setLayer("terrain");
@@ -72,7 +72,7 @@ const STEPS: Step[] = [
   },
   {
     title: "See what the terrain blocks",
-    text: "The horizon chart plots the Sun and Earth against this site's terrain skyline. Faded dots are hidden behind terrain. At the pole, small changes in elevation can decide whether a site has power or a direct view of Earth.",
+    text: "Yellow traces the Sun. Blue traces Earth. Where the dots fade, the terrain blocks the view. Near the pole, even a low ridge can make the difference.",
     enter: () => {
       closePanels();
       st().select("connecting-ridge-b");
@@ -81,7 +81,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Compare possible landing dates",
-    text: "Each row is a site and each column is a landing time. Colors show how much of the mission the selected lander's battery survives. Tap a date to select it. These are model estimates for this lander, not guaranteed landing windows.",
+    text: "Each row is a site. Pick a cell to see the landing time and when the battery would hit its reserve. Green means the model gives the lander enough power for the whole mission.",
     enter: () => {
       closePanels();
       st().setPorkchopOpen(true);
@@ -89,7 +89,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Find a site for your mission",
-    text: "Set the UTC landing time, mission length, night tolerance and terrain limits. Rank landing sites searches the loaded area. The score balances your chosen priorities; it does not certify that a location is safe to land on.",
+    text: "Set a landing time in UTC and tell the finder how much flat ground you need and how long the lander can go without sunlight. Rank landing sites sorts the area by how well each spot fits your mission.",
     enter: () => {
       closePanels();
       const s = st();
@@ -103,7 +103,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Compare sites at the same time",
-    text: "Compare sites puts candidates on the same UTC timeline, with separate Sun, Earth and DSN signals for each one. Add site changes the shortlist. Side by side opens two 3D views. On a phone, switch between the comparison table and Time.",
+    text: "Both sites share the same clock, with separate rows for sunlight, Earth and DSN contact. Use Add site to pick another candidate or Side by side to see both in 3D. On a phone, tap Time for the timeline.",
     enter: () => {
       closePanels();
       const s = st();
@@ -119,8 +119,8 @@ const STEPS: Step[] = [
     },
   },
   {
-    title: "Explore the power and ice tradeoff",
-    text: "Layers shows sunlight, Earth visibility, terrain slope and modeled ice stability. Sunlit ridges can provide power while shadowed floors may retain ice. Ice estimates require a full year of data. Advanced mission tools are available in Tools.",
+    title: "Where could ice stick around?",
+    text: "A sunlit ridge can power a lander. The crater floor below may stay cold enough for ice to persist. The ice map needs a full year of data. Use Layers to switch back to sunlight or slope.",
     enter: () => {
       clearTools();
       st().setRangeDays(365);
@@ -129,8 +129,8 @@ const STEPS: Step[] = [
     },
   },
   {
-    title: "Evaluate Artemis III candidate regions",
-    text: "This report compares NASA's candidate regions for the selected dates. It shows the same power, communication, night and ice tradeoffs at a wider scale. Analyze area loads a more detailed terrain field for a region.",
+    title: "Compare the 2024 Artemis III candidates",
+    text: "The report compares areas from NASA's October 2024 list for the dates you've picked. Choose Analyze area to load a finer grid and look more closely at one region.",
     enter: () => {
       closePanels();
       st().setRover(null);
@@ -139,8 +139,8 @@ const STEPS: Step[] = [
     },
   },
   {
-    title: "Check the evidence and model limits",
-    text: "Validation lists the data sources, comparisons with JPL Horizons and published sunlight research, temperature checks, and model limits. Settings also has Share view. Finish the tour, then try your own site, date and mission constraints.",
+    title: "How we checked the model",
+    text: "Validation shows how our estimates compare with JPL Horizons, published sunlight studies and Diviner temperature measurements. When you find a view you want to keep, use Share view in Settings.",
     enter: () => {
       closePanels();
       st().setRover(null);
@@ -215,8 +215,7 @@ export default function Tour() {
       <div className="glass tour-card welcome" role="dialog" aria-label="Welcome">
         <div className="tour-title">Plan a landing at the Moon's south pole</div>
         <div className="tour-text">
-          Real NASA terrain, the real Sun and Earth for any hour of {years}, and GPU models of sunlight, radio contact, temperature and ice. New here? The
-          guided tour walks through the landing decision.
+          Pick a site on NASA terrain, then move the clock to see when the Sun and Earth clear the local horizon. This timeline covers {years}.
         </div>
         <div className="tour-nav">
           <button
