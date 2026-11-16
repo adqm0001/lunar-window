@@ -6,6 +6,7 @@ import type { VisibilityBits } from "../gpu/engine";
 // cell (A* on arrival time). From a cell it can wait while the Sun is up, then drive to a
 // neighbour if the ground is gentle enough and both ends are sunlit (and, optionally, Earth is in
 // view for the drive). Waiting in darkness is only allowed at the start (parked, hibernating).
+// Because waiting is only allowed in sunlight, the result is a good route but not guaranteed to be the fastest possible.
 
 export interface RoverParams {
   start: { col: number; row: number };
@@ -42,44 +43,52 @@ export interface RoverFailure {
   millis: number;
 }
 
-class Heap {
+// Binary min-heap with lazy deletion: a key may be pushed again with a lower priority; each heap
+// entry carries its own priority, so the older, stale entry stays correctly ordered and the caller
+// skips it when it pops a key it has already closed.
+export class Heap {
   private k: number[] = [];
-  private v: Float64Array;
-  constructor(n: number) {
-    this.v = new Float64Array(n);
-  }
+  private pri: number[] = [];
   get size() {
     return this.k.length;
   }
   push(key: number, val: number) {
-    this.v[key] = val;
-    const a = this.k;
-    a.push(key);
-    let i = a.length - 1;
+    const k = this.k;
+    const q = this.pri;
+    let i = k.length;
+    k.push(key);
+    q.push(val);
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if (this.v[a[p]] <= this.v[a[i]]) break;
-      [a[p], a[i]] = [a[i], a[p]];
+      if (q[p] <= val) break;
+      k[i] = k[p];
+      q[i] = q[p];
       i = p;
     }
+    k[i] = key;
+    q[i] = val;
   }
   pop(): number {
-    const a = this.k;
-    const top = a[0];
-    const last = a.pop()!;
-    if (a.length) {
-      a[0] = last;
+    const k = this.k;
+    const q = this.pri;
+    const top = k[0];
+    const lastK = k.pop()!;
+    const lastQ = q.pop()!;
+    const n = k.length;
+    if (n) {
       let i = 0;
       for (;;) {
         const l = 2 * i + 1;
+        if (l >= n) break;
         const r = l + 1;
-        let m = i;
-        if (l < a.length && this.v[a[l]] < this.v[a[m]]) m = l;
-        if (r < a.length && this.v[a[r]] < this.v[a[m]]) m = r;
-        if (m === i) break;
-        [a[m], a[i]] = [a[i], a[m]];
+        const m = r < n && q[r] < q[l] ? r : l;
+        if (q[m] >= lastQ) break;
+        k[i] = k[m];
+        q[i] = q[m];
         i = m;
       }
+      k[i] = lastK;
+      q[i] = lastQ;
     }
     return top;
   }
@@ -107,11 +116,20 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
   };
   const startCell = p.start.row * n + p.start.col;
   const goalCell = p.goal.row * n + p.goal.col;
+  // Already being at the destination requires no driving. Otherwise it is subject to the terrain limit too.
+  const goalSlope = slopeAt(p.goal.col, p.goal.row);
+  if (startCell !== goalCell && goalSlope > p.maxSlopeDeg) {
+    return {
+      reason: `The destination cell is too steep (${goalSlope.toFixed(1)}°; limit ${p.maxSlopeDeg}°). Choose a gentler destination.`,
+      expanded: 0,
+      millis: performance.now() - t0,
+    };
+  }
   const arrive = new Float64Array(n * n).fill(Infinity);
   const departFrom = new Float64Array(n * n);
   const parent = new Int32Array(n * n).fill(-1);
   const closed = new Uint8Array(n * n);
-  const heap = new Heap(n * n);
+  const heap = new Heap();
   const hKm = (cell: number) => {
     const c = cell % n;
     const r = (cell - c) / n;
@@ -136,7 +154,7 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
       if (nc < 0 || nr < 0 || nc >= n || nr >= n) continue;
       const next = nr * n + nc;
       if (closed[next]) continue;
-      if (next !== goalCell && slopeAt(nc, nr) > p.maxSlopeDeg) continue;
+      if (slopeAt(nc, nr) > p.maxSlopeDeg) continue;
       const moveH = (Math.hypot(dc, dr) * cellKm) / p.speedKmh;
       // earliest departure: wait (in sunlight, or anywhere at the start) until the move is possible
       let td = tc;
@@ -148,7 +166,13 @@ export function planRoute(field: FieldData, bits: VisibilityBits, p: RoverParams
         if (!hereOk) break;
         const ta = td + moveH;
         const ha = Math.floor(ta);
-        const ok = bit(bits.sun, cell, hd) && bit(bits.sun, next, hd) && bit(bits.sun, next, ha) && (!p.needLink || bit(bits.link, cell, hd));
+        // A move can span several hours: apply both rules at both ends in every sampled hour.
+        // Contact, like sunlight, includes the arrival hour; waiting itself does not require contact.
+        let ok = true;
+        for (let h = hd; ok && h <= ha; h++) {
+          ok = bit(bits.sun, cell, h) && bit(bits.sun, next, h)
+            && (!p.needLink || (bit(bits.link, cell, h) && bit(bits.link, next, h)));
+        }
         if (ok) {
           found = ta;
           break;

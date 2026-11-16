@@ -57,9 +57,11 @@ export interface Surface {
   h: number;
   res: number;
   want: number;
+  /** 64 px/deg tile the height came from, or -1 */
+  tile: number;
 }
 
-const surf: Surface = { h: 0, res: 0, want: -1 };
+const surf: Surface = { h: 0, res: 0, want: -1, tile: -1 };
 
 export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpacingKm: number): Surface {
   const ux = -dirWorld.z;
@@ -70,11 +72,13 @@ export function surfaceHeightM(g: GlobeData, dirWorld: THREE.Vector3, vertexSpac
   let res = dataResKm(lat, lon);
   let base: number;
   surf.want = -1;
+  surf.tile = -1;
   if (res > 1 && vertexSpacingKm < 2.0) {
     const h64 = sampleGlobal64(lat, lon);
     if (h64 !== null) {
       base = h64;
       res = 0.474;
+      surf.tile = tileFor(lat, lon);
     } else {
       const miss = lastMissingGlobal64();
       surf.want = miss >= 0 ? miss : tileFor(lat, lon);
@@ -92,6 +96,8 @@ class Node {
   mesh: THREE.Mesh | null = null;
   lastUsed = 0;
   pending = new Set<number>();
+  // 64 px/deg tiles this node was built from: the shader needs them on the GPU while it is drawn
+  tiles = new Set<number>();
   dirty = false;
   center = new THREE.Vector3();
   constructor(
@@ -120,6 +126,7 @@ export class LodTerrain {
   private tmp = new THREE.Vector3();
   meshes: THREE.Mesh[] = [];
   private cache = new GpuTileCache();
+  private neededTiles = new Set<number>();
 
   constructor(
     private g: GlobeData,
@@ -229,15 +236,24 @@ export class LodTerrain {
     }
   }
 
+  // Tile detail: how close (in tile sizes) a tile must be before it splits into four finer ones.
+  private split = SPLIT;
+
   setQuality(q: Quality) {
     this.material.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
+    this.split = q === "saver" ? 1.7 : q === "balanced" ? SPLIT : 3.2;
+    this.hasWork = true;
   }
 
   /** Refines the terrain for one or more cameras (split screen passes two), then shows the first camera's tiles. */
   update(cameras: THREE.Camera | THREE.Camera[]): boolean {
     const cams = Array.isArray(cameras) ? cameras : [cameras];
     const moved = cams.length !== this.lastCams.length || cams.some((c, i) => c.position.distanceToSquared(this.lastCams[i]) >= 1e-10);
-    if (!this.hasWork && !moved) return false;
+    if (!this.hasWork && !moved) {
+      // Failed visible downloads need another attempt even while the camera stays still.
+      this.cache.use(this.neededTiles);
+      return false;
+    }
     this.lastCams = cams.map((c) => c.position.clone());
     this.changedFlag = false;
     this.frame++;
@@ -262,6 +278,14 @@ export class LodTerrain {
     this.viewSets = sets;
     this.viewCams = cams;
     for (const set of sets) for (const n of set) n.lastUsed = this.frame;
+    const need = this.neededTiles;
+    need.clear();
+    // tiles the visible nodes were built from, plus ones they still wait for (a failed fetch is retried)
+    for (const set of sets) for (const n of set) {
+      for (const k of n.tiles) need.add(k);
+      for (const k of n.pending) need.add(k);
+    }
+    this.cache.use(need);
     this.useView(0);
     if (this.nodes.size > MAX_CACHED) this.evict();
     return this.changedFlag;
@@ -294,7 +318,7 @@ export class LodTerrain {
       if (camDir.dot(n.center) < Math.cos(Math.min(Math.PI, horizon + ang))) return;
       const world = this.tmp.copy(n.center).multiplyScalar(R_MOON_KM).add(MOON_CENTER);
       const dist = world.distanceTo(camera.position);
-      const wantSplit = n.level < MAX_LEVEL && dist < n.sizeKm * SPLIT;
+      const wantSplit = n.level < MAX_LEVEL && dist < n.sizeKm * this.split;
       if (wantSplit) {
         const kids = [0, 1, 2, 3].map((q) => this.node(n.face, n.level + 1, n.i * 2 + (q & 1), n.j * 2 + (q >> 1)));
         const ready = kids.every((k) => k.mesh);
@@ -339,6 +363,7 @@ export class LodTerrain {
     const resArr = new Float32Array(E * E);
     const dir = new THREE.Vector3();
     n.pending.clear();
+    n.tiles.clear();
     n.dirty = false;
     for (let r = 0; r < E; r++) {
       for (let c = 0; c < E; c++) {
@@ -350,6 +375,7 @@ export class LodTerrain {
           n.pending.add(s.want);
           requestGlobalTile(s.want);
         }
+        if (s.tile >= 0) n.tiles.add(s.tile);
         resArr[r * E + c] = s.res;
         const h = s.h / 1000;
         const k = (r * E + c) * 3;
@@ -661,10 +687,29 @@ void main() {
   vec3 n = normalize(vNormal);
   float halo = 0.0;
   float footprint = max(camDist * 0.0012, 0.004);
+  // Per-pixel relief from the height data. A tile only has a vertex every vSpacing km, so from far away its
+  // normals are much smoother than the data, slopes look flat and the shadows (traced per pixel through
+  // the data) sit on featureless ground as hard black blobs. Where the mesh is coarser than the data, light
+  // the pixel with the data's own slope, measured over about one pixel so it doesn't sparkle.
+  float demW = smoothstep(res * 0.7, res * 2.0, vSpacing);
+  if (demW > 0.0) {
+    vec3 eastU = normalize(vec3(-u.y, u.x, 0.0) + vec3(1e-6, 0.0, 0.0));
+    vec3 northU = cross(u, eastU);
+    float eM = max(res * 1000.0, footprint * 1500.0);
+    float rE;
+    float hE = demH(normalize(u + eastU * (eM / R_M)), rE);
+    float hN = demH(normalize(u + northU * (eM / R_M)), rE);
+    vec3 nU = normalize(u - eastU * ((hE - h0) / eM) - northU * ((hN - h0) / eM));
+    n = normalize(mix(n, vec3(nU.y, -nU.z, -nU.x), demW));
+  }
   float maxCell = min(vSpacing * 2.5, min(res, vRes) * 2.5);
-  if (camDist < 140.0) {
+  // Quality: Saver keeps only the near crater detail, skips rocks and mottling; High draws rocks further out.
+  float detailFar = uQuality == 0 ? 45.0 : 140.0;
+  float rockFar = uQuality == 0 ? 0.0 : uQuality == 1 ? 0.3 : 0.6;
+  if (camDist < detailFar) {
     vec4 cd = craterTri((vWorld - CENTER) * 1000.0, dW);
-    float fade = 1.0 - smoothstep(80.0, 140.0, camDist);
+    // long fade: in a low oblique view a short one is squeezed into a visible line across the screen
+    float fade = 1.0 - smoothstep(detailFar * 0.2, detailFar, camDist);
     vec3 G = cd.xyz - dW * dot(cd.xyz, dW);
     n = normalize(n - G * 0.85 * fade);
     halo = cd.w * fade;
@@ -680,12 +725,18 @@ void main() {
     vec3 north = cross(u, east);
     vec3 sdir = normalize(sv - u * dot(sv, u));
     float hs = h0 + 2.0;
-    float best = -1.5;
+    // The horizon is tracked as a slope (rise over run) instead of an angle. atan is monotonic and the run is
+    // positive, so the steepest slope is the highest angle and the loop needs no atan at all.
+    float bestT = tan(-1.5);
+    float selT = tan(min(sel + 0.02, 1.5));
+    float lowT = tan(max(sel - radians(0.27), -1.5));
+    float dBest = 1e9;
     float d = max(res * 1000.0 * 0.6, camDist * 1.5);
     float hsDetail = camDist < 30.0 ? craterDetail(u * R_KM, max(footprint * 4.0, 0.45), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0 : 0.0;
     hs += hsDetail;
-    int steps = uQuality == 0 ? 28 : uQuality == 1 ? 42 : 70;
-    float grow = uQuality == 0 ? 1.2 : uQuality == 1 ? 1.14 : 1.095;
+    int steps = uQuality == 0 ? 24 : uQuality == 1 ? 42 : 64;
+    float grow = uQuality == 0 ? 1.22 : uQuality == 1 ? 1.14 : 1.1;
+    int detailSteps = uQuality == 0 ? 0 : uQuality == 1 ? 10 : 16;
     for (int i = 0; i < 90; i++) {
       if (i >= steps) break;
       float delta = d / R_M;
@@ -693,16 +744,31 @@ void main() {
       vec3 q = cos(delta) * u + sin(delta) * sdir;
       float r2;
       float dh = demH(q, r2) - hs;
-      if (uQuality > 0 && camDist < 25.0 && i < 10) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.45)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
-      best = max(best, atan(dh - 2.0 * R_M * sh * sh, R_M * sin(delta)));
-      if (best > sel + 0.02) break;
+      if (camDist < 25.0 && i < detailSteps) dh += craterDetail(q * R_KM, max(d * 0.0025, max(footprint * 4.0, 0.45)), min(vSpacing * 2.5, min(res, vRes) * 2.5)) * 1000.0;
+      float slope = (dh - 2.0 * R_M * sh * sh) / (R_M * sin(delta));
+      if (slope > bestT) {
+        bestT = slope;
+        dBest = d;
+      }
+      if (bestT > selT) break;
       d *= grow;
       if (d > 220000.0) break;
+      // Nothing on the Moon stands more than ~10.8 km above the 1737.4 km sphere (LOLA: Smith et al. 2010,
+      // GRL 37, L18204; 11.1 km here allows for the small-crater detail). Once even such a peak at the next
+      // sample could neither raise the horizon found so far nor reach the Sun's lower edge, the answer is final.
+      float dn = d / R_M;
+      float shn = sin(0.5 * dn);
+      if ((11100.0 - hs - 2.0 * R_M * shn * shn) / (R_M * sin(dn)) < max(bestT, lowT)) break;
     }
-    lit = clamp((sel - best) / radians(0.53) + 0.5, 0.0, 1.0);
+    float best = atan(bestT);
+    // Penumbra: the Sun's 0.53 degree disc, widened when a pixel covers ground comparable to the distance
+    // to whatever casts the shadow (far views). A sub-pixel shadow then averages to grey instead of
+    // flickering between black and lit from pixel to pixel.
+    float pen = radians(0.53) + 0.5 * atan(footprint * 1000.0, dBest);
+    lit = clamp((sel - best) / pen + 0.5, 0.0, 1.0);
   }
 
-  if (camDist < 140.0 && lit > 0.0) {
+  if (camDist < detailFar && lit > 0.0 && uQuality > 0) {
     vec3 Ls = normalize(uSunWorld);
     float sinE = dot(Ls, dW);
     if (sinE > 0.05 && sinE < 0.65) {
@@ -723,8 +789,8 @@ void main() {
   }
 
   float rockAlb = 1.0;
-  if (camDist < 0.3) {
-    float fd = 1.0 - smoothstep(0.12, 0.3, camDist);
+  if (camDist < rockFar) {
+    float fd = 1.0 - smoothstep(rockFar * 0.4, rockFar, camDist);
     vec3 aw = abs(dW);
     vec3 pw = vWorld * 1000.0;
     vec3 Lr = normalize(uSunWorld);
@@ -746,7 +812,13 @@ void main() {
   if (lit > 0.0) lit *= landerShadow(vWorld, normalize(uSunWorld));
 
   vec2 uv = vec2((lon + 180.0) / 360.0, (lat + 90.0) / 180.0);
-  vec3 mapAlbedo = texture(uColor, uv).rgb * 0.30;
+  // uv.x jumps from 1 to 0 at longitude ±180°, which would make the GPU pick the smallest mip level along that
+  // line. Take the x derivative from a copy shifted by half a turn wherever that copy is continuous.
+  vec2 uvDx = dFdx(uv), uvDy = dFdy(uv);
+  float uxs = fract(uv.x + 0.5);
+  float sDx = dFdx(uxs), sDy = dFdy(uxs);
+  if (abs(sDx) + abs(sDy) < abs(uvDx.x) + abs(uvDy.x)) { uvDx.x = sDx; uvDy.x = sDy; }
+  vec3 mapAlbedo = textureGrad(uColor, uv, uvDx, uvDy).rgb * 0.30;
   float tone = vnoise(mp / 2600.0) * 0.55 + vnoise(mp / 700.0) * 0.3 + vnoise(mp / 150.0) * 0.15;
   vec3 polarAlbedo = mix(vec3(0.105, 0.102, 0.098), vec3(0.165, 0.160, 0.152), tone);
   float polarW = 1.0 - smoothstep(-82.0, -76.0, lat);
@@ -754,7 +826,7 @@ void main() {
   albedo *= 0.92 + 0.16 * vnoise3(dW * 58.0);
   albedo *= 1.0 + 0.32 * halo;
   albedo *= rockAlb;
-  if (camDist < 150.0) albedo *= 1.0 + mottle(u * R_KM, footprint) * (1.0 - smoothstep(90.0, 150.0, camDist));
+  if (camDist < 150.0 && uQuality > 0) albedo *= 1.0 + mottle(u * R_KM, footprint) * (1.0 - smoothstep(90.0, 150.0, camDist));
 
   vec3 L = normalize(uSunWorld);
   vec3 V = normalize(cameraPosition - vWorld);

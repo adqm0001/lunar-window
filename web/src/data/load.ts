@@ -61,10 +61,14 @@ export const REPLAYS: Record<string, Replay> = {
   },
 };
 
+/** The replay with this id, or null. Only the listed ids count, not inherited names such as `constructor`. */
+export function replayById(id: string | null): Replay | null {
+  return id && Object.hasOwn(REPLAYS, id) ? REPLAYS[id] : null;
+}
+
 /** The replay named in the page URL (`?replay=im2`), if any. */
 export function replayFromUrl(): Replay | null {
-  const id = new URLSearchParams(location.search).get("replay");
-  return (id && REPLAYS[id]) || null;
+  return replayById(new URLSearchParams(location.search).get("replay"));
 }
 
 const base = `${import.meta.env.BASE_URL}data/`;

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { getGlobalTile, onGlobalTile } from "../data/globalTiles";
+import { getGlobalTile, onGlobalTile, requestGlobalTile } from "../data/globalTiles";
 
 const TILE = 480;
 const COLS = 48;
@@ -12,7 +12,10 @@ export class GpuTileCache {
   readonly index: THREE.DataTexture;
   private layerOf = new Map<number, number>();
   private keyOf: number[] = new Array(CACHE_LAYERS).fill(-1);
-  private next = 0;
+  // When each layer was last needed (use() calls); the least recently needed one is replaced first.
+  private lastUse: number[] = new Array(CACHE_LAYERS).fill(-1);
+  private tick = 0;
+  private needed = new Set<number>();
   private indexData = new Int16Array(COLS * ROWS).fill(-1);
 
   constructor() {
@@ -34,12 +37,33 @@ export class GpuTileCache {
     onGlobalTile((key) => this.add(key));
   }
 
+  /**
+   * Marks the tiles the visible terrain needs. Any that were pushed out of the GPU (or out of memory) are
+   * brought back, so the shader never falls back to the 4x coarser global heights under the camera.
+   */
+  use(keys: Iterable<number>) {
+    this.tick++;
+    this.needed.clear();
+    for (const key of keys) this.needed.add(key);
+    for (const key of this.needed) {
+      const layer = this.layerOf.get(key);
+      if (layer !== undefined) this.lastUse[layer] = this.tick;
+      else if (getGlobalTile(key)) this.add(key);
+      else requestGlobalTile(key);
+    }
+  }
+
   private add(key: number) {
     if (this.layerOf.has(key)) return;
     const tile = getGlobalTile(key);
     if (!tile) return;
-    const layer = this.next;
-    this.next = (this.next + 1) % CACHE_LAYERS;
+    let layer = 0;
+    for (let i = 1; i < CACHE_LAYERS; i++) {
+      const currentNeeded = this.needed.has(this.keyOf[layer]);
+      const otherNeeded = this.needed.has(this.keyOf[i]);
+      if ((currentNeeded && !otherNeeded) || (currentNeeded === otherNeeded && this.lastUse[i] < this.lastUse[layer])) layer = i;
+    }
+    this.lastUse[layer] = this.tick;
     const old = this.keyOf[layer];
     if (old >= 0) {
       this.layerOf.delete(old);
@@ -78,6 +102,24 @@ float h64(float latDeg, float lonDeg, out bool ok) {
   ivec2 p = ivec2(floor(vec2(px, py)));
   vec2 f = vec2(px, py) - floor(vec2(px, py));
   float a; float b; float d; float e;
+  // Fast path: all four pixels in one tile (all but ~0.4% of lookups), so the tile index is read once
+  // instead of four times. Same result as the general path below. Shadow rays call this up to 90 times per pixel.
+  int W = 48 * 480;
+  int x = ((p.x % W) + W) % W;
+  int tx = x / 480;
+  int ty = p.y / 480;
+  int lx = x - tx * 480;
+  int ly = p.y - ty * 480;
+  if (p.y >= 0 && lx < 479 && ly < 479) {
+    int layer = texelFetch(uT64Index, ivec2(tx, ty), 0).r;
+    ok = layer >= 0;
+    if (!ok) return 0.0;
+    a = float(texelFetch(uT64, ivec3(lx, ly, layer), 0).r);
+    b = float(texelFetch(uT64, ivec3(lx + 1, ly, layer), 0).r);
+    d = float(texelFetch(uT64, ivec3(lx, ly + 1, layer), 0).r);
+    e = float(texelFetch(uT64, ivec3(lx + 1, ly + 1, layer), 0).r);
+    return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);
+  }
   ok = pix64(p, a) && pix64(p + ivec2(1, 0), b) && pix64(p + ivec2(0, 1), d) && pix64(p + ivec2(1, 1), e);
   if (!ok) return 0.0;
   return mix(mix(a, b, f.x), mix(d, e, f.x), f.y);

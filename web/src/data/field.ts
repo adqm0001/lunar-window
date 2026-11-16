@@ -21,8 +21,8 @@ export interface FieldData {
 
 const base = `${import.meta.env.BASE_URL}data/`;
 
-async function fetchBytes(path: string, onBytes: (n: number, total: number) => void): Promise<Uint8Array> {
-  const res = await fetch(base + path);
+async function fetchBytes(path: string, onBytes: (n: number, total: number) => void, signal: AbortSignal): Promise<Uint8Array> {
+  const res = await fetch(base + path, { signal });
   if (!res.ok || !res.body) throw new Error(`Couldn't load ${path} (${res.status})`);
   const total = Number(res.headers.get("content-length")) || 0;
   const reader = res.body.getReader();
@@ -53,13 +53,22 @@ async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
 const APPROX_BYTES = 6_300_000 + 2_150_000 + 130_000;
 
 export async function loadField(onProgress: (f: number) => void): Promise<FieldData> {
-  const meta = (await (await fetch(base + "field_pole.json")).json()) as FieldMeta & { horizon: { file: string }; heights: { file: string }; slope: { file: string } };
+  const response = await fetch(base + "field_pole.json");
+  if (!response.ok) throw new Error(`Couldn't load field_pole.json (${response.status})`);
+  const meta = await response.json() as FieldMeta & { horizon: { file: string }; heights: { file: string }; slope: { file: string } };
   let got = 0;
   const tick = (n: number) => {
     got += n;
     onProgress(Math.min(0.99, got / APPROX_BYTES));
   };
-  const [h, z, s] = await Promise.all([fetchBytes(meta.horizon.file, tick), fetchBytes(meta.heights.file, tick), fetchBytes(meta.slope.file, tick)]);
+  const controller = new AbortController();
+  const [h, z, s] = await Promise.all(
+    [meta.horizon.file, meta.heights.file, meta.slope.file].map((file) => fetchBytes(file, tick, controller.signal)),
+  ).catch((error: unknown) => {
+    // Stop the other downloads before the stage offers to retry.
+    controller.abort();
+    throw error;
+  });
   const [horizon, heights, slope] = await Promise.all([gunzip(h), gunzip(z), gunzip(s)]);
   const layer = meta.horizon.size * meta.horizon.size;
   for (let a = 1; a < meta.horizon.azimuthBins; a++) {

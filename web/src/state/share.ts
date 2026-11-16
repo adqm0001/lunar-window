@@ -26,6 +26,16 @@ export function currentScene() {
 }
 
 const fix = (n: number, d: number) => Number(n.toFixed(d));
+const MAX_SHARED_POINTS = 20;
+
+// A link cut off in the middle of an escape ("%C3") cannot be decoded; keep the raw text instead of throwing at import.
+const decodeName = (s: string) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
 
 function parse(hash: string): Shared | null {
   const q = new URLSearchParams(hash.replace(/^#/, ""));
@@ -46,8 +56,8 @@ function parse(hash: string): Shared | null {
       .split(";")
       .map((e) => e.split(","))
       .filter((a) => a.length >= 2 && Number.isFinite(Number(a[0])) && Number.isFinite(Number(a[1])))
-      .slice(0, 20)
-      .map((a) => ({ lat: Number(a[0]), lon: Number(a[1]), name: decodeURIComponent(a.slice(2).join(",") || "") }));
+      .slice(0, MAX_SHARED_POINTS)
+      .map((a) => ({ lat: Number(a[0]), lon: Number(a[1]), name: decodeName(a.slice(2).join(",") || "") }));
   const c = q.get("c")?.split(",").map(Number);
   if (c && c.length === 6 && c.every(Number.isFinite)) out.c = { orbit: c[0] === 1, t: [c[1], c[2]], c: [c[3], c[4], c[5]] };
   return out;
@@ -66,15 +76,19 @@ export function sharedCamera(): ViewState | null {
 
 export function encodeState(): string {
   const st = useApp.getState();
+  // Finder IDs expire with the search. Share its selected result as a normal point, keeping
+  // the newest points within the same 20-point limit used when adding a point in the app.
+  const result = st.finder?.candidates.find((c) => c.site.id === st.selectedId)?.site;
+  const points = result ? [...st.customSites.slice(-(MAX_SHARED_POINTS - 1)), result] : st.customSites;
   const q = new URLSearchParams();
-  q.set("t", String(st.hour));
-  const pi = st.customSites.findIndex((c) => c.id === st.selectedId);
+  q.set("t", String(fix(st.hour, 2)));
+  const pi = points.findIndex((c) => c.id === st.selectedId);
   q.set("s", pi >= 0 ? `p${pi}` : st.selectedId);
   q.set("l", st.layer);
   q.set("r", String(st.rangeDays));
   q.set("v", st.view);
-  if (st.customSites.length)
-    q.set("p", st.customSites.map((c) => `${fix(c.lat, 4)},${fix(c.lon, 4)},${encodeURIComponent(c.name)}`).join(";"));
+  if (points.length)
+    q.set("p", points.map((c) => `${fix(c.lat, 4)},${fix(c.lon, 4)},${encodeURIComponent(c.name)}`).join(";"));
   const cam = scene?.getView();
   if (cam && st.view === "3d")
     q.set("c", [cam.orbit ? 1 : 0, fix(cam.t[0], 4), fix(cam.t[1], 4), fix(cam.c[0], 4), fix(cam.c[1], 4), fix(cam.c[2], 3)].join(","));
@@ -98,8 +112,9 @@ export function applyLate() {
   applied = true;
   const ids: string[] = [];
   for (const p of pending.p ?? []) {
-    const s = addPointAt(p.lat, p.lon, p.name || undefined);
-    if (s) ids.push(s.id);
+    // A shared point landing on one of this browser's own points keeps that point's name.
+    const s = addPointAt(p.lat, p.lon, p.name || undefined, true);
+    ids.push(s?.id ?? ""); // keep indexes lined up with the link even if a point fails to load
   }
   const st = useApp.getState();
   const m = pending.s?.match(/^p(\d+)$/);

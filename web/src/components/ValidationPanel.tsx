@@ -1,8 +1,12 @@
+import Icon from "./Icon";
 import { useMemo } from "react";
 import Modal from "./Modal";
 import { percentOn } from "../lib/visibility";
 import { getSeries, getThermal, useSeriesVersion } from "../state/seriesCache";
 import { useApp } from "../state/store";
+import { ephemYears } from "../lib/years";
+import { iceVerdictPossible } from "../gpu/thermal";
+import { thermalSpanLabel } from "../lib/siteThermal";
 
 // Results of the offline pipeline run for 2020 (pipeline/validate_illumination.py), same year as
 // the published study. The 2026 column is recomputed live in the browser.
@@ -46,7 +50,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sun and Earth positions
+            <span className="ok"><Icon name="check" /></span> Sun and Earth positions
           </h3>
           <p>
             Our positions (JPL DE421 ephemeris, Moon body-fixed frame) were compared with NASA JPL's Horizons service for 3 sites, every day of a year, for both
@@ -56,7 +60,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Sunlight at the famous "peaks of light"
+            <span className="ok"><Icon name="check" /></span> Sunlight at the famous "peaks of light"
           </h3>
           <p>
             Share of the year with at least half the Sun's disc above the real terrain horizon, compared with Bussey et al. 2010 (Icarus), which used Japan's
@@ -92,9 +96,9 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h3>
-            <span className="ok">✓</span> Ground temperature
+            <span className="ok"><Icon name="check" /></span> Ground temperature
           </h3>
-          <p>Our soil heat-flow model against NASA's Diviner thermal instrument on the Lunar Reconnaissance Orbiter:</p>
+          <p>Site temperatures from the CPU soil heat-flow model, compared with NASA's Diviner instrument on the Lunar Reconnaissance Orbiter:</p>
           <table className="vtable">
             <thead>
               <tr>
@@ -118,7 +122,10 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
                   <td>Shackleton crater floor (never sunlit)</td>
                   <td>below 110 K all year: a cold trap</td>
                   <td>
-                    {Math.round(thermal.b.min)}–{Math.round(thermal.b.max)} K · ice {thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}
+                    {Math.round(thermal.b.min)}–{Math.round(thermal.b.max)} K ·{" "}
+                    {iceVerdictPossible(thermal.b.hours)
+                      ? `ice ${thermal.b.iceDepth === 0 ? "stable at the surface" : thermal.b.iceDepth > 0 ? "stable below" : "unstable"}`
+                      : `over ${thermalSpanLabel(thermal.b.hours)} only: no full-year ice verdict`}
                   </td>
                 </tr>
               )}
@@ -126,14 +133,21 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
           </table>
           <p className="muted">
             Sources: Williams et al. 2017 (Icarus) for global Diviner temperatures; Paige et al. 2010 (Science) for polar cold traps; soil properties from Hayne
-            et al. 2017; light and heat bounced off crater walls from Ingersoll et al. 1992 (Icarus). Both are a full year of hourly heat flow, run in your
-            browser.
+            et al. 2017; light and heat bounced off crater walls from Ingersoll et al. 1992 (Icarus).{" "}
+            {thermal.b && !iceVerdictPossible(thermal.b.hours)
+              ? `Both are hourly heat flow over the ${thermalSpanLabel(thermal.b.hours)} of data available, run in your browser.`
+              : "Both are a full year of hourly heat flow, run in your browser."}
           </p>
+            <p className="muted">
+              The temperature and ice maps warm the soil model for up to four lunar days before the displayed period and include every sampled step in
+              that period. Where earlier data is missing, the maps use conditions from twelve lunar days later if available. The site estimates above
+              use a different warm-up, so short-period site and map temperatures can differ.
+            </p>
         </section>
 
         <section>
           <h3>
-            <span className="ok">✓</span> Engines agree with each other
+            <span className="ok"><Icon name="check" /></span> Engines agree with each other
           </h3>
           <p>
             The C++ horizon engine (6 billion terrain lookups on 8 cores) builds the horizon data. The browser's GPU engine reproduces the reference sunlight
@@ -150,7 +164,7 @@ export default function ValidationPanel({ onClose }: { onClose: () => void }) {
             <li>Terrain is NASA LOLA: 40 m near the pole, 80 m to 85°S, 474 m elsewhere. Rocks smaller than that are not in the data.</li>
             <li>Small craters you see up close are generated for looks only; they never affect any number.</li>
             <li>Light and heat bounced off surrounding slopes use a single-bounce crater approximation: multiple reflections and walls cooling after sunset are left out.</li>
-            <li>Sun and Earth positions cover 2026–2028.</li>
+            <li>Sun and Earth positions cover {ephemYears(data.ephem).label}.</li>
           </ul>
         </section>
     </Modal>
