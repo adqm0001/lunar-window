@@ -49,6 +49,57 @@ void main() {
   fragColor = vec4(col, 1.0);
 }`;
 
+/**
+ * Whether the label anchored at `anchor` can be seen from `cam` (both relative to the Moon's centre, km). The removed
+ * wedge is dot(p, a) > 0 and dot(p, b) > 0 (as in the shader). The anchor is drawn on the cut face whose normal is a,
+ * so it is seen only if the camera is clearly in front of that face (dot(cam, a) > 0.2 |cam|) and the part of the line from the
+ * camera that is inside the sphere, from where it enters to the anchor, is all in the wedge, where there is no rock
+ * in the way. The wedge is convex, so its two ends decide: the entry point (the camera itself if it is inside the
+ * sphere) must be in the wedge; the anchor is on the face, so it is. The anchors are lifted off the cut plane towards
+ * the camera's up, by 0 to ~120 km (largest for the crust), always to the wedge side (cutGeometry's test checks
+ * this); the 10 km tolerance only absorbs rounding where the line grazes the plane.
+ */
+export const LABEL_PLANE_TOL_KM = 10;
+/** The cut face must be seen at more than ~12 degrees from edge-on (sin 12 deg = 0.2), or the anchors, lifted off the face, would float in the opening. */
+export const MIN_FACE_VIEW = 0.2;
+export function cutawayLabelVisible(cam: THREE.Vector3, anchor: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, radius: number): boolean {
+  if (cam.dot(a) <= MIN_FACE_VIEW * cam.length()) return false; // the face is edge-on or turned away
+  const d = anchor.clone().sub(cam);
+  const A = d.lengthSq();
+  if (A === 0) return true;
+  let t = 0; // a camera inside the sphere sees from where it is
+  if (cam.lengthSq() > radius * radius) {
+    const B = cam.dot(d);
+    const disc = B * B - A * (cam.lengthSq() - radius * radius);
+    if (disc < 0) return false;
+    t = (-B - Math.sqrt(disc)) / A;
+    if (t > 1) return true; // the anchor is in front of the sphere
+  }
+  const p = cam.clone().addScaledVector(d, Math.max(t, 0));
+  return p.dot(a) >= -LABEL_PLANE_TOL_KM && p.dot(b) >= -LABEL_PLANE_TOL_KM;
+}
+
+/**
+ * The cut planes' normals a and b (the removed wedge is dot(p, a) > 0 and dot(p, b) > 0) and the label anchors
+ * (relative to the Moon's centre, km), for a camera at `camPos` (relative to the centre) with orientation `camQuat`.
+ */
+export function cutGeometry(camPos: THREE.Vector3, camQuat: THREE.Quaternion) {
+  const c0 = camPos.clone().normalize();
+  const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camQuat);
+  const c = c0.clone().applyAxisAngle(camUp, -0.55).add(camUp.clone().multiplyScalar(0.18)).normalize();
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camQuat);
+  right.sub(c.clone().multiplyScalar(right.dot(c))).normalize();
+  const a = c.clone().add(right).normalize();
+  const b = c.clone().sub(right).normalize();
+  const along = b.clone().sub(a.clone().multiplyScalar(b.dot(a))).normalize();
+  const anchors = LAYERS.map((l, i) => {
+    const r = l.r1 === R_MOON_KM ? R_MOON_KM - 8 : (l.r0 + l.r1) / 2;
+    const dir = along.clone().multiplyScalar(Math.cos(0.5 + i * 0.12)).add(camUp.clone().multiplyScalar(Math.sin(0.5 + i * 0.12) * 0.25)).normalize();
+    return dir.multiplyScalar(r);
+  });
+  return { a, b, anchors };
+}
+
 export class Cutaway {
   group = new THREE.Group();
   a = new THREE.Vector3(1, 0, 0);
@@ -114,13 +165,9 @@ export class Cutaway {
   }
 
   orient(camera: THREE.Camera) {
-    const c0 = camera.position.clone().sub(MOON_CENTER).normalize();
-    const camUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    const c = c0.clone().applyAxisAngle(camUp, -0.55).add(camUp.clone().multiplyScalar(0.18)).normalize();
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    right.sub(c.clone().multiplyScalar(right.dot(c))).normalize();
-    this.a.copy(c).add(right).normalize();
-    this.b.copy(c).sub(right).normalize();
+    const geo = cutGeometry(camera.position.clone().sub(MOON_CENTER), camera.quaternion);
+    this.a.copy(geo.a);
+    this.b.copy(geo.b);
     const set = (mesh: THREE.Mesh, normal: THREE.Vector3, keep: THREE.Vector3) => {
       mesh.position.copy(MOON_CENTER);
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
@@ -128,13 +175,7 @@ export class Cutaway {
     };
     set(this.faces[0], this.a, this.b);
     set(this.faces[1], this.b, this.a);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    const along = this.b.clone().sub(this.a.clone().multiplyScalar(this.b.dot(this.a))).normalize();
-    LAYERS.forEach((l, i) => {
-      const r = l.r1 === R_MOON_KM ? R_MOON_KM - 8 : (l.r0 + l.r1) / 2;
-      const dir = along.clone().multiplyScalar(Math.cos(0.5 + i * 0.12)).add(up.clone().multiplyScalar(Math.sin(0.5 + i * 0.12) * 0.25)).normalize();
-      this.labels[i].position.copy(MOON_CENTER).addScaledVector(dir, r);
-    });
+    geo.anchors.forEach((p, i) => this.labels[i].position.copy(MOON_CENTER).add(p));
   }
 
   /**
@@ -147,9 +188,15 @@ export class Cutaway {
     if (!this.group.visible) return;
     if (!(width > 0 && height > 0)) return;
     // where CSS2DRenderer puts each label; one it hides (outside the depth range, e.g. behind the camera) gets NaN
-    // so it doesn't push the visible ones around
+    // so it doesn't push the visible ones around; a label hidden by the Moon's rock (seen from outside the open
+    // wedge) is hidden (CSS2DRenderer gives it display none) and gets NaN the same way
+    const cam = camera.position.clone().sub(MOON_CENTER);
     const pts = this.labels.map((o) => {
-      const v = o.getWorldPosition(this.scratch).project(camera);
+      const w = o.getWorldPosition(this.scratch);
+      const seen = cutawayLabelVisible(cam, w.clone().sub(MOON_CENTER), this.a, this.b, R_MOON_KM);
+      o.visible = seen; // CSS2DRenderer sets display none on an invisible label (it overwrites the element style)
+      if (!seen) return [NaN, NaN];
+      const v = w.project(camera);
       return v.z < -1 || v.z > 1 ? [NaN, NaN] : [(v.x + 1) * 0.5 * width, (1 - v.y) * 0.5 * height];
     });
     // until the observer has measured a box (before its first render) use typical sizes; it then re-renders

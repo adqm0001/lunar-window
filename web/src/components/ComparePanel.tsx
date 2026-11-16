@@ -1,10 +1,11 @@
 import ControlMenu from "./ControlMenu";
-import { useSites } from "../state/selectors";
+import { useSelectedSite, useSites } from "../state/selectors";
 import Icon from "./Icon";
 import { useMemo } from "react";
 import { fieldSafePct } from "../data/field";
 import { formatLatLon } from "../lib/astro";
 import { compareStats, compareWindow, SUN_LIT } from "../lib/compareStats";
+import { pinIdentity } from "../lib/pins";
 import { hoursUntilChange, percentOn, siteStateAt } from "../lib/visibility";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { formatDuration, useApp } from "../state/store";
@@ -26,7 +27,7 @@ export default function ComparePanel() {
   const field = useApp((s) => s.field);
   const pinned = useApp((s) => s.pinned);
   const hour = useApp((s) => s.hour);
-  const selectedId = useApp((s) => s.selectedId);
+  const selectedPinId = pinIdentity(useSelectedSite());
   const split = useApp((s) => s.split);
   const { select, togglePin, setCompareOpen, setSplit } = useApp.getState();
   const h = Math.floor(hour);
@@ -74,7 +75,7 @@ export default function ComparePanel() {
 
         <span className="spacer" />
         <ControlMenu label="Add site" placement="above" align="end">
-          {(close) => sites.filter((site) => !pinned.some((chosen) => chosen.id === site.id)).map((site) => (
+          {(close) => sites.filter((site) => !pinned.some((chosen) => chosen.id === pinIdentity(site))).map((site) => (
             <button key={site.id} className="control-action" onClick={() => { togglePin(site); close(); }}>
               {site.name}
             </button>
@@ -105,7 +106,7 @@ export default function ComparePanel() {
             <tr>
               <th />
               {pinned.map((s) => (
-                <th key={s.id} className={s.id === selectedId ? "active" : ""}>
+                <th key={s.id} className={s.id === selectedPinId ? "active" : ""}>
                   <button className="c-site" onClick={() => select(s.id)}>
                     {s.name}
                   </button>

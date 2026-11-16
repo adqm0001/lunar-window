@@ -112,9 +112,9 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [x] **14. Firefox** (S).
 
-- [x] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels. [Android Chrome test report](docs/testing/task-15-android.md); persistent 3D lag recorded in [bug #146](https://github.com/adqm0001/lunar-window/issues/146).
+- [x] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels. [Android Chrome test report](docs/testing/task-15-android.md); 3D dragging reported smooth on the updated site after the initial lag in [bug #146](https://github.com/adqm0001/lunar-window/issues/146).
 
-- [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); 3D touch-camera lag/jumping tracked in [#143](https://github.com/adqm0001/lunar-window/issues/143).
+- [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); dragging and pinch zoom reported smooth on the updated site after the initial finding in [#143](https://github.com/adqm0001/lunar-window/issues/143).
 
 - [x] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
 
@@ -352,6 +352,11 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
   - **Verify:** in the emulator, you stand on Connecting ridge B and can look around; time playback moves the Sun.
 
 ## Follow-up bug fixes
+
+- [x] **Keep finder snapshot pins distinct when rank ids are reused** ([#217](https://github.com/adqm0001/lunar-window/issues/217)) — taken: malqedra
+  - **Files:** pin identity helper, store/selectors, Compare and site pin controls, 3D site markers, share links, and regression tests.
+  - **Spec:** preserve pins for distinct finder locations under independent identities without changing finder results. Keep snapshot coordinates, horizons and labels selectable after later searches, with correct Compare removal/keys, split destinations and sharing. Retain built-in/custom behavior and the six-pin limit.
+  - **Verify:** reuse best:1 for two locations, remove either snapshot, retain/resolve selected snapshots through finder reset and eviction, built-in/custom controls and fresh-link round trip. A live result and its snapshot should share one highlighted 3D marker. Run TypeScript, tests, build and production finder/Compare/split checks without console errors.
 
 - [x] **Render skyline horizons at their actual angular resolution** ([#207](https://github.com/adqm0001/lunar-window/issues/207)) — taken: malqedra
   - **Files:** `web/src/components/SkylinePanel.tsx` and regression tests.
