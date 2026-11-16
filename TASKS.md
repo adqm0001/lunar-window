@@ -94,13 +94,13 @@ Tasks are independent unless **Depends on** says otherwise. Sizes: S ≈ 1–2 h
 
 - [ ] **7. Video clip: report and validation** (S). Screen-record 🏁 Artemis III report and ✓ Validation.
 
-- [x] **8. Voice-over script** (S). ≤ 2:30. Problem (Sun ≤ 1.6° high, moving shadows, landers freeze, Earth hidden) → what the app does → validation numbers (README table).
+- [x] **8. Voice-over script** (S). A script and edit plan for a video of **30 seconds or less**, following the team-supplied 2026 project-page instructions. See [voiceover.md](docs/voiceover.md).
 
-- [ ] **9. Edit and upload video** (M). Clips 1–7 + voice-over, ≤ 3:00, upload (unlisted YouTube is fine). **Depends on** 1–8.
+- [ ] **9. Edit and upload video** (M, optional if using the seven-slide demo). Edit selected footage with captions or narration to **30 seconds or less**, upload publicly, and verify the link while signed out. [A 29-second captioned MP4](docs/demo/lunar-window-29s.mp4) is included, with optional narration in Task 8. Raw clips can be longer but are not the submitted demo. The team-supplied 2026 instructions permit a seven-slide deck instead of a video.
 
-- [x] **10. Slides** (M). ~7 slides: problem, solution, three feature screenshots (`docs/`), how it works (README diagram), validation table, impact, team. Export PDF.
+- [x] **10. Slides** (M). **Seven slides total**, including title and team, covering the challenge, local horizon, NASA data and method, site ranking, comparison and landing dates, evidence and limitations, and impact. Use current app screenshots and all five team names. Provide PDF and editable PPTX. See [slides.pdf](docs/slides.pdf), [slides.pptx](docs/slides.pptx), and [sources](docs/sources.md).
 
-- [ ] **11. NASA project page** (S). Description, live link, repo link, video, slides. **Depends on** 9, 10.
+- [ ] **11. NASA project page** (S). Prepared copy: [submission.md](docs/submission.md). Include summary, description, public final-project and demo links, NASA data, other references, SI disclosure and team credits. **Depends on either** 9 **or** 10, because the supplied 2026 form accepts a video of 30 seconds or less **or** up to seven slides. **Verify:** the team confirms disclosures and event/team details, opens final public links while signed out, completes all required fields and chooses Submit for Judging. Keep unchecked until actual submission is verified.
 
 ## Act 2: Device testing (people, not code)
 

@@ -1,52 +1,38 @@
-# Voice-over script
+# 30-second demo video plan
 
-For the submission video (task 9). About 310 spoken words: 2:13 at 140 words per minute, 2:23 at a slower 130, so it stays under 2:30 even with short pauses between sections. Numbers are written the way they should be said. Each section names the clip from tasks 1–7 that plays under it. Every number comes from the README's validation table or the app itself (sources below).
+Use the seven-slide PDF as the official demo if recording time is short. It stands on its own. For a video, show **two opening slides**, cut to the actual website and finish on the team slide. Showing every slide plus a useful interaction would be too rushed.
 
-## The problem
+This plan replaces the older multi-minute submission script. The team-supplied 2026 rules cap a video demo at **30 seconds**.
 
-*Clip 1: whole Moon to pole*
+## Included edit
 
-Artemis is heading for the Moon's south pole, where permanently shadowed craters hold water ice: drinking water, oxygen and rocket fuel. It's also the hardest place on the Moon to land.
+[The captioned video](demo/lunar-window-29s.mp4) is **29.000 seconds**, 1920 × 1080, H.264 MP4, 30 fps, with no audio. It shows slides 1 and 2, a still hold on a real finder result, recorded comparison/date-selection footage, then slide 7. SI assistance is visible in the slide footers and throughout the app footage, and appears in the file metadata. Add your own narration only if the final export remains within 30 seconds.
 
-*Clip 2: moving shadows*
+## Included edit sequence
 
-Here the Sun never climbs more than one point six degrees above the horizon. Hills cast shadows tens of kilometres long that sweep around every twenty-nine and a half days. A solar lander that sets down in the wrong place, or at the wrong time, freezes. Earth dips behind the hills too, cutting off radio contact.
+| Time | Picture | Action |
+| --- | --- | --- |
+| 0:00–0:03 | Slide 1: Lunar Window | Establish project and challenge. |
+| 0:03–0:06 | Slide 2: terrain horizon | Show how the skyline blocks the Sun or Earth. |
+| 0:06–0:10 | Actual app, Find best site | Hold a real screenshot of the mission settings and ranked result. |
+| 0:10–0:18 | Actual app, Compare sites | Recorded candidates and their Sun/Earth/DSN rows, including a seek on the shared timeline. |
+| 0:18–0:22 | Actual app, Landing dates | Recorded selection with its UTC date and battery-endurance reading. |
+| 0:22–0:29 | Slide 7: team and public URL | End on all five names and the live project address. |
 
-Planners need to know where there's light, Earth contact and safe ground, and when.
+Record the **whole browser page**, not only the WebGL canvas. The app’s Record tool captures the 3D canvas and omits the panels that explain the decision. Use a screen recorder for this sequence. Trim waits in the edit without inventing values or implying a measured response time.
 
-## What Lunar Window does
+## Narration
 
-*Clip 3: layers*
+> We’re team Lunar Window. Near the Moon’s south pole, terrain can block sunlight and Earth contact. Our browser planner combines NASA terrain with Sun and Earth positions. Set a mission, rank sites, compare their power and communication windows, then explore landing dates with a battery model. It helps explain where and when to land.
 
-Lunar Window answers both, in the browser. It combines NASA terrain with the real Sun and Earth, hour by hour, and runs the physics on your GPU. In milliseconds it maps how often each spot sees the Sun, sees Earth and reaches the Deep Space Network. A soil heat-flow model shows where it's cold enough for ice.
+This is 54 words, about 27 seconds at 120 words per minute. Rehearse it against the edit and measure the exported duration. Leave a little headroom under 30 seconds. Use a team member’s voice, or disclose synthetic narration in both the description and metadata.
 
-*Clip 4: landing finder*
+## Recording setup
 
-Pick a date and mission length; the finder scores over a hundred thousand spots and ranks the top ten.
+For a new recording, use a clean browser capture with notifications off and no personal tabs visible. The included edit places a 1600 × 900 viewport in a 1920 × 1080 frame, leaving space for captions. It starts at November 15, 2026, 17:00 UTC, near Connecting ridge B. The date changes visibly when seeking and selecting a landing date. The finder uses 14 days, at most 50 hours of night, at least 50% flat ground and Balanced priority. The comparison uses Connecting ridge B and Shackleton ridge A.
 
-*Clip 5: rover*
+Keep the app’s labels visible. Use simple cuts rather than transitions that consume the time budget. Carry the deck’s SI-assistance disclosure into the video’s opening or closing frame, and describe the footage as application output from NASA-derived data. No newly generated imagery is needed.
 
-The rover planner keeps a rover in sunlight as shadows move, waiting out the dark when it must.
+## Publishing
 
-*Clip 6: lander*
-
-The lander simulator tracks power hour by hour and tests four thousand random touchdowns for the odds of survival.
-
-## How we know it's right
-
-*Clip 7: report and validation*
-
-The Artemis Three report card covers NASA's nine candidate regions for your dates. Sun and Earth positions match JPL Horizons to better than a ten-thousandth of a degree. Sunlight at the polar peaks matches published research to three point seven percentage points on average. At the Apollo Eleven site, the model gives eighty-six to three hundred eighty-five kelvin; NASA's Diviner measured about ninety-five to three hundred ninety. Shackleton crater's floor stays below a hundred and ten kelvin all year: a cold trap for ice.
-
-Lunar Window: where, and when, to land at the Moon's south pole.
-
-## Sources for each claim
-
-| Line | Source |
-|---|---|
-| Ice in permanently shadowed craters; Sun ≤ 1.6°; shadows tens of km; 29.5-day sweep; landers freeze; Earth hidden | README, "The problem" |
-| Sun, Earth, DSN maps; heat-flow model | README, "What it does"; `src/gpu/engine.ts`, `src/gpu/thermal.ts` |
-| 102,400 spots, top 10 | README; `src/components/FinderPanel.tsx`, tour step 6 |
-| 4,000 touchdowns | `src/lib/montecarlo.ts` (`n = 4000`), shown in `src/components/LanderPanel.tsx` |
-| Nine Artemis III regions | `src/data/artemis.ts` |
-| 0.00003° (better than 1/10,000°), 3.7-point average difference, 86–385 K vs ≈95–390 K, Shackleton < 110 K | README, "How we know it's right"; `src/components/ValidationPanel.tsx` |
+The file is included in the repository. Use the verified public link in [submission.md](submission.md) after publication, or upload the same file to a password-free video host and test it while signed out. Choose its link in the demo field if using video instead of the seven-slide PDF. Do not submit the longer raw clips as the short demo.
