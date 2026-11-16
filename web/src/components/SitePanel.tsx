@@ -140,7 +140,8 @@ export default function SitePanel() {
         </div>
         <div className={`card link ${st.link ? "" : "bad"}`}>
           <div className="k" title="Direct-to-Earth link via Deep Space Network">DSN</div>
-          <div className="v">{st.link ? `Open · ${data.ephem.stations[bestStation].name}` : "Down"}</div>
+          <div className="v">{st.link ? "Open" : "Down"}</div>
+          {st.link && <div className="card-angle">via {data.ephem.stations[bestStation].name}</div>}
           <div className="s">
             {st.link ? "closes in" : "opens in"} {formatDuration(next?.link ?? null)}
           </div>
