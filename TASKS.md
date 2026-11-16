@@ -114,7 +114,7 @@ Open https://adqm0001.github.io/lunar-window/ with DevTools console open (F12). 
 
 - [x] **15. Android phone** (S). Bottom tab bar, moving the camera, opening panels. [Android Chrome test report](docs/testing/task-15-android.md); persistent 3D lag recorded in [bug #146](https://github.com/adqm0001/lunar-window/issues/146).
 
-- [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); 3D touch-camera lag/jumping tracked in [#143](https://github.com/adqm0001/lunar-window/issues/143).
+- [x] **16. iPhone** (S). [User-assisted Safari test report](docs/testing/task-16-iphone.md); dragging and pinch zoom reported smooth on the updated site after the initial finding in [#143](https://github.com/adqm0001/lunar-window/issues/143).
 
 - [x] **17. Slow network** (S). DevTools → Network → "Fast 4G", hard reload, time until the Moon appears and until the pole is sharp.
 
