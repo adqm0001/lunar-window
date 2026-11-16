@@ -393,6 +393,9 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
 .tour-card.welcome { border-color: rgba(184,203,227,0.50); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
 .load-error { position: fixed; left: 50%; transform: translateX(-50%); bottom: 182px; width: min(480px, calc(100vw - 32px)); padding: 12px 14px; z-index: 60; display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .load-error span { flex: 1; }
+.app-error { bottom: auto; top: 40%; }
+.app-error .btn { min-height: 44px; }
+.app-error small { display: block; margin-top: 4px; color: var(--muted); font-family: var(--mono); font-size: 10.5px; overflow-wrap: anywhere; }
 
 .modal.report { max-width: 900px; }
 .report-table td { white-space: nowrap; }
@@ -450,6 +453,19 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
   .modal { padding: 14px; }
   .vtable { font-size: 10.5px; }
   .report-table td { white-space: normal; }
+}
+/* Phones: the eight-column report squeezed each column to ~40 px (the button ran to four lines). Show each region as a
+   card instead: rank and name on top, the numbers as labelled pairs, the button full width. */
+@media (max-width: 600px) {
+  .report-table, .report-table tbody { display: block; }
+  .report-table thead { display: none; }
+  .report-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+  .report-table td { display: flex; justify-content: space-between; gap: 8px; padding: 0; border: 0; white-space: nowrap; }
+  .report-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 10.5px; white-space: normal; }
+  .report-table .rt-rank { display: none; }
+  .report-table .rt-name { grid-column: 1 / -1; font-weight: 650; font-size: 13px; }
+  .report-table .rt-go { grid-column: 1 / -1; }
+  .report-table .rt-go .btn { width: 100%; min-height: 44px; }
 }
 
 @media (max-width: 520px) {
@@ -524,7 +540,16 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
 }
 @media (max-width: 1100px) and (max-height: 520px) {
   .map-actions { top: 108px; }
-
+  /* With a sheet open there was only ~155 px left for it on a landscape phone (one or two rows of sites). Hide the
+     mission-planning shortcuts while it is open (they come back when it closes) and let the sheet start right under
+     the layer bar. */
+  .app:is(.m-sites, .m-site, .m-time) .map-actions { display: none; }
+  .app.m-sites .left, .app.m-site .right { max-height: calc(100dvh - 184px - env(safe-area-inset-bottom)); }
+  .app.m-time .bottom { height: calc(100dvh - 184px - env(safe-area-inset-bottom)); }
+  /* and a shorter heading, so the first sites show without scrolling */
+  .app.m-sites .sites-heading { margin-bottom: 6px; }
+  .app.m-sites .sites-heading span { display: none; }
+  .app.m-sites .site-sections { margin-bottom: 6px; }
 }
 
 .site-sections { display: flex; gap: 2px; padding: 3px; margin: 0 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: #0003; }

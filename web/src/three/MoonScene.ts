@@ -98,6 +98,7 @@ export class MoonScene {
   private stars!: THREE.Points;
   private sunDir = new THREE.Vector3(1, 0, 0);
   private earthDir = new THREE.Vector3(0, 1, 0);
+  private patchCenter = new THREE.Vector3();
   private globe: GlobeData | null = null;
   private pendingIntro: Site | null = null;
   private lastSites: Site[] = [];
@@ -300,15 +301,15 @@ export class MoonScene {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute("aMap", new THREE.BufferAttribute(map, 2));
-    // Normals come from the full grid (vertexNormals: three's computeVertexNormals on the typed arrays); Saver then
-    // draws every second vertex (a quarter of the triangles).
+    // Normals come from the full grid (vertexNormals: three's computeVertexNormals on the typed arrays). Coarser index
+    // buffers (every 2nd, 4th, 8th vertex) are drawn when the patch is far away or in Saver; see patchDetail().
     const fullIdx = gridIndex(n, 1);
     const full = new THREE.BufferAttribute(fullIdx, 1);
     geometry.setIndex(full);
     geometry.setAttribute("normal", new THREE.BufferAttribute(vertexNormals(pos, fullIdx), 3));
-    geometry.userData.full = full;
-    geometry.userData.coarse = new THREE.BufferAttribute(gridIndex(n, 2), 1);
-    if (this.quality === "saver") geometry.setIndex(geometry.userData.coarse);
+    geometry.computeBoundingSphere();
+    geometry.userData.levels = [full, ...[2, 4, 8].map((s) => new THREE.BufferAttribute(gridIndex(n, s), 1))];
+    geometry.userData.level = 0;
     return { geometry };
   }
 
@@ -1173,6 +1174,7 @@ export class MoonScene {
         this.keys = keys;
       });
     this.updateDepthAndSky();
+    this.patchDetail();
     if (this.lod?.update(this.split && this.splitOn ? [this.camera, this.split.camera] : this.camera)) this.dirty = true;
     if (!this.dirty) return;
     const fps = this.quality === "saver" ? 30 : this.quality === "balanced" ? 60 : 0;
@@ -1722,10 +1724,31 @@ export class MoonScene {
     this.bloom.enabled = q !== "saver" && !this.mapMode;
     this.lens.enabled = q !== "saver";
     this.terrainMat.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
-    const g = this.terrainMesh?.geometry;
-    if (g?.userData.full) g.setIndex(q === "saver" ? g.userData.coarse : g.userData.full);
+    this.patchDetail();
     this.lod?.setQuality(q);
     this.resize();
+    this.dirty = true;
+  }
+
+  /**
+   * The polar patch has 1280² vertices (62.5 m apart, 3.3 million triangles). Seen from far away most of
+   * them are smaller than a pixel, so draw every 2nd / 4th / 8th vertex depending on the distance to the
+   * patch's nearest point (vertex spacing stays under ~4 px). Saver never uses the full grid.
+   */
+  private patchDetail() {
+    const mesh = this.terrainMesh;
+    const g = mesh?.geometry;
+    const levels = g?.userData.levels as THREE.BufferAttribute[] | undefined;
+    if (!levels || !g.boundingSphere) return;
+    const center = this.patchCenter.copy(g.boundingSphere.center).applyMatrix4(mesh.matrixWorld);
+    const leftDistance = this.camera.position.distanceTo(center);
+    const distance = this.split ? Math.min(leftDistance, this.split.camera.position.distanceTo(center)) : leftDistance;
+    const nearKm = Math.max(0, distance - g.boundingSphere.radius);
+    let level = nearKm > 400 ? 3 : nearKm > 150 ? 2 : nearKm > 60 ? 1 : 0;
+    if (this.quality === "saver") level = Math.max(level, 1);
+    if (level === g.userData.level) return;
+    g.userData.level = level;
+    g.setIndex(levels[level]);
     this.dirty = true;
   }
 

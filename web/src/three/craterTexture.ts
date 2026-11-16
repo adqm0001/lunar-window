@@ -71,6 +71,46 @@ vec4 craterTap(vec2 m, float size, float ang, vec2 off) {
   t.xy = transpose(R) * t.xy;
   return t;
 }
+// slow random variation, used to pick which copy of the tile to show so the pattern never repeats visibly
+float ctHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float ctNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(ctHash(i), ctHash(i + vec2(1.0, 0.0)), f.x), mix(ctHash(i + vec2(0.0, 1.0)), ctHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// Anti-tiling (I. Quilez, "Texture repetition", technique 3): a slow noise chooses one of 8 random shifts
+// of the tile in each patch of ground and blends two neighbouring choices, so the same craters never
+// line up in a visible grid. Returns the two shifts (xy, zw) and the blend weight.
+vec4 craterShifts(vec2 m, float size, float seed, out float w) {
+  // patches about half a tile across: larger ones still show the tile repeating inside them
+  float l = ctNoise(m / (size * 0.55) + seed) * 8.0;
+  float ia = floor(l);
+  w = smoothstep(0.2, 0.8, l - ia);
+  return vec4(sin(vec2(3.0, 7.0) * (ia + seed)), sin(vec2(3.0, 7.0) * (ia + 1.0 + seed)));
+}
+vec4 craterVar(vec2 m, float size, float ang, float seed) {
+  float w;
+  vec4 sh = craterShifts(m, size, seed, w);
+  float c = cos(ang);
+  float s = sin(ang);
+  mat2 R = mat2(c, s, -s, c);
+  vec2 uv = (R * m) / size;
+  // explicit gradients: the shift jumps where the choice changes, and the implicit ones would then pick
+  // the blurriest mip level along those lines
+  vec2 gx = dFdx(uv);
+  vec2 gy = dFdy(uv);
+  vec4 a = textureGrad(uCraterTex, uv + sh.xy, gx, gy);
+  vec4 b = textureGrad(uCraterTex, uv + sh.zw, gx, gy);
+  vec4 t = mix(a, b, w);
+  t.xy = transpose(R) * t.xy;
+  return t;
+}
+vec2 craterShift(vec2 m, float size, float seed) {
+  float w;
+  vec4 sh = craterShifts(m, size, seed, w);
+  return w < 0.5 ? sh.xy : sh.zw;
+}
 // Cast shadows inside the crater tile: march from the pixel toward the Sun through the height
 // channel; if the terrain rises above the ray the pixel is shadowed. k is that scale's weight.
 float craterShadow1(vec2 m, float size, float ang, vec2 off, vec2 sd, float tanE, float fpm) {
@@ -94,25 +134,15 @@ float craterShadow1(vec2 m, float size, float ang, vec2 off, vec2 sd, float tanE
   return lit;
 }
 float craterShadow(vec2 m, vec2 sd, float tanE, float fpm) {
-  float a = craterShadow1(m, 5200.0, 0.0, vec2(0.0), sd, tanE / 0.85, fpm);
-  float b = a > 0.0 ? craterShadow1(m, 1300.0, 2.1, vec2(0.37, 0.71), sd, tanE / (0.85 * 0.55), fpm) : 1.0;
+  float a = craterShadow1(m, 5200.0, 0.0, craterShift(m, 5200.0, 0.0), sd, tanE / 0.85, fpm);
+  float b = a > 0.0 ? craterShadow1(m, 1300.0, 2.1, craterShift(m, 1300.0, 3.7), sd, tanE / (0.85 * 0.55), fpm) : 1.0;
   float c = a * b > 0.0 ? craterShadow1(m, 330.0, 4.2, vec2(0.13, 0.52), sd, tanE / (0.85 * 0.3), fpm) : 1.0;
   return a * b * c;
 }
 
-// slow random variation, used to blend two copies of the tile so the pattern never repeats visibly
-float ctHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float ctNoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(ctHash(i), ctHash(i + vec2(1.0, 0.0)), f.x), mix(ctHash(i + vec2(0.0, 1.0)), ctHash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
 vec4 craterDetailTex(vec2 m) {
-  float w = smoothstep(0.3, 0.7, ctNoise(m / 7300.0));
-  vec4 a = mix(craterTap(m, 5200.0, 0.0, vec2(0.0)), craterTap(m, 4300.0, 1.3, vec2(0.61, 0.27)), w);
-  float w2 = smoothstep(0.3, 0.7, ctNoise(m / 1900.0 + 17.0));
-  vec4 b = mix(craterTap(m, 1300.0, 2.1, vec2(0.37, 0.71)), craterTap(m, 1070.0, 5.0, vec2(0.83, 0.44)), w2);
+  vec4 a = craterVar(m, 5200.0, 0.0, 0.0);
+  vec4 b = craterVar(m, 1300.0, 2.1, 3.7);
   vec4 c = craterTap(m, 330.0, 4.2, vec2(0.13, 0.52));
   return vec4(a.xy + b.xy * 0.55 + c.xy * 0.3, 0.0, max(a.w, max(b.w * 0.7, c.w * 0.4)));
 }

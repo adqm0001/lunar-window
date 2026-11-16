@@ -81,7 +81,7 @@ export function encodeState(): string {
   const result = st.finder?.candidates.find((c) => c.site.id === st.selectedId)?.site;
   const points = result ? [...st.customSites.slice(-(MAX_SHARED_POINTS - 1)), result] : st.customSites;
   const q = new URLSearchParams();
-  q.set("t", String(st.hour));
+  q.set("t", String(fix(st.hour, 2)));
   const pi = points.findIndex((c) => c.id === st.selectedId);
   q.set("s", pi >= 0 ? `p${pi}` : st.selectedId);
   q.set("l", st.layer);
