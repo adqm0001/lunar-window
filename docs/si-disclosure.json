@@ -2,6 +2,7 @@
   "schema_version": 1,
   "updated": "2026-11-15",
   "project": "Lunar Window",
+  "team_decisions": "The team originated the idea, chose the approach to the challenge, and made the scientific and design decisions, including dataset selection, modeling sunlight, Earth visibility, Deep Space Network contact and temperature, and validating the results. The listed SI tools helped implement, test and document those decisions.",
   "tools": [
     {
       "name": "OpenAI Codex / ChatGPT",
@@ -12,7 +13,8 @@
         "pull request review",
         "UI exploration",
         "documentation",
-        "presentation text and layout"
+        "presentation text and layout",
+        "video editing and timed narration script"
       ]
     },
     {
@@ -34,22 +36,21 @@
     "files": [
       "README.md",
       "docs/submission.md",
+      "project-desc.md",
       "docs/slides.pptx",
       "docs/slides.pdf",
       "docs/voiceover.md",
-      "docs/demo/lunar-window-29s.mp4"
+      "docs/demo/lunar-window-30s.mp4"
     ],
     "assistance": "SI-assisted writing and layout",
-    "visuals": "Screenshots of the running app on main e103f29. No SI-generated lunar images in the refreshed deck.",
-    "visible_indicator": "Slides show SI-assisted code and presentation. Sources are in speaker notes and docs/sources.md."
+    "visuals": "Screenshots of the running application with editable text and diagrams based on the team's project decisions.",
+    "sources": "Slide notes and docs/sources.md describe the data and validation references."
   },
-  "earlier_concepts": "SI-generated UI concept images exist outside this demo and are not included as demo visuals.",
   "team_confirmation": "Confirm additional member-specific tools and any later media additions before submitting.",
   "video": {
-    "duration_seconds": 29,
-    "indication": "Visible SI acknowledgment throughout and MP4 descriptive metadata",
-    "audio": "none",
+    "duration_seconds": 29.8,
+    "audio": "Silent edit for narration by three team members",
     "format": "1920x1080 H.264 MP4 at 30 fps",
-    "content": "Actual Chromium app recording with opening/team slides and SI-assisted editorial captions"
+    "content": "Live application footage captured in Chromium at High graphics. SI tools helped prepare the edit and timed narration script."
   }
 }

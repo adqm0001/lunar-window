@@ -6,7 +6,7 @@ At the Moon's south pole, a ridge can get sunlight while the crater next to it s
 
 We built it for the 2026 NASA Space Apps Challenge. It's a prototype for comparing sites and dates, whether you're working through an early mission idea or teaching someone how lunar shadows move. [Lunar Landing Site Navigator challenge](https://www.spaceappschallenge.org/2026/challenges/lunar-landing-site-navigator/)
 
-**[Open the live planner](https://adqm0001.github.io/lunar-window/)** · **[Seven-slide demo](docs/slides.pdf)** · [Editable slides](docs/slides.pptx) · [29-second video](docs/demo/lunar-window-29s.mp4) · [Project-page copy](docs/submission.md)
+**[Open the live planner](https://adqm0001.github.io/lunar-window/)** · **[Seven-slide demo](docs/slides.pdf)** · [Editable slides](docs/slides.pptx) · [Video demo](docs/demo/lunar-window-30s.mp4) · [Project-page form answers](project-desc.md)
 
 ![Connecting ridge B with Sun and Earth status and a shared UTC timeline](docs/demo/overview.webp)
 
@@ -75,7 +75,7 @@ Near the pole, NASA's elevation data reaches 40 m resolution. The default 80 × 
 
 ## Evidence and limits
 
-Open **Validation** under **Tools** to see what we checked and where the estimates can differ.
+Open **Validation** under **Settings** to see what we checked and where the estimates can differ.
 
 | Check | Recorded result and scope |
 | --- | --- |
@@ -127,7 +127,9 @@ For contributions, read [CLAUDE.md](CLAUDE.md), [TASKS.md](TASKS.md) and [REVIEW
 
 ## SI assistance
 
-We used OpenAI Codex/ChatGPT and Anthropic Claude to help write and review code, debug, test, explore interface ideas and draft documentation. Codex helped write this README and lay out the slides. The demo images are screenshots of the running app. The earlier design concepts used image generation.
+Our team came up with Lunar Window and chose how to address the challenge. We made the scientific and design decisions, including which data to use, how to model sunlight, Earth visibility, Deep Space Network contact and temperature, and how to validate the results.
+
+We used OpenAI Codex/ChatGPT and Anthropic Claude to help implement and review code, debug, test, explore interface ideas and draft documentation. Codex also helped write this README and project-page copy, lay out the slides and prepare the video edit and narration script. The demo images and video come from the running app.
 
 The terrain and ephemeris files come from the NASA and JPL data we process in the pipeline. [SI disclosure](docs/si-disclosure.json) · [Source credits](docs/sources.md)
 

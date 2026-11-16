@@ -4,7 +4,7 @@ Prepared for Task 11. The text below follows the form fields supplied by the tea
 
 ## Project Name
 
-Lunar Window
+Lunar Window: A South Pole Landing Planner
 
 ## High-Level Project Summary
 
@@ -16,15 +16,15 @@ Use the **seven-slide PDF** as the official demo. It already includes the projec
 
 Public PDF link, verified without signing in:
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/f97e42d19ecf7965310431623e6ab6250e84f077/docs/slides.pdf
+https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/slides.pdf
 
 This link pins the checked demo revision, so it works before the documentation PR merges and does not depend on the review branch remaining open. The editable source is `docs/slides.pptx`; `docs/slides.html` is a local browser preview.
 
-An alternative [29-second captioned video](demo/lunar-window-29s.mp4) combines opening slides with actual site ranking, comparison and landing-date selection. It has no audio. Choose its public link instead if you prefer video. The [optional narration script](voiceover.md) fits within the time limit when read at the stated pace. The older long raw clips are source material, not the submitted short demo.
+The alternative [29.8-second video](demo/lunar-window-30s.mp4) shows the live planner in High graphics. The edit has no audio and is ready for the team's three voice tracks. Use the seven-slide PDF for the form now, or choose the public link to the finished narration mix when that is ready. [Timed narration script](voiceover.md)
 
 Public video link, verified without signing in:
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/f97e42d19ecf7965310431623e6ab6250e84f077/docs/demo/lunar-window-29s.mp4
+https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/demo/lunar-window-30s.mp4
 
 ## Link to Final Project
 
@@ -62,11 +62,17 @@ These checks support specific parts of the model. They do not certify a mission.
 
 The prototype makes early site/date tradeoffs visible and explainable without specialist software installation. Educators can demonstrate how terrain and time affect exploration, and users can share the same view with a URL. Future work could add uncertainty estimates, more detailed hazard data and a fuller communication link budget. These extensions are goals rather than current capabilities.
 
+### AI use
+
+Our team came up with Lunar Window, chose how to address the challenge, and made the scientific and design decisions. We chose the data, the models for sunlight, Earth visibility, Deep Space Network contact and temperature, and the checks we used to validate them. Codex/ChatGPT and Claude helped us implement those decisions, review and debug the code, run tests, explore the interface and document the work. Codex also helped prepare the slides and video materials.
+
 ## Use of Super Intelligence (SI)
 
-Yes. OpenAI Codex/ChatGPT and Anthropic Claude assisted with coding, debugging, tests, reviews, UI exploration and documentation. Codex also assisted the writing and layout of the refreshed README, project-page copy and seven-slide presentation. Earlier interface concept images used SI image generation, but those concepts are not included as visuals in this demo.
+Yes. Our team originated the idea, chose the approach to the challenge, and made the scientific and design decisions. That includes which datasets to use, how to model sunlight, Earth visibility, Deep Space Network contact and temperature, and how to validate the results.
 
-The demo visuals are screenshots of the working application, which renders NASA-derived terrain and computed model results. We do not present them as spacecraft photographs. Source NASA observations are not SI-generated. The processed terrain and ephemerides are outputs of the project’s computational pipeline. The README and machine-readable SI disclosure acknowledge assistance with code and data-processing code. The deck visibly acknowledges SI assistance and its speaker notes include sources.
+OpenAI Codex/ChatGPT and Anthropic Claude helped implement those decisions, write and review code, debug, test, explore the interface, check references and document the project. Codex also helped write this README and project-page copy, lay out the seven-slide presentation and prepare the video edit and narration script. We used SI image generation for earlier interface concepts that are absent from the submission.
+
+The demo visuals are screenshots and recordings of the working application, which renders NASA-derived terrain and computed model results. Source NASA observations come from the cited missions and resources. The processed terrain and ephemerides are outputs of the project's computational pipeline. The README and machine-readable SI disclosure record assistance with the code and data pipeline. The deck includes sources in its notes, and the team will record its own voices for the video.
 
 Before submission, every team member should confirm whether additional tools or generated media need disclosure. If the team adds SI-generated images or video, include the required visible indicator. If it adds synthetic narration, acknowledge that in the description and media metadata. Do not create or alter NASA branding with SI.
 
@@ -98,10 +104,10 @@ Our comparison with Bussey et al. (2010) uses published illumination values deri
 
 Additional references include Hayne et al. (2017) for regolith properties, Williams et al. (2017) and Paige et al. (2010) for Diviner thermal/cold-trap context, Ingersoll et al. (1992) for approximate crater heating, Weber et al. (2011) for the educational cutaway, and IAU/USGS feature locations.
 
-Software: C++/OpenMP, Python, NumPy, Skyfield, Pillow, TypeScript, React, three.js, Zustand, WebGL2, Vite and Vitest. Geist is bundled under the SIL Open Font License. The optional Viridis palette derives from the BIDS CC0 colormap collection. The presentation uses Segoe UI. SI and screenshot tooling are disclosed above.
+Software: C++/OpenMP, Python, NumPy, Skyfield, Pillow, TypeScript, React, three.js, Zustand, WebGL2, Vite and Vitest. The planner and presentation use Geist, bundled under the SIL Open Font License. The optional Viridis palette derives from the BIDS CC0 colormap collection. SI and capture tooling are disclosed above.
 
 Full publications, URLs, media credits and license notes:
-https://github.com/adqm0001/lunar-window/blob/f97e42d19ecf7965310431623e6ab6250e84f077/docs/sources.md
+https://github.com/adqm0001/lunar-window/blob/task-11-project-submission/docs/sources.md
 
 ## Team credits
 

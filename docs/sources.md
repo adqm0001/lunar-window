@@ -20,7 +20,7 @@ This inventory distinguishes source observations, reference publications, softwa
 - **Hayne, P. O., et al. (2017).** “Global Regolith Thermophysical Properties of the Moon From the Diviner Lunar Radiometer Experiment.” *Journal of Geophysical Research: Planets*. [DOI](https://doi.org/10.1002/2017JE005387). Regolith heat-flow model properties.
 - **Williams, J.-P., et al. (2017).** “The global surface temperatures of the Moon as measured by the Diviner Lunar Radiometer Experiment.” *Icarus* 283, 300–325. [DOI](https://doi.org/10.1016/j.icarus.2016.08.012). Thermal reference ranges.
 - **Paige, D. A., et al. (2010).** “Diviner Lunar Radiometer Observations of Cold Traps in the Moon’s South Polar Region.” *Science* 330, 479–482. [DOI](https://doi.org/10.1126/science.1187726). Cold-trap context.
-- **Ingersoll, A. P., et al. (1992).** “Stability of polar frosts in spherical bowl-shaped craters on the Moon, Mercury, and Mars.” *Icarus* 100, 40–47. [DOI](https://doi.org/10.1016/0019-1035(92)90016-Z). Approximate crater radiative heating.
+- **Ingersoll, A. P., et al. (1992).** “Stability of polar frosts in spherical bowl-shaped craters on the Moon, Mercury, and Mars.” *Icarus* 100, 40–47. [NASA Technical Reports Server](https://ntrs.nasa.gov/citations/19930034907). Approximate crater radiative heating.
 - **Weber, R. C., et al. (2011).** “Seismic Detection of the Lunar Core.” *Science*. [DOI](https://doi.org/10.1126/science.1199375). Reference for the educational Moon cutaway.
 - **IAU Working Group for Planetary System Nomenclature / USGS.** [Gazetteer of Planetary Nomenclature](https://planetarynames.wr.usgs.gov/). Named-feature centers and dimensions. The region circles use these approximate feature extents, not official landing polygons.
 - **BIDS colormap collection.** [Viridis source](https://github.com/BIDS/colormap/blob/master/colormaps.py), CC0. Optional map palette.
@@ -29,15 +29,15 @@ This inventory distinguishes source observations, reference publications, softwa
 
 Application and build dependencies are pinned in `web/package-lock.json`. Direct tools include [React](https://react.dev/), [three.js](https://threejs.org/), [Zustand](https://github.com/pmndrs/zustand), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vite.dev/) and [Vitest](https://vitest.dev/). The offline pipeline uses [Python](https://www.python.org/), [NumPy](https://numpy.org/), [Skyfield](https://rhodesmill.org/skyfield/), [Pillow](https://python-pillow.org/) and C++/OpenMP.
 
-The application bundles **Geist** under the SIL Open Font License. Its notice is in [Geist-OFL.txt](../web/src/fonts/Geist-OFL.txt). Slides use Segoe UI as editable presentation text. PowerPoint or another presentation viewer may substitute a font if Segoe UI is unavailable.
+The application bundles **Geist** under the SIL Open Font License. Its notice is in [Geist-OFL.txt](../web/src/fonts/Geist-OFL.txt). The deck uses the same Geist typeface and keeps PowerPoint text editable. A PowerPoint installation without Geist may substitute a system font. The PDF preserves the original layout.
 
 Codex/ChatGPT and Claude assisted development. The refreshed presentation uses OpenAI’s presentation authoring tooling. Browser screenshots use Chromium/Playwright. See [SI disclosure metadata](si-disclosure.json).
 
 ## Screenshot and presentation credits
 
-The images in `docs/demo/` capture Lunar Window running locally from main commit `e103f29`, with the simulated time set to November 15, 2026, 17:00 UTC. They show the application’s computed rendering from the sources above. They are not spacecraft photographs or SI image generations. Map colors describe modeled values. Crops in the deck retain the relevant interface content.
+The original app screenshots capture Lunar Window running locally from main commit `e103f29`, with the simulated time set to November 15, 2026, 17:00 UTC. They show the application’s computed rendering from the sources above. They are not spacecraft photographs or SI image generations. Map colors describe modeled values. Crops in the deck retain the relevant interface content.
 
-Slide text, layout, README and submission copy are SI-assisted. The deck visibly acknowledges that assistance and includes sources and presentation notes. The 29-second video combines slides with a real Chromium page recording and editorial captions, with no audio. It carries the same visible acknowledgment and an SI-assistance description in its MP4 metadata. FFmpeg performs encoding and full-file decoding checks. No generated NASA logos or mission emblems appear in the new materials. Earlier concept mockups are not included in the demo.
+Slide text, layout, README and submission copy are SI-assisted. The deck includes presentation notes and sources. For the video, we recorded the public app in Chromium with High graphics enabled. The 29.8-second edit contains app footage only. The MP4 metadata acknowledges assistance with editing and the timed script. We used FFmpeg to encode and check all frames.
 
 ## License status
 
