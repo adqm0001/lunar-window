@@ -6,6 +6,7 @@ import { useSeries } from "../state/selectors";
 import { getSeries, useSeriesVersion } from "../state/seriesCache";
 import { canRecord, startRecording, stopRecording } from "../lib/recorder";
 import { ephemYears } from "../lib/years";
+import { resolveStart, scrubHour, type HeldView } from "../lib/timelineScrub";
 
 const WINDOWS = [7, 30, 90, 365];
 const OVERVIEW_H = 16;
@@ -38,6 +39,8 @@ export default function Timeline() {
   const [windowDays, setWindowDays] = useState(30);
   const scrubbing = useRef<"main" | "overview" | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const dragStart = useRef(0);
+  const [held, setHeld] = useState<HeldView | null>(null);
   const view = useApp((s) => s.view);
   const [recStart, setRecStart] = useState<number | null>(null);
   const [, tick] = useState(0);
@@ -60,7 +63,7 @@ export default function Timeline() {
 
   const total = data.ephem.count;
   const span = Math.min(windowDays * 24, total);
-  const start = Math.max(0, Math.min(total - span, hour - span / 3));
+  const start = resolveStart(held, hour, span, total);
 
   useEffect(() => {
     const el = wrapRef.current!;
@@ -234,8 +237,15 @@ export default function Timeline() {
   const hourFromEvent = (e: React.PointerEvent, mode: "main" | "overview") => {
     const rect = canvasRef.current!.getBoundingClientRect();
     const W = size.w - LABEL_W - 12;
-    const f = Math.max(0, Math.min(1, (e.clientX - rect.left - LABEL_W) / W));
-    return mode === "overview" ? f * total : start + f * span;
+    return scrubHour((e.clientX - rect.left - LABEL_W) / W, mode, dragStart.current, span, total);
+  };
+  const scrubTo = (event: React.PointerEvent, mode: "main" | "overview") => {
+    setHour(hourFromEvent(event, mode));
+    setHeld(mode === "main" ? { start: dragStart.current, hour: useApp.getState().hour, span } : null);
+  };
+  const endScrub = () => {
+    touchStart.current = null;
+    scrubbing.current = null;
   };
 
   const date = hourToDate(data, hour);
@@ -291,11 +301,12 @@ export default function Timeline() {
         tabIndex={0}
         aria-label={compare ? "Sun, Earth, and DSN for each compared site. Scroll for more sites, or drag horizontally to change time." : "Sun, Earth, and DSN timeline. Drag or use the arrow keys to change the time."}
         onPointerDown={(e) => {
-          (e.target as Element).setPointerCapture(e.pointerId);
+          e.currentTarget.setPointerCapture(e.pointerId);
+          dragStart.current = start;
           const rect = canvasRef.current!.getBoundingClientRect();
           scrubbing.current = e.clientY - rect.top < OVERVIEW_H + 8 ? "overview" : "main";
           if (e.pointerType === "touch") touchStart.current = { x: e.clientX, y: e.clientY };
-          else setHour(hourFromEvent(e, scrubbing.current));
+          else scrubTo(e, scrubbing.current);
         }}
         onPointerMove={(event) => {
           if (!scrubbing.current) return;
@@ -309,14 +320,14 @@ export default function Timeline() {
               return;
             }
           }
-          setHour(hourFromEvent(event, scrubbing.current));
+          scrubTo(event, scrubbing.current);
         }}
         onPointerUp={(event) => {
-          if (touchStart.current && scrubbing.current) setHour(hourFromEvent(event, scrubbing.current));
-          touchStart.current = null;
-          scrubbing.current = null;
+          if (touchStart.current && scrubbing.current) scrubTo(event, scrubbing.current);
+          endScrub();
         }}
-        onPointerCancel={() => { touchStart.current = null; scrubbing.current = null; }}
+        onPointerCancel={endScrub}
+        onLostPointerCapture={endScrub}
       >
         <canvas ref={canvasRef} style={{ height: chartHeight }} />
       </div>
