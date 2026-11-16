@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { recordRenderedFrame } from "../lib/playbackPerformance";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -185,6 +186,7 @@ export class MoonScene {
     this.stars = this.makeStars();
     this.scene.add(this.stars);
     this.scene.add(this.cutaway.group);
+    this.cutaway.onResize = () => (this.dirty = true);
     this.scene.add(this.lander.group, this.lander.lights);
 
     const { geometry } = this.makeTerrain();
@@ -249,7 +251,7 @@ export class MoonScene {
     this.earthLabel.center.set(0.5, -1.4);
     this.earth.add(this.earthLabel);
 
-    this.sunRay = rayLine(0xffb547);
+    this.sunRay = rayLine(0xf7d577);
     this.earthRay = rayLine(0x4ea8ff);
     this.scene.add(this.sunRay, this.earthRay);
 
@@ -493,7 +495,10 @@ export class MoonScene {
     const tangent = offset.clone().projectOnPlane(up);
     if (tangent.lengthSq() < 1e-6) tangent.set(1, 0, 0).projectOnPlane(up);
     const dist = Math.min(Math.max(offset.length(), 6), 14);
-    this.startFlight(p, tangent.setLength(dist * 0.92).add(up.clone().multiplyScalar(dist * 0.38)), 1.8, up);
+    // Same distance as now (within 6–14 km), at a fixed viewing angle: 0.92 / 0.38 is ~23° down. setLength keeps
+    // the distance exact, so going from site to site doesn't creep the camera closer each time.
+    const next = tangent.setLength(0.92).add(up.clone().multiplyScalar(0.38)).setLength(dist);
+    this.startFlight(p, next, 1.8, up);
   }
 
   get canvas(): HTMLCanvasElement {
@@ -1156,10 +1161,12 @@ export class MoonScene {
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     const now = performance.now();
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    // Never negative: a clock that steps back (or a test clock) would otherwise run flights and damping backwards.
+    const elapsed = Math.max(0, (now - this.last) / 1000);
+    const dt = Math.min(0.05, elapsed);
     // Flights keep to their duration even when frames are slow (a region analysis busy on the GPU), up to 1/4 s
     // per frame so a tab that was hidden doesn't skip the whole flight.
-    const flightDt = Math.min(0.25, (now - this.last) / 1000);
+    const flightDt = Math.min(0.25, elapsed);
     this.last = now;
     const keys = this.keys;
     if (this.splitOn && this.activeRight) this.keys = NO_KEYS;
@@ -1188,7 +1195,12 @@ export class MoonScene {
       this.renderPass.camera = this.camera;
       this.composer.render();
     }
+    if (this.cutOn && !this.cutPending) {
+      const size = this.labels.getSize();
+      this.cutaway.layout(this.camera, size.width, size.height);
+    }
     this.labels.render(this.scene, this.camera);
+    recordRenderedFrame(now);
   };
 
   // Moves the current view's camera one frame: flight, 2D map keys, or orbit/surface controls.
@@ -1385,13 +1397,29 @@ export class MoonScene {
     this.composer.render();
   }
 
-  setGlobe(g: GlobeData) {
-    this.dirty = true;
-    this.globe = g;
-    const tex = new THREE.Texture(g.color);
+  private colorTexture(img: HTMLImageElement) {
+    const tex = new THREE.Texture(img);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.needsUpdate = true;
+    return tex;
+  }
+
+  /** Swaps the globe's colour map (the full-size map arriving after the preview it started with). */
+  setColorMap(img: HTMLImageElement) {
+    if (!this.globe || !this.lod) return;
+    this.globe.color = img;
+    const u = this.lod.material.uniforms.uColor;
+    const old = u.value as THREE.Texture;
+    u.value = this.colorTexture(img);
+    old.dispose();
+    this.dirty = true;
+  }
+
+  setGlobe(g: GlobeData) {
+    this.dirty = true;
+    this.globe = g;
+    const tex = this.colorTexture(g.color);
     if (this.lod) {
       this.scene.remove(this.lod.group);
       this.lod.dispose();
@@ -1647,13 +1675,13 @@ export class MoonScene {
       }
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineDashedMaterial({ color: new THREE.Color(1.6, 1.25, 0.45), dashSize: 2.2, gapSize: 1.4, transparent: true, opacity: 0.9 }),
+        new THREE.LineDashedMaterial({ color: new THREE.Color("#b8cbe3"), dashSize: 2.2, gapSize: 1.4, transparent: true, opacity: 0.9 }),
       );
       line.computeLineDistances();
       this.regionGroup.add(line);
       const el = document.createElement("div");
       el.className = "region-label";
-      el.innerHTML = `<b>ARTEMIS III</b> ${r.name}`;
+      el.innerHTML = `<b>Artemis III</b> ${r.name}`;
       el.addEventListener("pointerdown", (ev) => {
         ev.stopPropagation();
         this.onFlyRegion?.(r);
@@ -1748,6 +1776,7 @@ export class MoonScene {
   dispose() {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
+    this.cutaway.dispose();
     this.controls.dispose();
     this.split?.controls.dispose();
     this.splitEl?.remove();

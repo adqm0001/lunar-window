@@ -1,11 +1,12 @@
 import { lazy, useEffect, useState } from "react";
 import { loadAppData } from "./data/load";
-import { loadField } from "./data/field";
-import { loadGlobe, startPolar80 } from "./data/globe";
+import { fieldLoader } from "./data/fieldLoad";
+import { loadFullColor, loadGlobe, startPolar80 } from "./data/globe";
 import { useApp } from "./state/store";
 import { applyEarly, currentScene, openedFromLink, syncUrl } from "./state/share";
 import { usePlayback } from "./state/usePlayback";
-import TopBar from "./components/TopBar";
+import TopBar, { type PanelAppearance } from "./components/TopBar";
+import PanelResizeHandle from "./components/PanelResizeHandle";
 import SiteList from "./components/SiteList";
 import SitePanel from "./components/SitePanel";
 import Timeline from "./components/Timeline";
@@ -13,7 +14,9 @@ import Scene3D from "./components/Scene3D";
 import LayerControls from "./components/LayerControls";
 import Tour from "./components/Tour";
 import MobileNav from "./components/MobileNav";
+import PlaybackQualityNotice from "./components/PlaybackQualityNotice";
 import LazyPanel from "./components/LazyPanel";
+import { shouldHandleShortcut } from "./lib/shortcuts";
 
 const FinderPanel = lazy(() => import("./components/FinderPanel"));
 const ComparePanel = lazy(() => import("./components/ComparePanel"));
@@ -26,6 +29,18 @@ let startedData = false;
 let startedReplay = false;
 
 export default function App() {
+  const [panelAppearance, setPanelAppearance] = useState<PanelAppearance>(() => {
+    try {
+      const saved = localStorage.getItem("lw-panel-appearance");
+      if (saved === "solid") return saved;
+    } catch {
+      // Glass is the default appearance when storage is unavailable.
+    }
+    return "glass";
+  });
+  useEffect(() => {
+    try { localStorage.setItem("lw-panel-appearance", panelAppearance); } catch { /* optional persistence */ }
+  }, [panelAppearance]);
   const data = useApp((s) => s.data);
   const setData = useApp((s) => s.setData);
   const cinema = useApp((s) => s.cinema);
@@ -38,9 +53,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      // Space presses a focused button, link, select or chip; it only plays/pauses from the page or the 3D view.
-      if (e.key === " " && e.target instanceof Element && e.target.closest("button, a, select, textarea, [role=button], [contenteditable=true]")) return;
+      if (!shouldHandleShortcut(e)) return;
       const s = useApp.getState();
       if (e.key === "h" || e.key === "H") s.toggleCinema();
       else if (e.key === " ") {
@@ -98,10 +111,10 @@ export default function App() {
     if (!data || startedField) return;
     startedField = true;
     const s = useApp.getState();
-    loadField(s.setFieldProgress)
-      .then(s.setField)
-      .catch((e: Error) => s.setFieldError(e.message));
-    loadGlobe()
+    // The 3D scene needs both the pole field and the globe, so they load together. The globe starts with a preview
+    // colour map; the full-size one (7 MB) is fetched only once both are in, so it doesn't slow the first view.
+    const field = fieldLoader.start();
+    const globe = loadGlobe()
       .then((g) => {
         s.setGlobe(g);
         startPolar80(g, {
@@ -109,8 +122,20 @@ export default function App() {
           onStart: () => currentScene()?.beginPolar80(),
           onTile: (t) => currentScene()?.applyPolar80Tile(t),
         }).catch((e: Error) => console.warn("80 m polar terrain failed to load:", e.message));
+        return g;
       })
-      .catch((e: Error) => console.warn("Globe data failed to load:", e.message));
+      .catch((e: Error) => {
+        console.warn("Globe data failed to load:", e.message);
+        return null;
+      });
+    Promise.all([globe, field])
+      .then(async ([g]) => {
+        const img = g && (await loadFullColor());
+        if (!g || !img) return;
+        g.color = img; // also used if the scene builds the globe later
+        currentScene()?.setColorMap(img);
+      })
+      .catch((e: Error) => console.warn("Full-size colour map failed to load:", e.message));
   }, [data]);
 
   usePlayback();
@@ -133,11 +158,11 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${cinema ? "cinema" : ""} m-${mobilePanel}`}>
+    <div className={`app ${cinema ? "cinema" : ""} m-${mobilePanel}`} data-panel-appearance={panelAppearance}>
       <main className="stage">
         <Scene3D />
       </main>
-      <TopBar />
+      <TopBar panelAppearance={panelAppearance} setPanelAppearance={setPanelAppearance} />
       {roverOpen ? (
         <LazyPanel key="rover" name="the rover route planner" onClose={() => useApp.getState().setRoverOpen(false)}>
           <RoverPanel />
@@ -155,6 +180,8 @@ export default function App() {
       )}
       <LayerControls />
       <SitePanel />
+      <PanelResizeHandle side="left" />
+      <PanelResizeHandle side="right" />
       {porkchopOpen ? (
         <LazyPanel key="porkchop" name="the landing dates chart" onClose={() => useApp.getState().setPorkchopOpen(false)}>
           <PorkchopPanel />
@@ -169,7 +196,7 @@ export default function App() {
       <Timeline />
       <Tour />
       <MobileNav />
-      <div className="kbd-hint">WASD move · R F up/down · Q E turn · drag look · right-drag pan · scroll zoom · click adds a point · Space play · ← → hour · H hide</div>
+      <PlaybackQualityNotice />
     </div>
   );
 }

@@ -6,9 +6,9 @@ import type { LayerId, Palette } from "../gpu/layers";
 import type { Quality } from "../three/lod";
 import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
-import { LANDER_PRESETS, type Lander } from "../lib/lander";
+import { LANDER_PRESETS, type Lander, type SurvivalInputs } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
-import type { RoverFailure, RoverRoute } from "../lib/rover";
+import { isRoute, type RoverFailure, type RoverRoute } from "../lib/rover";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -49,20 +49,25 @@ interface AppState {
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
   reportOpen: boolean;
+  skylineOpen: boolean;
+  setSkylineOpen: (open: boolean) => void;
   mobilePanel: "none" | "sites" | "site" | "time";
   setMobilePanel: (p: "none" | "sites" | "site" | "time") => void;
   setReportOpen: (o: boolean) => void;
   setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
+  roverDestination: Pick<Site, "id" | "name" | "lat" | "lon"> | null;
   setRoverOpen: (o: boolean) => void;
-  setRover: (r: RoverRoute | RoverFailure | null) => void;
+  setRover: (r: RoverRoute | RoverFailure | null, destination?: Site | null) => void;
   lander: Lander;
   survival: FieldMetrics | null;
+  /** The settings `survival` was simulated with. */
+  survivalFor: SurvivalInputs | null;
   mc: MonteCarloResult | null;
   flyRequest: { lat: number; lon: number; altKm: number; n: number } | null;
   setLanderOpen: (o: boolean) => void;
   setLander: (l: Lander) => void;
-  setSurvival: (m: FieldMetrics | null) => void;
+  setSurvival: (m: FieldMetrics | null, inputs?: SurvivalInputs | null) => void;
   setMc: (r: MonteCarloResult | null) => void;
   flyTo: (lat: number, lon: number, altKm: number) => void;
   globe: GlobeData | null;
@@ -89,7 +94,7 @@ interface AppState {
   selectedId: string;
   setField: (f: FieldData) => void;
   setFieldProgress: (p: number) => void;
-  setFieldError: (e: string) => void;
+  setFieldError: (e: string | null) => void;
   setLayer: (l: LayerId) => void;
   setRangeDays: (d: number) => void;
   setCustomSite: (s: Site) => void;
@@ -151,7 +156,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ palette });
   },
   porkchopOpen: false,
-  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
+  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen, split: porkchopOpen ? false : s.split })),
   poleField: null,
   regionStatus: null,
   setRegionStatus: (regionStatus) => set({ regionStatus }),
@@ -160,8 +165,10 @@ export const useApp = create<AppState>((set, get) => ({
       field,
       finder: null,
       survival: null,
+      survivalFor: null,
       mc: null,
       rover: null,
+      roverDestination: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
     })),
   landerOpen: false,
@@ -174,35 +181,45 @@ export const useApp = create<AppState>((set, get) => ({
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
   reportOpen: false,
+  skylineOpen: false,
+  setSkylineOpen: (skylineOpen) => set({ skylineOpen }),
   mobilePanel: "none",
   setMobilePanel: (mobilePanel) => set({ mobilePanel }),
   setReportOpen: (reportOpen) => set({ reportOpen }),
   setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,
+  roverDestination: null,
   setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
-  setRover: (rover) => set({ rover }),
+  setRover: (rover, destination = null) => set({
+    rover,
+    roverDestination: isRoute(rover) && destination
+      ? { id: destination.id, name: destination.name, lat: destination.lat, lon: destination.lon }
+      : null,
+  }),
   lander: LANDER_PRESETS[0],
   survival: null,
+  survivalFor: null,
   mc: null,
   flyRequest: null,
   setLanderOpen: (landerOpen) => set((s) => ({ landerOpen, finderOpen: landerOpen ? false : s.finderOpen, roverOpen: landerOpen ? false : s.roverOpen })),
   setLander: (lander) => set({ lander }),
-  setSurvival: (survival) => set((s) => ({ survival, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
+  setSurvival: (survival, inputs = null) => set((s) => ({ survival, survivalFor: survival ? inputs : null, layer: survival ? "survive" : s.layer === "survive" ? "terrain" : s.layer })),
   setMc: (mc) => set({ mc }),
   flyTo: (lat, lon, altKm) => set((s) => ({ flyRequest: { lat, lon, altKm, n: (s.flyRequest?.n ?? 0) + 1 }, view: "3d" })),
   globe: null,
   setGlobe: (globe) => set({ globe }),
   orbitRequest: 0,
-  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d" })),
+  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d", split: false, compareOpen: false })),
   pinned: [],
   compareOpen: false,
   togglePin: (site) =>
     set((s) => {
       const has = s.pinned.some((p) => p.id === site.id);
       const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
-      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen, split: s.split && pinned.length >= 2 };
+      const compareOpen = pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen;
+      return { pinned, compareOpen, split: s.split && pinned.length >= 2, porkchopOpen: compareOpen ? false : s.porkchopOpen };
     }),
-  setCompareOpen: (compareOpen) => set({ compareOpen }),
+  setCompareOpen: (compareOpen) => set((s) => ({ compareOpen, split: compareOpen && s.split, porkchopOpen: compareOpen ? false : s.porkchopOpen })),
   split: false,
   setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,

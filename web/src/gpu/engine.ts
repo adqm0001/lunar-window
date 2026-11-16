@@ -2,7 +2,7 @@ import type { Ephemeris } from "../data/load";
 import type { FieldData } from "../data/field";
 import { DSN_MIN_ELEVATION_DEG } from "../lib/astro";
 import { missionFits } from "../lib/lander";
-import { THERMAL_MAIN } from "./thermal";
+import { THERMAL_MAIN, thermalWarmup } from "./thermal";
 
 const ROW = 4096;
 
@@ -125,15 +125,18 @@ void main() {
     float f = uPanelMode == 2 ? max(0.0, sin(el)) : max(0.0, cos(el));
     float p = uPanelW * frac * f;
     float load = frac >= 0.5 ? uDayLoad : uNightLoad;
+    // Mirrors batteryDead / chargePct / survivalMapCell in lib/lander.ts: keep them in step.
     if (alive) {
       wh = min(uBattery, wh + (p - load) * float(uStride));
-      if (wh / uBattery <= uMinSoc) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
+      bool dead = uBattery > 0.0 ? wh <= uMinSoc * uBattery : wh < 0.0;
+      if (dead) { alive = false; diedAt = float((k + 1) * uStride); wh = 0.0; }
     }
-    minSoc = min(minSoc, alive ? wh / uBattery : 0.0);
+    minSoc = min(minSoc, alive ? (uBattery > 0.0 ? wh / uBattery : 1.0) : 0.0);
     sunSum += frac;
   }
   float total = float(uSteps * uStride);
-  outColor = vec4(diedAt < 0.0 ? 1.0 : diedAt / total, minSoc, sunSum / float(uSteps), diedAt);
+  // lived: the steps completed before the one it died in, so only a battery that never dies reaches 1
+  outColor = vec4(diedAt < 0.0 ? 1.0 : (diedAt - float(uStride)) / total, minSoc, sunSum / float(uSteps), diedAt);
 }`;
 
 // Packs "Sun up" and "link to Earth" into bits: 4 x 32-bit words = 128 hours per pass.
@@ -352,7 +355,7 @@ export class GpuEngine {
     if (!this.thermProg) {
       this.thermProg = link(gl, VERT, FRAG.split("void main() {")[0] + THERMAL_MAIN);
       gl.useProgram(this.thermProg);
-      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uSpin"]) {
+      for (const n of ["uField", "uSun", "uEarth", "uSize", "uAzBins", "uCell", "uExtent", "uCenter", "uDecodeStep", "uDecodeOffset", "uStart", "uSteps", "uStride", "uHeights", "uHSize", "uHCell", "uReplay", "uHistory"]) {
         this.thermUni[n] = gl.getUniformLocation(this.thermProg, n);
       }
       const f = this.field;
@@ -390,7 +393,10 @@ export class GpuEngine {
     gl.uniform1i(u.uStart, start);
     gl.uniform1i(u.uSteps, steps);
     gl.uniform1i(u.uStride, stride);
-    gl.uniform1i(u.uSpin, Math.min(Math.floor(steps / 4), Math.round(709 / stride)));
+    // warm up on the lunar days before the window, then record all of it (see thermalWarmup)
+    const warm = thermalWarmup(start, stride, this.count);
+    gl.uniform1i(u.uReplay, warm.replay);
+    gl.uniform1i(u.uHistory, warm.history);
     // draw in bands so no single GPU job runs long enough to trip the driver watchdog
     gl.enable(gl.SCISSOR_TEST);
     const band = 32;
