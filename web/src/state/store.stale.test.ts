@@ -67,7 +67,7 @@ describe("stale selection", () => {
 });
 
 describe("compare state", () => {
-  it("compareOpen closes when removing pins leaves fewer than two, and at none", async () => {
+  it("keeps the one-site picker after a removal, exits split view, and closes Compare at zero pins", async () => {
     const app = await fresh();
     const a = site("custom:a", "A");
     const b = site("custom:b", "B");
@@ -77,11 +77,26 @@ describe("compare state", () => {
     g.togglePin(a);
     g.togglePin(b);
     expect(app.getState().compareOpen).toBe(true);
+    app.getState().setSplit(true);
     app.getState().removeCustomSite("custom:a");
     expect(app.getState().pinned.length).toBe(1);
+    expect(app.getState().compareOpen).toBe(true);
+    expect(app.getState().split).toBe(false);
     app.getState().removeCustomSite("custom:b");
     expect(app.getState().pinned.length).toBe(0);
     expect(app.getState().compareOpen).toBe(false);
+  });
+  it("removing an unrelated point leaves Compare closed while Landing dates is open", async () => {
+    const app = await fresh();
+    for (const id of ["a", "b", "c"]) app.getState().setCustomSite(site("custom:" + id));
+    app.getState().togglePin(site("custom:a"));
+    app.getState().togglePin(site("custom:b"));
+    app.getState().setPorkchopOpen(true);
+    app.getState().removeCustomSite("custom:c");
+    expect(app.getState().pinned).toHaveLength(2);
+    expect(app.getState().compareOpen).toBe(false);
+    expect(app.getState().porkchopOpen).toBe(true);
+    expect(app.getState().split).toBe(false);
   });
   it("pinning one site after removals does not reopen Compare", async () => {
     const app = await fresh();

@@ -1,6 +1,7 @@
+import Icon from "./Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toMap } from "../lib/astro";
-import { changedSurvivalInputs, LANDER_PRESETS, PANEL_LABEL, simulate, survivalInputs, type Lander, type PanelMode, type SimResult } from "../lib/lander";
+import { changedSurvivalInputs, LANDER_PRESETS, missionFits, PANEL_LABEL, simulate, survivalInputs, type Lander, type PanelMode, type SimResult } from "../lib/lander";
 import { monteCarlo } from "../lib/montecarlo";
 import { inField } from "../data/field";
 import { getEngine } from "../gpu/useFieldMetrics";
@@ -35,7 +36,9 @@ export default function LanderPanel() {
   const [busy, setBusy] = useState(false);
   const start = Math.floor(hour);
 
-  const sim: SimResult = useMemo(() => simulate(data.ephem, site, lander, start, missionDays * 24), [data, site, lander, start, missionDays]);
+  const fits = missionFits(start, missionDays * 24, data.ephem.count);
+  // null when the data ends before the mission does (see simulate)
+  const sim: SimResult | null = useMemo(() => simulate(data.ephem, site, lander, start, missionDays * 24), [data, site, lander, start, missionDays]);
 
   const siteInField = useMemo(() => {
     if (!field) return false;
@@ -50,10 +53,12 @@ export default function LanderPanel() {
   const set = (patch: Partial<Lander>) => setLander({ ...lander, ...patch, name: "Custom" });
 
   const runMap = () => {
-    if (!field) return;
+    if (!field || !fits) return;
     setBusy(true);
     setTimeout(() => {
       try {
+        const current = useApp.getState();
+        if (Math.floor(current.hour) !== start || current.field !== field) return;
         const e = getEngine();
         if (!e) return;
         const m = e.computeSurvival(start, missionDays * 24, {
@@ -64,6 +69,7 @@ export default function LanderPanel() {
           minSocPct: lander.minSocPct,
           horizontal: lander.panel === "horizontal",
         });
+        if (!m) return;
         setSurvival(m, inputs);
         if (siteInField) {
           const [x, y] = toMap(site.lat, site.lon);
@@ -76,12 +82,17 @@ export default function LanderPanel() {
   };
 
   useEffect(() => {
+    if (!fits) {
+      setSurvival(null);
+      setMc(null);
+      return;
+    }
     if (!survival || !field || !siteInField) return;
     const [x, y] = toMap(site.lat, site.lon);
     setMc(monteCarlo(field, survival, x, y, miss));
-  }, [miss, site, survival, field, siteInField]);
+  }, [miss, site, survival, field, siteInField, fits, setSurvival, setMc]);
 
-  const survived = sim.diedAtHour === null;
+  const survived = sim !== null && sim.diedAtHour === null;
 
   return (
     <aside className="left finder lander">
@@ -91,7 +102,7 @@ export default function LanderPanel() {
           <div className="finder-sub">Hour-by-hour battery at {site.name}</div>
         </div>
         <button className="icon-btn" onClick={() => setLanderOpen(false)} aria-label="Close">
-          ✕
+          <Icon name="close" />
         </button>
       </div>
 
@@ -121,7 +132,7 @@ export default function LanderPanel() {
             <span>Panel faces</span>
             <span className="chips">
               <button className={`chip ${lander.panelAz < 0 ? "sel" : ""}`} onClick={() => set({ panelAz: -1 })}>Sun at landing</button>
-              <button className={`chip ${lander.panelAz >= 0 ? "sel" : ""}`} onClick={() => set({ panelAz: Math.round(sim.panelAz) })}>{lander.panelAz >= 0 ? `${lander.panelAz}°` : "Fixed"}</button>
+              <button className={`chip ${lander.panelAz >= 0 ? "sel" : ""}`} disabled={!sim} onClick={() => sim && set({ panelAz: Math.round(sim.panelAz) })}>{lander.panelAz >= 0 ? `${lander.panelAz}°` : "Fixed"}</button>
             </span>
           </label>
         )}
@@ -137,13 +148,25 @@ export default function LanderPanel() {
         ))}
       </div>
 
-      <div className={`verdict ${survived ? "ok" : "bad"}`}>
-        {survived ? `Survives ${missionDays} days` : `Battery dead after ${formatDuration(sim.diedAtHour)}`}
-        <span>
-          lowest charge {Math.round(sim.minSocPct)}% · {sim.energyInKWh.toFixed(1)} kWh collected
-        </span>
-      </div>
-      <SocChart sim={sim} minSoc={lander.minSocPct} />
+      {sim ? (
+        <>
+          <div className={`verdict ${survived ? "ok" : "bad"}`}>
+            {survived ? `Survives ${missionDays} days` : `Battery dead after ${formatDuration(sim.diedAtHour)}`}
+            <span>
+              lowest charge {Math.round(sim.minSocPct)}% · {sim.energyInKWh.toFixed(1)} kWh collected
+            </span>
+          </div>
+          <SocChart sim={sim} minSoc={lander.minSocPct} />
+        </>
+      ) : (
+        <div className="verdict na" role="status">
+          Not enough data for this mission
+          <span>
+            A {missionDays}-day mission from here runs past the end of the data ({formatUtc(hourToDate(data, data.ephem.count - 1))} UTC). Choose an earlier
+            landing time or a shorter mission.
+          </span>
+        </div>
+      )}
 
       <button
         className="btn view-lander"
@@ -152,18 +175,18 @@ export default function LanderPanel() {
           setTimeout(() => currentScene()?.viewLander(), 60);
         }}
       >
-        👁 See the lander on the ground
+        <Icon name="eye" /> View lander
       </button>
 
-      <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy}>
+      <button className="btn primary search-btn" onClick={runMap} disabled={!field || busy || !fits}>
         {busy ? "Simulating…" : `Simulate ${field ? (field.meta.horizon.size ** 2).toLocaleString() : ""} landing spots`}
       </button>
-      {survival && (
+      {fits && survival && (
         <div className="f-stats">
           Every spot simulated hour by hour on the GPU in {survival.millis.toFixed(0)} ms (vertical panels modeled as Sun-tracking on the map)
         </div>
       )}
-      {stale.length > 0 && (
+      {fits && stale.length > 0 && (
         <div className="f-hint warn" role="status">
           Out of date: the {joinNames(stale)} changed since the map was simulated, so the map and the landing odds below are for the earlier
           settings. Simulate again to update them.
@@ -178,11 +201,11 @@ export default function LanderPanel() {
           </button>
         ))}
       </div>
-      {!survival && <div className="f-hint">Run the map simulation first, then 4,000 random touchdowns are scored around this site.</div>}
-      {survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Use “⚡ Analyze this area in detail” in the right panel.</div>}
-      {mc && siteInField && (
+      {fits && !survival && <div className="f-hint">Run the map simulation first, then 4,000 random touchdowns are scored around this site.</div>}
+      {fits && survival && !siteInField && <div className="f-hint">Landing-miss odds need a detailed area here. Select Analyze area in the site panel.</div>}
+      {fits && mc && siteInField && (
         <div className={stale.length ? "mc stale" : "mc"}>
-          <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "#ffd27a" : "var(--danger)" }}>
+          <div className="mc-big" style={{ color: mc.okPct >= 90 ? "var(--link)" : mc.okPct >= 60 ? "var(--sun)" : "var(--danger)" }}>
             {mc.okPct.toFixed(1)}%
           </div>
           <div className="mc-text">
@@ -229,17 +252,17 @@ function SocChart({ sim, minSoc }: { sim: SimResult; minSoc: number }) {
     for (let k = 0; k < n; k++) {
       const v = sim.power[k] / maxP;
       if (v <= 0.01) continue;
-      g.fillStyle = `rgba(255,181,71,${0.08 + 0.25 * v})`;
+      g.fillStyle = `rgba(247,213,119,${0.08 + 0.25 * v})`;
       g.fillRect((k / n) * w, 0, Math.max(1, w / n + 0.5), h);
     }
-    g.strokeStyle = "rgba(255,93,108,0.6)";
+    g.strokeStyle = "rgba(255,170,163,0.6)";
     g.setLineDash([3, 3]);
     g.beginPath();
     g.moveTo(0, h - (minSoc / 100) * h);
     g.lineTo(w, h - (minSoc / 100) * h);
     g.stroke();
     g.setLineDash([]);
-    g.strokeStyle = sim.diedAtHour === null ? "#3ddc97" : "#ff5d6c";
+    g.strokeStyle = sim.diedAtHour === null ? "#a7d9c8" : "#ffaaa3";
     g.lineWidth = 1.6;
     g.beginPath();
     for (let k = 0; k <= n; k++) {
@@ -249,8 +272,8 @@ function SocChart({ sim, minSoc }: { sim: SimResult; minSoc: number }) {
       else g.lineTo(x, y);
     }
     g.stroke();
-    g.fillStyle = "#7d889b";
-    g.font = "9px JetBrains Mono, monospace";
+    g.fillStyle = "#bdc3cd";
+    g.font = "9px Geist, sans-serif";
     g.fillText("battery %", 4, 10);
     g.fillText(`${Math.round(n / 24)} d`, w - 22, h - 3);
   }, [sim, minSoc]);

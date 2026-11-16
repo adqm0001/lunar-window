@@ -59,7 +59,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
   const y = (el: number) => H - ((el - bottom) / (top - bottom)) * H;
 
   let ground = `M0,${H}`;
-  for (let a = 0; a <= 720; a++) ground += `L${x(a / 2).toFixed(1)},${y(hz[a % hz.length]).toFixed(1)}`;
+  for (let a = 0; a <= 720; a++) ground += `L${x(a / 2).toFixed(1)},${y(horizonAt(hz, a / 2)).toFixed(1)}`;
   ground += `L${W},${H}Z`;
 
   const sunUpPct = Math.round((100 * paths.sun.filter((p) => p.up).length) / paths.sun.length);
@@ -83,10 +83,10 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
           <rect x={0} y={0} width={W} height={H} fill="#05070d" />
           <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.18)" strokeDasharray="2 4" />
           {paths.earth.map((p, i) => (
-            <circle key={`e${i}`} cx={x(p.az)} cy={y(p.el)} r={1.6} fill={p.up ? "#4ea8ff" : "rgba(78,168,255,0.22)"} />
+            <circle key={`e${i}`} cx={x(p.az)} cy={y(p.el)} r={1.6} fill={p.up ? "var(--earth)" : "rgba(78,168,255,0.22)"} />
           ))}
           {paths.sun.map((p, i) => (
-            <circle key={`s${i}`} cx={x(p.az)} cy={y(p.el)} r={1.8} fill={p.up ? "#ffb547" : "rgba(255,181,71,0.22)"} />
+            <circle key={`s${i}`} cx={x(p.az)} cy={y(p.el)} r={1.8} fill={p.up ? "var(--sun)" : "rgba(247,213,119,0.22)"} />
           ))}
           <path d={ground} fill="#2a2724" stroke="#9a9186" strokeWidth={1} />
           <circle cx={x(paths.now.az)} cy={y(paths.now.el)} r={5} fill="none" stroke="#fff" strokeWidth={1.4} />
@@ -104,10 +104,10 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
         </svg>
         <div className="sky-legend">
           <span>
-            <i style={{ background: "#ffb547" }} /> Sun, visible {sunUpPct}% of the month (faded dots = behind terrain)
+            <i style={{ background: "var(--sun)" }} /> Sun, visible {sunUpPct}% of the month (faded dots = behind terrain)
           </span>
           <span>
-            <i style={{ background: "#4ea8ff" }} /> Earth, visible {earthUpPct}%
+            <i style={{ background: "var(--earth)" }} /> Earth, visible {earthUpPct}%
           </span>
           <span>
             <i style={{ border: "1.4px solid #fff", background: "none" }} /> Sun now
@@ -125,7 +125,7 @@ export default function SkylinePanel({ site, onClose }: { site: Site; onClose: (
             </p>
             <svg viewBox={`0 0 ${SW} ${SH + 14}`} width={SW} role="img" aria-label={`Latitude where the Sun is overhead, ${years.first} to ${years.last}`}>
               <line x1={0} x2={SW} y1={SH / 2} y2={SH / 2} stroke="rgba(255,255,255,0.15)" />
-              <path d={seasonPath} fill="none" stroke="#ffb547" strokeWidth={1.4} />
+              <path d={seasonPath} fill="none" stroke="var(--sun)" strokeWidth={1.4} />
               <line x1={(nowIdx / (season.length - 1)) * SW} x2={(nowIdx / (season.length - 1)) * SW} y1={0} y2={SH} stroke="#fff" strokeWidth={0.8} />
               <text x={2} y={9} className="tc-label">
                 +2°

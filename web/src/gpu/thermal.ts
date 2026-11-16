@@ -31,11 +31,49 @@ export const EMISSIVITY = 0.95;
 // Fraction of the light entering a crater's opening that a shadowed point inside absorbs per unit F.
 export const BOUNCE_ABSORBED = WALL_ALBEDO * (1 - WALL_ALBEDO) + (1 - WALL_ALBEDO) * EMISSIVITY;
 
+// Warm-up before recording. The regolith model above (Hayne et al. 2017) starts every layer at one
+// guessed temperature, and the surface keeps showing that guess until the layers below have been
+// through several day-night cycles. So the run first steps through the lunar days just before the
+// window (the real history) and then records every step of the window. Four lunar days (a synodic
+// month is 709 h) are enough: compared with a 12-day warm-up, every cell of the polar map (7 and
+// 30 d windows from hour 9600) stays within 4.5 K in max, mean and min, where one day left up to
+// 18 K and three days still left 11 % of the whole-Moon points more than 5 K off in a 7 d window.
+// Where the data starts too late, the missing hours are taken from 12 lunar days (354.5 d) later:
+// the same point of the day-night cycle and nearly the same season, since the Sun's latitude seen
+// from the Moon (equator tilted 1.54° to the ecliptic, nodes regressing; Cassini's laws) repeats
+// every eclipse year, 346.6 d.
+export const LUNAR_DAY_HOURS = 709;
+export const WARMUP_HOURS = 4 * LUNAR_DAY_HOURS;
+export const STAND_IN_HOURS = 12 * LUNAR_DAY_HOURS;
+
+/** Warm-up of a run with steps of `stride` h from `start`, in data of `count` hours: `replay` steps
+ *  standing in for missing history (STAND_IN_HOURS later), then `history` steps just before the window. */
+export function thermalWarmup(start: number, stride: number, count: number) {
+  const spin = Math.round(WARMUP_HOURS / stride);
+  const history = Math.min(spin, Math.floor(start / stride));
+  // the stand-in hours end where the history starts, a year on; without that much data, warm up on history only
+  const fits = start - history * stride + STAND_IN_HOURS <= count;
+  return { replay: fits ? spin - history : 0, history };
+}
+
+/** Hour of the run's j-th step, as the shaders compute it (j counts the warm-up steps first). */
+export const STEP_HOUR_GLSL = `uStart + (j - uReplay - uHistory) * uStride + (j < uReplay ? ${STAND_IN_HOURS} : 0)`;
+
+/** Every step of a run in order: its hour, and whether it is recorded (only the window's own steps are). */
+export function thermalSchedule(start: number, steps: number, stride: number, count: number) {
+  const { replay, history } = thermalWarmup(start, stride, count);
+  return Array.from({ length: replay + history + steps }, (_, j) => ({
+    hour: start + (j - replay - history) * stride + (j < replay ? STAND_IN_HOURS : 0),
+    record: j >= replay + history,
+  }));
+}
+
 export const THERMAL_MAIN = `
 uniform highp sampler2D uHeights;
 uniform int uHSize;
 uniform float uHCell;
-uniform int uSpin;
+uniform int uReplay;
+uniform int uHistory;
 
 const int NZ = ${NZ};
 const float S0 = 1361.0;
@@ -130,8 +168,10 @@ void main() {
   float tMin = 1e9;
   float tSum = 0.0;
   float nRec = 0.0;
-  for (int k = 0; k < uSteps; k++) {
-    int idx = uStart + k * uStride;
+  // warm up first (see thermalSchedule), then record every step of the window
+  int warm = uReplay + uHistory;
+  for (int j = 0; j < warm + uSteps; j++) {
+    int idx = ${STEP_HOUR_GLSL};
     vec3 sv = normalize(texelFetch(uSun, tc(idx), 0).xyz - site);
     float sel = degrees(asin(dot(sv, up)));
     float saz = degrees(atan(dot(sv, east), dot(sv, north)));
@@ -174,7 +214,7 @@ void main() {
       Tn[0] = Ts;
       for (int i = 0; i < NZ; i++) T[i] = Tn[i];
     }
-    if (k >= uSpin) {
+    if (j >= warm) {
       tMax = max(tMax, T[0]);
       tMin = min(tMin, T[0]);
       tSum += T[0];

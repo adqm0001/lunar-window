@@ -39,8 +39,10 @@ export function monteCarlo(field: FieldData, survival: FieldMetrics, x0: number,
     const col = Math.floor((x - cx + E) / cell);
     const row = Math.floor((E - (y - cy)) / cell);
     if (col < 0 || row < 0 || col >= size || row >= size) continue;
-    const lived = survival.data[(row * size + col) * 4];
-    const good = lived >= 0.999;
+    const o = (row * size + col) * 4;
+    const lived = survival.data[o];
+    // ok only when the battery never died (channel 3 is the hour it died in, -1 if never), not when it nearly lasted
+    const good = survival.data[o + 3] < 0;
     if (good) ok++;
     livedSum += lived;
     worst = Math.min(worst, lived);

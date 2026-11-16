@@ -30,18 +30,27 @@ export function globalRequest(layer: LayerId, hour: number, rangeDays: number) {
   return { kind, start, hours, key: `${kind}:${start}:${hours}` };
 }
 
-// Raw whole-Moon results for a kind of model and a time window (cached).
-export async function getGlobalMetrics(kind: "light" | "thermal", start: number, hours: number): Promise<GlobalMetrics | null> {
+// Jobs still running, with everyone waiting on each; a job stops early once none of them want it any more.
+const inflight = new Map<string, { job: Promise<GlobalMetrics | null>; wanted: (() => boolean)[] }>();
+
+// Raw whole-Moon results for a kind of model and a time window (cached). `wanted` says whether the caller still
+// needs the result (for example the day it was asked for is still shown); by default it always does.
+export async function getGlobalMetrics(kind: "light" | "thermal", start: number, hours: number, wanted: () => boolean = () => true): Promise<GlobalMetrics | null> {
   const st = useApp.getState();
   if (!st.globe || !st.data) return null;
   const key = `${kind}:${start}:${hours}`;
-  let m = cache.get(key);
+  const running = inflight.get(key);
+  if (running) {
+    running.wanted.push(wanted);
+    return running.job;
+  }
+  let m: GlobalMetrics | null | undefined = cache.get(key);
   if (!m) {
     if (!engine && !engineError) {
       st.setGlobalStatus("Building horizons for the whole Moon on your GPU (one time)…");
       await new Promise((r) => setTimeout(r, 30));
       try {
-        engine = new GlobalLayers(st.globe, st.data.ephem);
+        engine ??= new GlobalLayers(st.globe, st.data.ephem);
       } catch (e) {
         engineError = (e as Error).message;
       }
@@ -50,17 +59,30 @@ export async function getGlobalMetrics(kind: "light" | "thermal", start: number,
       st.setGlobalStatus(engineError);
       return null;
     }
+    // Another caller may have started this window while the initial horizons were being built.
+    const joined = inflight.get(key);
+    if (joined) {
+      joined.wanted.push(wanted);
+      return joined.job;
+    }
     st.setGlobalStatus(kind === "thermal" ? "Running the soil heat model for the whole Moon…" : "Computing the whole Moon…");
-    await new Promise((r) => setTimeout(r, 30));
-    m = engine.compute(kind, start, hours);
+    const waiting = [wanted];
+    const job = engine.compute(kind, start, hours, () => waiting.some((w) => w()));
+    inflight.set(key, { job, wanted: waiting });
+    try {
+      m = await job;
+    } finally {
+      inflight.delete(key);
+      if (inflight.size === 0) useApp.getState().setGlobalStatus(null);
+    }
+    if (!m) return null;
     if (cache.size > 6) cache.clear();
     cache.set(key, m);
-    st.setGlobalStatus(null);
   }
   return m;
 }
 
-export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number): Promise<GlobalPaintSource | null> {
+export async function computeGlobal(layer: LayerId, hour: number, rangeDays: number, wanted: () => boolean = () => true): Promise<GlobalPaintSource | null> {
   const req = globalRequest(layer, hour, rangeDays);
   const count = useApp.getState().data?.ephem.count ?? 0;
   if (layer === "ice" && !iceCovered(count, req.start)) {
@@ -68,7 +90,7 @@ export async function computeGlobal(layer: LayerId, hour: number, rangeDays: num
     useApp.getState().setGlobalInfo(null);
     return null;
   }
-  const m = await getGlobalMetrics(req.kind, req.start, req.hours);
+  const m = await getGlobalMetrics(req.kind, req.start, req.hours, wanted);
   return m ? { layer, m } : null;
 }
 
