@@ -9,6 +9,7 @@ import type { FieldMetrics } from "../gpu/engine";
 import { LANDER_PRESETS, type Lander, type SurvivalInputs } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
 import { isRoute, type RoverFailure, type RoverRoute } from "../lib/rover";
+import { pinIdentity } from "../lib/pins";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -170,7 +171,7 @@ export const useApp = create<AppState>((set, get) => ({
       rover: null,
       roverDestination: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
-      selectedId: resolveSelection(s.selectedId, s.data, s.customSites, null),
+      selectedId: resolveSelection(s.selectedId, s.data, s.customSites, null, s.pinned),
     })),
   landerOpen: false,
   roverOpen: false,
@@ -215,17 +216,22 @@ export const useApp = create<AppState>((set, get) => ({
   compareOpen: false,
   togglePin: (site) =>
     set((s) => {
-      const has = s.pinned.some((p) => p.id === site.id);
-      const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
+      const id = pinIdentity(site);
+      const snapshot = id === site.id ? site : { ...site, id, group: "Pinned landing spots" };
+      const has = s.pinned.some((p) => p.id === id);
+      const pinned = has ? s.pinned.filter((p) => p.id !== id) : [...s.pinned, snapshot].slice(-6);
       const compareOpen = pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen;
-      return { pinned, compareOpen, split: s.split && pinned.length >= 2, porkchopOpen: compareOpen ? false : s.porkchopOpen };
+      return {
+        pinned, compareOpen, split: s.split && pinned.length >= 2, porkchopOpen: compareOpen ? false : s.porkchopOpen,
+        selectedId: resolveSelection(s.selectedId, s.data, s.customSites, s.finder, pinned),
+      };
     }),
   setCompareOpen: (compareOpen) => set((s) => ({ compareOpen, split: compareOpen && s.split, porkchopOpen: compareOpen ? false : s.porkchopOpen })),
   split: false,
   setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,
   setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
-  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? resolveSelection(s.selectedId, s.data, s.customSites, finder) })),
+  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? resolveSelection(s.selectedId, s.data, s.customSites, finder, s.pinned) })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSites: [],
@@ -257,7 +263,7 @@ export const useApp = create<AppState>((set, get) => ({
         pinned,
         compareOpen: s.compareOpen && pinned.length > 0,
         split: s.split && pinned.length >= 2,
-        selectedId: s.selectedId === id ? resolveSelection(id, s.data, customSites, s.finder) : s.selectedId,
+        selectedId: s.selectedId === id ? resolveSelection(id, s.data, customSites, s.finder, pinned) : s.selectedId,
       };
     }),
   renameCustomSite: (id, name) =>
@@ -282,9 +288,9 @@ export const useApp = create<AppState>((set, get) => ({
   select: (selectedId) => set({ selectedId }),
 }));
 
-/** Keep `id` if it names a built-in site, a custom point or a finder candidate; otherwise the first built-in site. */
-function resolveSelection(id: string, data: AppData | null, customSites: Site[], finder: FinderResult | null) {
-  if (data?.sites.some((x) => x.id === id) || customSites.some((x) => x.id === id) || finder?.candidates.some((c) => c.site.id === id)) return id;
+/** Keep a still-selectable site, including saved finder pins; otherwise the first built-in site. */
+function resolveSelection(id: string, data: AppData | null, customSites: Site[], finder: FinderResult | null, pinned: Site[]) {
+  if (data?.sites.some((x) => x.id === id) || customSites.some((x) => x.id === id) || finder?.candidates.some((c) => c.site.id === id) || pinned.some((p) => p.id === id)) return id;
   return data?.sites[0]?.id ?? id;
 }
 
