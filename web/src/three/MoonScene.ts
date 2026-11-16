@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FrameOrbitControls } from "./FrameOrbitControls";
+import { pinIdentity } from "../lib/pins";
 import { recordRenderedFrame } from "../lib/playbackPerformance";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -88,6 +89,7 @@ export class MoonScene {
   private earthMat: THREE.ShaderMaterial;
   private earthLabel: CSS2DObject;
   private beacons = new Map<string, { group: THREE.Group; label: HTMLDivElement; pos: THREE.Vector3 }>();
+  private selectedBeaconId: string | null = null;
   private sunRay: THREE.Line;
   private earthRay: THREE.Line;
   private selected: string | null = null;
@@ -427,6 +429,9 @@ export class MoonScene {
     for (const b of this.beacons.values()) this.dropGroup(b.group);
     this.beacons.clear();
     for (const s of sites) {
+      // A live finder result and its saved pin can both refer to the same marker.
+      const markerId = pinIdentity(s);
+      if (this.beacons.has(markerId)) continue;
       const p = this.sitePosition(s);
       if (!p) continue;
       const group = new THREE.Group();
@@ -452,9 +457,9 @@ export class MoonScene {
       obj.center.set(0.5, 1);
       group.add(obj);
       this.scene.add(group);
-      this.beacons.set(s.id, { group, label, pos: p });
+      this.beacons.set(markerId, { group, label, pos: p });
     }
-    if (this.selected) this.highlight(this.selected);
+    if (this.selectedBeaconId) this.highlight(this.selectedBeaconId);
   }
 
   /** The site the scene last highlighted (and flew to, if it changed); set by Scene3D's effect after the store changes. */
@@ -465,8 +470,9 @@ export class MoonScene {
   select(site: Site, fly: boolean) {
     this.dirty = true;
     this.selected = site.id;
-    this.highlight(site.id);
-    const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
+    this.selectedBeaconId = pinIdentity(site);
+    this.highlight(this.selectedBeaconId);
+    const p = this.beacons.get(this.selectedBeaconId)?.pos ?? this.sitePosition(site);
     if (!p || !fly) return;
     if (!this.introDone && !this.globe) {
       this.pendingIntro = site;
@@ -1055,7 +1061,7 @@ export class MoonScene {
 
   setRays(site: Site, sunUp: boolean, earthUp: boolean) {
     this.dirty = true;
-    const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
+    const p = this.beacons.get(pinIdentity(site))?.pos ?? this.sitePosition(site);
     for (const [line, target, up] of [
       [this.sunRay, this.sun.position, sunUp],
       [this.earthRay, this.earth.position, earthUp],
@@ -1309,7 +1315,7 @@ export class MoonScene {
 
   /** Flies the right-hand view to a site. */
   flySplitTo(site: Site) {
-    const p = this.beacons.get(site.id)?.pos ?? this.sitePosition(site);
+    const p = this.beacons.get(pinIdentity(site))?.pos ?? this.sitePosition(site);
     if (this.split && p) this.inView(true, () => this.flyToPoint(p));
   }
 
