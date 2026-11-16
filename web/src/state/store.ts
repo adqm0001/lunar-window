@@ -8,7 +8,7 @@ import type { FinderResult } from "../gpu/finder";
 import type { FieldMetrics } from "../gpu/engine";
 import { LANDER_PRESETS, type Lander, type SurvivalInputs } from "../lib/lander";
 import type { MonteCarloResult } from "../lib/montecarlo";
-import type { RoverFailure, RoverRoute } from "../lib/rover";
+import { isRoute, type RoverFailure, type RoverRoute } from "../lib/rover";
 
 export const SPEEDS = [
   { label: "1 h/s", hoursPerSecond: 1 },
@@ -49,13 +49,16 @@ interface AppState {
   setTourStep: (n: number | null) => void;
   validationOpen: boolean;
   reportOpen: boolean;
+  skylineOpen: boolean;
+  setSkylineOpen: (open: boolean) => void;
   mobilePanel: "none" | "sites" | "site" | "time";
   setMobilePanel: (p: "none" | "sites" | "site" | "time") => void;
   setReportOpen: (o: boolean) => void;
   setValidationOpen: (o: boolean) => void;
   rover: RoverRoute | RoverFailure | null;
+  roverDestination: Pick<Site, "id" | "name" | "lat" | "lon"> | null;
   setRoverOpen: (o: boolean) => void;
-  setRover: (r: RoverRoute | RoverFailure | null) => void;
+  setRover: (r: RoverRoute | RoverFailure | null, destination?: Site | null) => void;
   lander: Lander;
   survival: FieldMetrics | null;
   /** The settings `survival` was simulated with. */
@@ -91,7 +94,7 @@ interface AppState {
   selectedId: string;
   setField: (f: FieldData) => void;
   setFieldProgress: (p: number) => void;
-  setFieldError: (e: string) => void;
+  setFieldError: (e: string | null) => void;
   setLayer: (l: LayerId) => void;
   setRangeDays: (d: number) => void;
   setCustomSite: (s: Site) => void;
@@ -153,7 +156,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ palette });
   },
   porkchopOpen: false,
-  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen })),
+  setPorkchopOpen: (porkchopOpen) => set((s) => ({ porkchopOpen, compareOpen: porkchopOpen ? false : s.compareOpen, split: porkchopOpen ? false : s.split })),
   poleField: null,
   regionStatus: null,
   setRegionStatus: (regionStatus) => set({ regionStatus }),
@@ -165,7 +168,9 @@ export const useApp = create<AppState>((set, get) => ({
       survivalFor: null,
       mc: null,
       rover: null,
+      roverDestination: null,
       layer: s.layer === "score" || s.layer === "survive" ? "terrain" : s.layer,
+      selectedId: resolveSelection(s.selectedId, s.data, s.customSites, null),
     })),
   landerOpen: false,
   roverOpen: false,
@@ -177,13 +182,21 @@ export const useApp = create<AppState>((set, get) => ({
   setTourStep: (tourStep) => set({ tourStep }),
   validationOpen: false,
   reportOpen: false,
+  skylineOpen: false,
+  setSkylineOpen: (skylineOpen) => set({ skylineOpen }),
   mobilePanel: "none",
   setMobilePanel: (mobilePanel) => set({ mobilePanel }),
   setReportOpen: (reportOpen) => set({ reportOpen }),
   setValidationOpen: (validationOpen) => set({ validationOpen }),
   rover: null,
+  roverDestination: null,
   setRoverOpen: (roverOpen) => set((s) => ({ roverOpen, landerOpen: roverOpen ? false : s.landerOpen, finderOpen: roverOpen ? false : s.finderOpen })),
-  setRover: (rover) => set({ rover }),
+  setRover: (rover, destination = null) => set({
+    rover,
+    roverDestination: isRoute(rover) && destination
+      ? { id: destination.id, name: destination.name, lat: destination.lat, lon: destination.lon }
+      : null,
+  }),
   lander: LANDER_PRESETS[0],
   survival: null,
   survivalFor: null,
@@ -197,21 +210,22 @@ export const useApp = create<AppState>((set, get) => ({
   globe: null,
   setGlobe: (globe) => set({ globe }),
   orbitRequest: 0,
-  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d" })),
+  requestOrbit: () => set((s) => ({ orbitRequest: s.orbitRequest + 1, view: "3d", split: false, compareOpen: false })),
   pinned: [],
   compareOpen: false,
   togglePin: (site) =>
     set((s) => {
       const has = s.pinned.some((p) => p.id === site.id);
       const pinned = has ? s.pinned.filter((p) => p.id !== site.id) : [...s.pinned, site].slice(-6);
-      return { pinned, compareOpen: pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen, split: s.split && pinned.length >= 2 };
+      const compareOpen = pinned.length >= 2 ? true : pinned.length === 0 ? false : s.compareOpen;
+      return { pinned, compareOpen, split: s.split && pinned.length >= 2, porkchopOpen: compareOpen ? false : s.porkchopOpen };
     }),
-  setCompareOpen: (compareOpen) => set({ compareOpen }),
+  setCompareOpen: (compareOpen) => set((s) => ({ compareOpen, split: compareOpen && s.split, porkchopOpen: compareOpen ? false : s.porkchopOpen })),
   split: false,
   setSplit: (on) => set((s) => ({ split: on && s.pinned.length >= 2 })),
   finder: null,
   setFinderOpen: (finderOpen) => set((s) => ({ finderOpen, landerOpen: finderOpen ? false : s.landerOpen, roverOpen: finderOpen ? false : s.roverOpen })),
-  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? s.selectedId })),
+  setFinder: (finder) => set((s) => ({ finder, layer: finder ? "score" : s.layer === "score" ? "terrain" : s.layer, selectedId: finder?.candidates[0]?.site.id ?? resolveSelection(s.selectedId, s.data, s.customSites, finder) })),
   toggleCinema: () => set((s) => ({ cinema: !s.cinema })),
   setView: (view) => set((s) => ({ view, layer: view === "3d" && s.layer === "now" ? "terrain" : s.layer })),
   customSites: [],
@@ -227,20 +241,30 @@ export const useApp = create<AppState>((set, get) => ({
       if (i >= 0) {
         const next = [...s.customSites];
         next[i] = { ...site, name: s.customSites[i].name };
-        return { customSites: next, selectedId: site.id };
+        // A pinned copy of this point follows the replacement (same id, kept name).
+        return { customSites: next, pinned: s.pinned.map((p) => (p.id === site.id ? next[i] : p)), selectedId: site.id };
       }
       const seq = s.pointSeq + 1;
       const named = site.name === "Custom point" ? { ...site, name: `Point ${seq}` } : site;
       return { customSites: [...s.customSites, named].slice(-20), pointSeq: seq, selectedId: site.id };
     }),
   removeCustomSite: (id) =>
+    set((s) => {
+      const customSites = s.customSites.filter((c) => c.id !== id);
+      const pinned = s.pinned.filter((p) => p.id !== id);
+      return {
+        customSites,
+        pinned,
+        compareOpen: s.compareOpen && pinned.length > 0,
+        split: s.split && pinned.length >= 2,
+        selectedId: s.selectedId === id ? resolveSelection(id, s.data, customSites, s.finder) : s.selectedId,
+      };
+    }),
+  renameCustomSite: (id, name) =>
     set((s) => ({
-      customSites: s.customSites.filter((c) => c.id !== id),
-      pinned: s.pinned.filter((p) => p.id !== id),
-      split: s.split && s.pinned.filter((p) => p.id !== id).length >= 2,
-      selectedId: s.selectedId === id ? "connecting-ridge-b" : s.selectedId,
+      customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)),
+      pinned: s.pinned.map((p) => (p.id === id ? { ...p, name } : p)),
     })),
-  renameCustomSite: (id, name) => set((s) => ({ customSites: s.customSites.map((c) => (c.id === id ? { ...c, name } : c)) })),
   hour: 0,
   playing: false,
   speedIndex: 2,
@@ -257,6 +281,12 @@ export const useApp = create<AppState>((set, get) => ({
   setSpeedIndex: (speedIndex) => set({ speedIndex }),
   select: (selectedId) => set({ selectedId }),
 }));
+
+/** Keep `id` if it names a built-in site, a custom point or a finder candidate; otherwise the first built-in site. */
+function resolveSelection(id: string, data: AppData | null, customSites: Site[], finder: FinderResult | null) {
+  if (data?.sites.some((x) => x.id === id) || customSites.some((x) => x.id === id) || finder?.candidates.some((c) => c.site.id === id)) return id;
+  return data?.sites[0]?.id ?? id;
+}
 
 export function hourToDate(data: AppData, hour: number) {
   return new Date(data.ephem.startMs + hour * 3600e3);
