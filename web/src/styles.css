@@ -394,6 +394,7 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
 .load-error { position: fixed; left: 50%; transform: translateX(-50%); bottom: 182px; width: min(480px, calc(100vw - 32px)); padding: 12px 14px; z-index: 60; display: flex; align-items: center; gap: 10px; font-size: 12px; }
 .load-error span { flex: 1; }
 .app-error { bottom: auto; top: 40%; }
+.app-error .btn { min-height: 44px; }
 .app-error small { display: block; margin-top: 4px; color: var(--muted); font-family: var(--mono); font-size: 10.5px; overflow-wrap: anywhere; }
 
 .modal.report { max-width: 900px; }
@@ -464,7 +465,7 @@ body:has(.tour-card:not(.welcome)) .modal { max-height: calc(100vh - 40px - var(
   .report-table .rt-rank { display: none; }
   .report-table .rt-name { grid-column: 1 / -1; font-weight: 650; font-size: 13px; }
   .report-table .rt-go { grid-column: 1 / -1; }
-  .report-table .rt-go .btn { width: 100%; }
+  .report-table .rt-go .btn { width: 100%; min-height: 44px; }
 }
 
 @media (max-width: 520px) {
