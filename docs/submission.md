@@ -16,7 +16,7 @@ Use the **seven-slide PDF** as the official demo. It already includes the projec
 
 Public PDF link, verified without signing in:
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/slides.pdf
+https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf
 
 This link pins the checked demo revision, so it works before the documentation PR merges and does not depend on the review branch remaining open. The editable source is `docs/slides.pptx`; `docs/slides.html` is a local browser preview.
 
@@ -24,7 +24,7 @@ The alternative [29.8-second video](demo/lunar-window-30s.mp4) shows the live pl
 
 Public video link, verified without signing in:
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/demo/lunar-window-30s.mp4
+https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/demo/lunar-window-30s.mp4
 
 ## Link to Final Project
 
@@ -107,7 +107,7 @@ Additional references include Hayne et al. (2017) for regolith properties, Willi
 Software: C++/OpenMP, Python, NumPy, Skyfield, Pillow, TypeScript, React, three.js, Zustand, WebGL2, Vite and Vitest. The planner and presentation use Geist, bundled under the SIL Open Font License. The optional Viridis palette derives from the BIDS CC0 colormap collection. SI and capture tooling are disclosed above.
 
 Full publications, URLs, media credits and license notes:
-https://github.com/adqm0001/lunar-window/blob/task-11-project-submission/docs/sources.md
+https://github.com/adqm0001/lunar-window/blob/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/sources.md
 
 ## Team credits
 

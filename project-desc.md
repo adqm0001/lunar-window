@@ -14,9 +14,9 @@ At the Moon's south pole, a ridge can get sunlight while the crater next to it s
 
 Use this public PDF URL in the form.
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/slides.pdf
+https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf
 
-The PDF has seven slides, including the title and team. The [29.8-second silent edit](https://raw.githubusercontent.com/adqm0001/lunar-window/task-11-project-submission/docs/demo/lunar-window-30s.mp4) and [three-speaker narration script](docs/voiceover.md) are available for the team's video mix.
+The PDF has seven slides, including the title and team. The [29.8-second silent edit](https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/demo/lunar-window-30s.mp4) and [three-speaker narration script](docs/voiceover.md) are available for the team's video mix.
 
 ## Project
 
