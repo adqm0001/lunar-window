@@ -6,4 +6,4 @@ Application screenshots were captured from main `e103f29` using Chromium at 1600
 
 Open [slides.html](../slides.html) locally for keyboard navigation, [slides.pdf](../slides.pdf) for a portable seven-page demo or [slides.pptx](../slides.pptx) to edit text, images and speaker notes. The PDF preserves the inspected slide rendering as images. The PowerPoint keeps editable text and source notes.
 
-The deck contains exactly seven slides, including title and team. [The video](lunar-window-30s.mp4) is 29.8 seconds of footage recorded from the live site in High graphics mode. It is 1920 × 1080 H.264 MP4 at 30 fps, with 894 frames and no audio track. See [voiceover.md](../voiceover.md) for the three-speaker script and cut times.
+The deck contains exactly seven slides, including title and team. [The video](lunar-window-30s.mp4) is 29.8 seconds of footage recorded from the live site in High graphics mode. It is 1920 × 1080 at 30 fps with narration recorded by the team. See [voiceover.md](../voiceover.md) for the three-speaker script and cut times.

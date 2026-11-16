@@ -37,7 +37,7 @@ Codex/ChatGPT and Claude assisted development. The refreshed presentation uses O
 
 The original app screenshots capture Lunar Window running locally from main commit `e103f29`, with the simulated time set to November 15, 2026, 17:00 UTC. They show the application’s computed rendering from the sources above. They are not spacecraft photographs or SI image generations. Map colors describe modeled values. Crops in the deck retain the relevant interface content.
 
-Slide text, layout, README and submission copy are SI-assisted. The deck includes presentation notes and sources. For the video, we recorded the public app in Chromium with High graphics enabled. The 29.8-second edit contains app footage only. The MP4 metadata acknowledges assistance with editing and the timed script. We used FFmpeg to encode and check all frames.
+Slide text, layout, README and submission copy are SI-assisted. The deck includes presentation notes and sources. For the video, we recorded the public app in Chromium with High graphics enabled. The 29.8-second demo pairs footage from the live app with narration recorded by team members. The README and SI disclosure describe assistance with the edit and timed script.
 
 ## License status
 

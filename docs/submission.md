@@ -12,19 +12,11 @@ Lunar Window is a browser-based tool for comparing where and when to land at the
 
 ## Link to Project Demo
 
-Use the **seven-slide PDF** as the official demo. It already includes the project, challenge, team names, NASA data, working interface and limitations.
+Use this public link to the narrated demo in the Project Demonstration field.
 
-Public PDF link, verified without signing in:
+https://raw.githubusercontent.com/adqm0001/lunar-window/2a4f5dec89c1b495d73690caffc3df855f08e558/docs/demo/lunar-window-30s.mp4
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf
-
-This link pins the checked demo revision, so it works before the documentation PR merges and does not depend on the review branch remaining open. The editable source is `docs/slides.pptx`; `docs/slides.html` is a local browser preview.
-
-The alternative [29.8-second video](demo/lunar-window-30s.mp4) shows the live planner in High graphics. The edit has no audio and is ready for the team's three voice tracks. Use the seven-slide PDF for the form now, or choose the public link to the finished narration mix when that is ready. [Timed narration script](voiceover.md)
-
-Public video link, verified without signing in:
-
-https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/demo/lunar-window-30s.mp4
+The live planner demo includes narration recorded by the team. The [seven-slide PDF](https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf) is also available.
 
 ## Link to Final Project
 
@@ -72,7 +64,7 @@ Yes. Our team originated the idea, chose the approach to the challenge, and made
 
 OpenAI Codex/ChatGPT and Anthropic Claude helped implement those decisions, write and review code, debug, test, explore the interface, check references and document the project. Codex also helped write this README and project-page copy, lay out the seven-slide presentation and prepare the video edit and narration script. We used SI image generation for earlier interface concepts that are absent from the submission.
 
-The demo visuals are screenshots and recordings of the working application, which renders NASA-derived terrain and computed model results. Source NASA observations come from the cited missions and resources. The processed terrain and ephemerides are outputs of the project's computational pipeline. The README and machine-readable SI disclosure record assistance with the code and data pipeline. The deck includes sources in its notes, and the team will record its own voices for the video.
+The demo visuals are screenshots and recordings of the working application, which renders NASA-derived terrain and computed model results. Source NASA observations come from the cited missions and resources. The processed terrain and ephemerides are outputs of the project's computational pipeline. The README and machine-readable SI disclosure record assistance with the code and data pipeline. The deck includes sources in its notes, and team members recorded the video narration.
 
 Before submission, every team member should confirm whether additional tools or generated media need disclosure. If the team adds SI-generated images or video, include the required visible indicator. If it adds synthetic narration, acknowledge that in the description and media metadata. Do not create or alter NASA branding with SI.
 

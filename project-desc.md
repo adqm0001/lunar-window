@@ -1,6 +1,6 @@
 # Lunar Window | NASA Space Apps 2026
 
-Copy each section into its matching form field. For a complete demo you can submit now, use the seven-slide PDF. If the team records the voice tracks before the deadline, it can use the finished video link instead.
+Copy each section into its matching form field. Use the narrated video link in the Project Demonstration field.
 
 ## Project Name
 
@@ -12,11 +12,11 @@ At the Moon's south pole, a ridge can get sunlight while the crater next to it s
 
 ## Project Demonstration
 
-Use this public PDF URL in the form.
+Use this public video URL in the form.
 
-https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf
+https://raw.githubusercontent.com/adqm0001/lunar-window/2a4f5dec89c1b495d73690caffc3df855f08e558/docs/demo/lunar-window-30s.mp4
 
-The PDF has seven slides, including the title and team. The [29.8-second silent edit](https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/demo/lunar-window-30s.mp4) and [three-speaker narration script](docs/voiceover.md) are available for the team's video mix.
+The video shows the live app and includes the team's narration. The [seven-slide PDF](https://raw.githubusercontent.com/adqm0001/lunar-window/d675c926e6d4be2fe72df78f7fd5fd0d2d84840c/docs/slides.pdf) is also available.
 
 ## Project
 
@@ -46,7 +46,7 @@ Select the following options that reflect the work we recorded.
 - **Coding, Debugging, or Troubleshooting** — helped implement the team's decisions, review code, diagnose bugs and run tests.
 - **Writing, Editing, or Translation** — helped draft and edit documentation, the README, form copy and narration.
 - **Visual Design or Image Creation** — helped explore the interface and lay out the slides.
-- **Presentation, Video, or Audio** — helped with the deck, editing the screen recording and timing the script. The team records its own voices.
+- **Presentation, Video, or Audio** — helped with the deck, editing the screen recording and timing the script. The narration was recorded by team members.
 
 Our team came up with the idea, chose the challenge approach, and made the scientific and design decisions. The app runs physics and geometry models. Source NASA observations come from the cited missions, and the processed products come from our data pipeline. The demo footage and screenshots show the real app. README and `docs/si-disclosure.json` document the AI assistance.
 
