@@ -43,11 +43,14 @@ function layer(px: number, py: number, pz: number, cell: number, seed: number, d
     const cy = by + ((k >> 1) & 1);
     const cz = bz + ((k >> 2) & 1);
     const hh = pcg3(cx + seed, cy, cz);
-    if (hh / U32 > density) continue;
+    // Crater density varies between regions 5 cells across (some ground heavily cratered, some smooth), and
+    // centres can sit almost anywhere in their cell, so the craters don't form an even grid.
+    const region = pcg3(Math.floor(cx / 5) + seed * 3, Math.floor(cy / 5), Math.floor(cz / 5) + 11) / U32;
+    if (hh / U32 > density * (0.25 + 1.5 * region)) continue;
     const h2 = pcg3(cx, cy + seed, cz + 7);
-    const fx = (cx + 0.25 + 0.5 * ((hh & 0xffff) / 65536)) * cell;
-    const fy = (cy + 0.25 + 0.5 * ((hh >>> 16) / 65536)) * cell;
-    const fz = (cz + 0.25 + 0.5 * ((h2 & 0xffff) / 65536)) * cell;
+    const fx = (cx + 0.08 + 0.84 * ((hh & 0xffff) / 65536)) * cell;
+    const fy = (cy + 0.08 + 0.84 * ((hh >>> 16) / 65536)) * cell;
+    const fz = (cz + 0.08 + 0.84 * ((h2 & 0xffff) / 65536)) * cell;
     const fl = Math.hypot(fx, fy, fz);
     const sx = (fx / fl) * R_KM - px;
     const sy = (fy / fl) * R_KM - py;
@@ -116,9 +119,11 @@ float craterLayer(vec3 p, float cell, int seed, float density) {
   for (int k = 0; k < 8; k++) {
     ivec3 c = b + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
     uint hh = pcg3(c.x + seed, c.y, c.z);
-    if (float(hh) / 4294967296.0 > density) continue;
+    ivec3 rc = ivec3(floor(vec3(c) / 5.0));
+    float region = float(pcg3(rc.x + seed * 3, rc.y, rc.z + 11)) / 4294967296.0;
+    if (float(hh) / 4294967296.0 > density * (0.25 + 1.5 * region)) continue;
     uint h2 = pcg3(c.x, c.y + seed, c.z + 7);
-    vec3 f = (vec3(c) + 0.25 + 0.5 * vec3(float(hh & 0xffffu) / 65536.0, float(hh >> 16u) / 65536.0, float(h2 & 0xffffu) / 65536.0)) * cell;
+    vec3 f = (vec3(c) + 0.08 + 0.84 * vec3(float(hh & 0xffffu) / 65536.0, float(hh >> 16u) / 65536.0, float(h2 & 0xffffu) / 65536.0)) * cell;
     vec3 s = normalize(f) * ${R_KM} - p;
     float sizeU = float(h2 >> 16u) / 65536.0;
     float radius = cell * (0.07 + 0.36 * sizeU * sizeU);
