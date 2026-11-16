@@ -30,6 +30,7 @@ Technical reference for working on the code. Read this before starting a task in
 | ✓ Validation | `components/ValidationPanel.tsx` |
 | ▶ Tour, welcome card | `components/Tour.tsx` |
 | Share view (URL state) | `state/share.ts` |
+| Slow High-quality playback guidance | `components/PlaybackQualityNotice.tsx`, `lib/playbackPerformance.ts`; actual draw-frame timestamps from `MoonScene.loop` |
 | ● Rec (video) | `lib/recorder.ts`, `components/Timeline.tsx` |
 | Inside the Moon (cutaway) | `three/cutaway.ts` |
 | Phone layout | `components/MobileNav.tsx`, `@media (max-width: 760px)` in `styles.css` |

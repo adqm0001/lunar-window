@@ -1,115 +1,36 @@
 import * as THREE from "three";
+import { buildCraterLevels, CRATER_N } from "./craterData";
 
-// A seamless tile of small craters, built once at startup. Each texel holds the surface slope
-// (x, y), the height and a bright-ejecta "halo" value. Sampling it at a few scales gives crater
-// detail for the price of three texture reads, and the mipmaps stop it from shimmering far away.
+// A seamless tile of small craters (craterData.ts). Sampling it at a few scales gives crater detail for the price of
+// three texture reads, and the mipmaps stop it from shimmering far away.
+//
+// Building it takes about a second, so it happens in a worker: the texture starts out flat (no crater detail) and
+// is filled in when the worker is done, instead of freezing the page while the Moon first loads.
 
-const N = 1024;
+const N = CRATER_N;
 let cached: THREE.DataTexture | null = null;
+const ready = new Set<() => void>();
 
-function rng(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+/** Calls cb once the crater detail has been filled in (so a render-on-demand scene can redraw). */
+export function onCraterTexture(cb: () => void): () => void {
+  ready.add(cb);
+  return () => ready.delete(cb);
 }
 
-// Simple crater shape from lunar morphometry: parabolic bowl about 1/5 as deep as it is wide,
-// a raised rim, and ejecta thinning out as r^-3. Old craters (low "fresh") are eroded into
-// shallow, rimless cosine dips. Radius is 1 at the rim.
-function shape(r: number, fresh: number): number {
-  const d = 0.4 * fresh;
-  const rim = 0.08 * fresh;
-  let sharp: number;
-  if (r < 1) sharp = rim + d * (r * r - 1);
-  else sharp = (rim * (Math.pow(r, -3) - 0.064)) / 0.936;
-  const soft = -0.12 * 0.5 * (1 + Math.cos(Math.PI * Math.min(r / 1.35, 1)));
-  const k = Math.min(1, fresh * 1.6);
-  const v = soft * (1 - k) + sharp * k;
-  return r < 2.5 ? v : 0;
-}
-
-function build() {
-  const rand = rng(20261114);
-  const h = new Float32Array(N * N);
-  const halo = new Float32Array(N * N);
-  for (let r = 150; r >= 1.6; r /= 1.25) {
-    const count = Math.round((0.07 * Math.pow(r / 150, 0.85) * N * N) / (r * r));
-    for (let k = 0; k < count; k++) {
-      const cx = rand() * N;
-      const cy = rand() * N;
-      const radius = r * (0.85 + 0.3 * rand());
-      const fresh = Math.pow(rand(), 2.2 + radius / 90);
-      const ph = rand() * 6.283;
-      const ext = Math.ceil(radius * 2.6);
-      const depth = radius;
-      for (let dy = -ext; dy <= ext; dy++) {
-        const py = Math.floor(cy) + dy;
-        const row = (((py % N) + N) % N) * N;
-        const sy = py + 0.5 - cy;
-        for (let dx = -ext; dx <= ext; dx++) {
-          const px = Math.floor(cx) + dx;
-          const sx = px + 0.5 - cx;
-          const d = Math.hypot(sx, sy);
-          const ang = Math.atan2(sy, sx);
-          const wob = 1 + 0.09 * Math.sin(2 * ang + ph) + 0.05 * Math.sin(3 * ang + 2.1 * ph) + 0.03 * Math.sin(5 * ang + 3.3 * ph);
-          const rr = d / (radius * wob);
-          if (rr >= 2.6) continue;
-          const i = row + (((px % N) + N) % N);
-          h[i] += shape(rr, fresh) * depth;
-          if (fresh > 0.8) {
-            const v = (fresh - 0.8) * 5 * Math.exp(-((Math.max(rr - 0.9, 0) * 1.8) ** 2));
-            if (v > halo[i]) halo[i] = v;
-          }
-        }
-      }
-    }
-  }
-  return { h, halo };
-}
-
-function level(src: Float32Array, n: number): Float32Array {
-  const m = n >> 1;
-  const out = new Float32Array(m * m * 4);
-  for (let y = 0; y < m; y++)
-    for (let x = 0; x < m; x++)
-      for (let c = 0; c < 4; c++) {
-        const a = (2 * y * n + 2 * x) * 4 + c;
-        out[(y * m + x) * 4 + c] = 0.25 * (src[a] + src[a + 4] + src[a + n * 4] + src[a + n * 4 + 4]);
-      }
-  return out;
+function fill(tex: THREE.DataTexture, levels: Uint16Array[]) {
+  (tex.image as unknown as { data: Uint16Array }).data = levels[0];
+  tex.mipmaps?.forEach((m, k) => ((m as unknown as { data: Uint16Array }).data = levels[k]));
+  tex.needsUpdate = true;
+  ready.forEach((cb) => cb());
 }
 
 export function craterTexture(): THREE.DataTexture {
   if (cached) return cached;
-  const { h, halo } = build();
-  const base = new Float32Array(N * N * 4);
-  for (let y = 0; y < N; y++) {
-    const up = ((y + N - 1) % N) * N;
-    const dn = ((y + 1) % N) * N;
-    for (let x = 0; x < N; x++) {
-      const i = y * N + x;
-      const l = y * N + ((x + N - 1) % N);
-      const r = y * N + ((x + 1) % N);
-      base[i * 4] = (h[r] - h[l]) / 2;
-      base[i * 4 + 1] = (h[dn + x] - h[up + x]) / 2;
-      base[i * 4 + 2] = h[i];
-      base[i * 4 + 3] = halo[i];
-    }
-  }
-  const levels: Float32Array[] = [base];
-  for (let n = N; n > 1; n >>= 1) levels.push(level(levels[levels.length - 1], n));
-  const toHalf = (f: Float32Array) => {
-    const u = new Uint16Array(f.length);
-    for (let i = 0; i < f.length; i++) u[i] = THREE.DataUtils.toHalfFloat(f[i]);
-    return u;
-  };
-  const tex = new THREE.DataTexture(toHalf(base), N, N, THREE.RGBAFormat, THREE.HalfFloatType);
-  tex.mipmaps = levels.map((d, k) => ({ data: toHalf(d), width: N >> k, height: N >> k })) as unknown as typeof tex.mipmaps;
+  // flat until the real tile arrives: all slopes, heights and halos zero
+  const sizes: number[] = [];
+  for (let n = N; n >= 1; n >>= 1) sizes.push(n);
+  const tex = new THREE.DataTexture(new Uint16Array(N * N * 4), N, N, THREE.RGBAFormat, THREE.HalfFloatType);
+  tex.mipmaps = sizes.map((n) => ({ data: new Uint16Array(n * n * 4), width: n, height: n })) as unknown as typeof tex.mipmaps;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -117,6 +38,25 @@ export function craterTexture(): THREE.DataTexture {
   tex.anisotropy = 8;
   tex.needsUpdate = true;
   cached = tex;
+  if (typeof Worker !== "undefined") {
+    try {
+      const worker = new Worker(new URL("./craterWorker.ts", import.meta.url), { type: "module" });
+      worker.onmessage = (e: MessageEvent<Uint16Array[]>) => {
+        worker.terminate();
+        fill(tex, e.data);
+      };
+      const fallback = () => {
+        worker.terminate();
+        fill(tex, buildCraterLevels());
+      };
+      worker.onerror = fallback;
+      worker.onmessageerror = fallback;
+      return tex;
+    } catch {
+      // Some environments expose Worker but block its construction. Build the texture locally there.
+    }
+  }
+  fill(tex, buildCraterLevels());
   return tex;
 }
 
