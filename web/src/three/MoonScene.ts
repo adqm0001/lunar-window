@@ -220,6 +220,7 @@ export class MoonScene {
         uCutA: { value: new THREE.Vector3(1, 0, 0) },
         uCutB: { value: new THREE.Vector3(0, 0, 1) },
         uTime: { value: 0 },
+        uQuality: { value: 1 },
         uLanderPos: { value: new THREE.Vector3() },
         uLanderUp: { value: new THREE.Vector3(0, 1, 0) },
         uLanderR: { value: LANDER_SHADOW_R_KM },
@@ -294,27 +295,16 @@ export class MoonScene {
         map[i * 2 + 1] = y;
       }
     }
-    const idx = new Uint32Array((n - 1) * (n - 1) * 6);
-    let k = 0;
-    for (let r = 0; r < n - 1; r++) {
-      for (let c = 0; c < n - 1; c++) {
-        const a = r * n + c;
-        const b = a + 1;
-        const d = a + n;
-        const e = d + 1;
-        idx[k++] = a;
-        idx[k++] = d;
-        idx[k++] = b;
-        idx[k++] = b;
-        idx[k++] = d;
-        idx[k++] = e;
-      }
-    }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geometry.setAttribute("aMap", new THREE.BufferAttribute(map, 2));
-    geometry.setIndex(new THREE.BufferAttribute(idx, 1));
+    // Normals come from the full grid; Saver then draws every second vertex (a quarter of the triangles).
+    const full = new THREE.BufferAttribute(gridIndex(n, 1), 1);
+    geometry.setIndex(full);
     geometry.computeVertexNormals();
+    geometry.userData.full = full;
+    geometry.userData.coarse = new THREE.BufferAttribute(gridIndex(n, 2), 1);
+    if (this.quality === "saver") geometry.setIndex(geometry.userData.coarse);
     return { geometry };
   }
 
@@ -1704,15 +1694,28 @@ export class MoonScene {
     this.startFlight(p, offset, 2.6, up);
   }
 
+  /**
+   * Graphics modes.
+   * Saver: 70% resolution, no bloom or lens glow, a quarter of the polar mesh's triangles, coarser terrain
+   * tiles, a short shadow march and less close-up detail, 30 fps.
+   * Balanced: native resolution (up to 1.25×), bloom, 60 fps.
+   * High: 1.5× supersampling (up to 2×), finer terrain tiles, a longer and finer shadow march, rocks drawn
+   * further out, no frame cap. All modes still lower the resolution if frames get slow.
+   * No multisampling: the terrain mesh is dense, so most pixels hold a triangle edge and MSAA would run the
+   * (expensive) terrain shader 2-3 times for them. Supersampling costs about the same and smooths shading too.
+   */
   setQuality(q: Quality) {
     this.quality = q;
     const native = window.devicePixelRatio || 1;
-    this.maxDpr = q === "high" ? Math.min(native, 1.75) : q === "balanced" ? Math.min(native, 1.25) : 1;
-    this.dpr = Math.min(this.dpr, this.maxDpr);
-    if (q !== "high") this.dpr = this.maxDpr;
+    this.maxDpr = q === "high" ? Math.min(native * 1.5, 2) : q === "balanced" ? Math.min(native, 1.25) : Math.min(native, 1) * 0.7;
+    this.dpr = this.maxDpr;
     this.renderer.setPixelRatio(this.dpr);
     this.composer.setPixelRatio(this.dpr);
     this.bloom.enabled = q !== "saver" && !this.mapMode;
+    this.lens.enabled = q !== "saver";
+    this.terrainMat.uniforms.uQuality.value = q === "saver" ? 0 : q === "balanced" ? 1 : 2;
+    const g = this.terrainMesh?.geometry;
+    if (g?.userData.full) g.setIndex(q === "saver" ? g.userData.coarse : g.userData.full);
     this.lod?.setQuality(q);
     this.resize();
     this.dirty = true;
@@ -1785,6 +1788,32 @@ export class MoonScene {
     this.renderer.domElement.remove();
     this.labels.domElement.remove();
   }
+}
+
+// Triangle indices for an n×n vertex grid, using every `stride`-th row and column (the last row and column are
+// always included, so the edge of the patch stays where it is).
+function gridIndex(n: number, stride: number): Uint32Array {
+  const ticks: number[] = [];
+  for (let i = 0; i < n - 1; i += stride) ticks.push(i);
+  ticks.push(n - 1);
+  const m = ticks.length - 1;
+  const idx = new Uint32Array(m * m * 6);
+  let k = 0;
+  for (let ri = 0; ri < m; ri++) {
+    for (let ci = 0; ci < m; ci++) {
+      const a = ticks[ri] * n + ticks[ci];
+      const b = ticks[ri] * n + ticks[ci + 1];
+      const d = ticks[ri + 1] * n + ticks[ci];
+      const e = ticks[ri + 1] * n + ticks[ci + 1];
+      idx[k++] = a;
+      idx[k++] = d;
+      idx[k++] = b;
+      idx[k++] = b;
+      idx[k++] = d;
+      idx[k++] = e;
+    }
+  }
+  return idx;
 }
 
 const LENS_SHADER = {

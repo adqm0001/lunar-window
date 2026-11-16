@@ -8,6 +8,13 @@ const ValidationPanel = lazy(() => import("./ValidationPanel"));
 
 export type PanelAppearance = "glass" | "solid";
 
+// What each graphics mode changes (see MoonScene.setQuality)
+const QUALITY_NOTE = {
+  saver: "Lower resolution, simpler shadows and detail, no glow, 30 fps. For laptops on battery.",
+  balanced: "Full resolution and detail, 60 fps.",
+  high: "Supersampled for sharper edges, finer terrain and shadows, rocks further out. Needs a good GPU.",
+} as const;
+
 export default function TopBar({ panelAppearance, setPanelAppearance }: {
   panelAppearance: PanelAppearance;
   setPanelAppearance: (value: PanelAppearance) => void;
@@ -44,11 +51,12 @@ export default function TopBar({ panelAppearance, setPanelAppearance }: {
                 <div className="control-label">Graphics</div>
                 <div className="seg control-options" role="group" aria-label="Graphics quality">
                   {(["saver", "balanced", "high"] as const).map((q) => (
-                    <button key={q} className="control-action" aria-pressed={q === quality} onClick={() => setQuality(q)}>
+                    <button key={q} className="control-action" aria-pressed={q === quality} onClick={() => setQuality(q)} title={QUALITY_NOTE[q]}>
                       {q === "saver" ? "Saver" : q === "balanced" ? "Balanced" : "High"}
                     </button>
                   ))}
                 </div>
+                <div className="f-hint">{QUALITY_NOTE[quality]}</div>
                 <div className="control-label">Panel appearance</div>
                 <div className="seg control-options" role="group" aria-label="Panel appearance">
                   {(["glass", "solid"] as const).map((appearance) => (
